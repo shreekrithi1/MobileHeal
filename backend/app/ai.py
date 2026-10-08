@@ -52,12 +52,16 @@ PROVIDERS: Dict[str, dict] = {
                    "console": "", "needs_base": True, "base_hint": "https://your-gateway/v1"},
 }
 DEFAULT_PROVIDER = "anthropic"
-SECRET_KEYS = {"jira_api_token", "zephyr_token", "github_token", "figma_token"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
+SECRET_KEYS = {"gitlab_token", "confluence_api_token", "jira_api_token", "zephyr_token", "github_token", "figma_token"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
 DEFAULTS = {
     "llm_provider": DEFAULT_PROVIDER, "llm_model": "", "llm_base_url": "",
     "anthropic_model": MODELS[0], "user_name": "You",
     "jira_base_url": "", "jira_email": "", "jira_project_key": "MH", "require_fix_approval": "on",
     "runtime_environment": "development",
+    "git_provider": "local", "github_repo": "", "github_api_url": "https://api.github.com",
+    "gitlab_base_url": "https://gitlab.com", "gitlab_project": "",
+    "confluence_base_url": "", "confluence_email": "", "confluence_space_key": "", "confluence_parent_id": "",
+    "confluence_publish": "off",
     "watchdog_enabled": "on", "watchdog_autofix": "on", "notify_webhook_url": "",
     "android_repo_url": "https://github.com/android/nowinandroid", "android_repo_branch": "",
     "zephyr_base_url": "https://api.zephyrscale.smartbear.com/v2", "zephyr_project_key": "", "zephyr_cycle_key": "",
@@ -82,6 +86,12 @@ class Settings:
             return os.getenv("FIGMA_TOKEN", "")
         if not v and key == "github_token":
             return os.getenv("GITHUB_TOKEN", "")
+        if not v and key == "github_repo":
+            return os.getenv("GITHUB_REPO", "")
+        if not v and key == "gitlab_token":
+            return os.getenv("GITLAB_TOKEN", "")
+        if not v and key == "git_provider" and os.getenv("GITHUB_TOKEN") and os.getenv("GITHUB_REPO"):
+            return "github"
         return v or DEFAULTS.get(key, "")
 
     def set(self, key: str, value: str):
@@ -109,7 +119,9 @@ class Settings:
 
     # changing where a credential is sent invalidates that credential (blocks "point the URL at me" key theft)
     URL_SECRETS = {"jira_base_url": ["jira_api_token"], "jira_email": ["jira_api_token"],
-                   "zephyr_base_url": ["zephyr_token"], "llm_base_url": ["custom_api_key", "azure_api_key"]}
+                   "zephyr_base_url": ["zephyr_token"], "llm_base_url": ["custom_api_key", "azure_api_key"],
+                   "github_api_url": ["github_token"], "gitlab_base_url": ["gitlab_token"],
+                   "confluence_base_url": ["confluence_api_token"], "confluence_email": ["confluence_api_token"]}
 
     @staticmethod
     def _check_url(k: str, v: str):
@@ -123,7 +135,8 @@ class Settings:
 
     def update(self, data: dict, actor: str) -> dict:
         changed = []
-        for k in ("jira_base_url", "zephyr_base_url", "llm_base_url", "notify_webhook_url", "android_repo_url"):
+        for k in ("jira_base_url", "zephyr_base_url", "llm_base_url", "notify_webhook_url", "android_repo_url",
+                  "github_api_url", "gitlab_base_url", "confluence_base_url"):
             if data.get(k):
                 self._check_url(k, str(data[k]).strip())
         for k, secrets in self.URL_SECRETS.items():

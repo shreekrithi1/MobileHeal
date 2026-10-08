@@ -334,6 +334,32 @@ details.adv{border:1px dashed var(--line);border-radius:10px;padding:10px 12px} 
 .lv{width:8px;height:8px;border-radius:50%;display:inline-block}.lv-error{background:var(--red)}.lv-warn{background:var(--amber)}.lv-ok{background:#12B76A}.lv-info{background:#2E90FA}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.tile{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px}.tile b{font-size:26px;display:block}.tile span{color:var(--muted);font-size:12.5px}
 table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child(4),table.lib td:nth-child(5){white-space:nowrap}
+
+/* ---------- settings ---------- */
+.settings{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;margin-top:20px;align-items:start}
+.snav{position:sticky;top:12px;display:grid;gap:2px}
+.snav a{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:9px;color:var(--fg);text-decoration:none;font-size:13.5px;font-weight:500}
+.snav a span{width:18px;text-align:center;color:var(--muted)} .snav a:hover{background:var(--sunk)} .snav a.on{background:var(--rail-on);color:var(--accent)} .snav a.on span{color:var(--accent)}
+.spane h2{font-size:22px;letter-spacing:-.015em;margin:2px 0 4px}.sdesc{color:var(--muted);margin:0 0 18px;max-width:720px}
+.sgroup{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:18px;box-shadow:var(--shadow);overflow:hidden}
+.sgroup-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 18px;font-weight:650;border-bottom:1px solid var(--line)}
+.sgroup-h > span:first-child{display:flex;align-items:center;gap:9px}
+.sgroup-b{padding:14px 18px}.sgroup-b:empty{display:none}
+.sgroup-f{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px;background:var(--sunk);border-top:1px solid var(--line)}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;padding:14px 18px;border-top:1px solid var(--line);align-items:center}
+.sgroup-h + .srow{border-top:0}
+.srow-t{font-weight:550;font-size:13.5px}.srow-h{color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.45}
+.srow-c{display:flex;justify-content:flex-end}.srow-c > .input,.srow-c > select,.srow-c .secret{width:100%}
+.secret{display:flex;gap:8px;align-items:center}.secret .chip{flex:none}
+.brand-ic{width:22px;height:22px;border-radius:6px;display:inline-grid;place-items:center;color:#fff;font-size:10.5px;font-weight:800}
+.brand-ic.gh{background:#24292f}.brand-ic.gl{background:#fc6d26}.brand-ic.jr{background:#0052cc}.brand-ic.cf{background:#1868db}
+.ctiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:22px}
+.ctile{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-decoration:none;color:inherit;transition:box-shadow .15s}
+.ctile:hover{box-shadow:0 4px 14px rgba(16,24,40,.08)}.ctile b{display:block;font-size:13.5px}.ctile span{font-size:12px;color:var(--muted)}.ctile .chev{margin-left:auto;font-size:18px;color:var(--faint)}
+.savebar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:18px;align-items:center;background:var(--fg);color:var(--bg);padding:10px 12px 10px 18px;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.25);z-index:40;font-weight:550}
+.savebar[hidden]{display:none}
+.savebar .btn{color:var(--fg)} .savebar .btn.primary{color:#fff}
+@media (max-width:900px){.settings{grid-template-columns:1fr}.snav{position:static;grid-auto-flow:column;overflow-x:auto}.srow{grid-template-columns:1fr}.srow-c{justify-content:flex-start}}
 </style>
 </head>
 <body>
@@ -470,7 +496,7 @@ async function refreshInfo(){
   const i = state.info, head = i.log[0];
   $("#repo").innerHTML = (i.git ? `<span class="pill"><span class="d"></span>${i.repo ? `main · <code style="padding:0;background:none">${esc(head?head.sha:"")}</code>` : "git ready"}</span>`
      : `<span class="pill" title="Install git to create real branches"><span class="d" style="background:var(--amber)"></span>git not found</span>`) +
-    (i.github ? `<span class="pill">GitHub · ${esc(i.github)}</span>` : "");
+    (i.github ? `<span class="pill">${esc(i.github)}</span>` : "");
 }
 function renderList(){
   document.querySelectorAll(".filters button").forEach(b => b.classList.toggle("on", b.dataset.f===state.filter));
@@ -1475,66 +1501,155 @@ async function dsAdd(){ const values = Object.fromEntries($("#ds-vals").value.sp
 async function dsDelete(id){ await act(async()=>{ await api(`/api/datasets/${id}`,{method:"DELETE"}); renderLibrary(); }); }
 
 /* ---------- settings ---------- */
-async function renderSettings(){
-  await loadSettings(); const s = state.settings;
-  const secret = (k, ph) => `<input id="s-${k}" class="input" type="password" autocomplete="off" placeholder="${s[k].set?esc(s[k].hint)+(s[k].from_env?" (from environment)":""):ph}">`;
+/* =====================================================================
+   Settings — sectioned, enterprise layout
+   ===================================================================== */
+const SET_SECTIONS = [
+  ["general","General","⚙︎"], ["model","Agent model","✦"], ["source","Source control","⎇"], ["jira","Jira","◆"],
+  ["confluence","Confluence","▤"], ["design","Design & testing","◐"], ["android","Android","▣"],
+  ["data","Data & notifications","🔔"], ["delivery","Delivery & approvals","✓"],
+];
+function sChip(ok, okText, offText, warn){ return `<span class="chip ${ok?'s-pr_open':warn?'s-diagnosing':'s-closed'}">${ok?okText:offText}</span>`; }
+function sRow(label, help, control){ return `<div class="srow"><div class="srow-l"><div class="srow-t">${label}</div>${help?`<div class="srow-h">${help}</div>`:""}</div><div class="srow-c">${control}</div></div>`; }
+function sGroup(title, chip, rows, foot){ return `<section class="sgroup"><div class="sgroup-h"><span>${title}</span>${chip||""}</div>${rows}${foot?`<div class="sgroup-f">${foot}</div>`:""}</section>`; }
+function sInput(k, ph, v){ const s=state.settings; return `<input id="s-${k}" class="input" value="${esc(v!==undefined?v:(s[k]??""))}" placeholder="${esc(ph||"")}" autocomplete="off">`; }
+function sSecret(k, ph){ const s=state.settings, x=s[k]||{}; return `<div class="secret"><input id="s-${k}" class="input" type="password" autocomplete="new-password" placeholder="${x.set?esc(x.hint)+(x.from_env?" · from environment":" · saved"):esc(ph||"")}">${x.set?`<span class="chip s-pr_open" title="A value is stored on the server">Saved</span>`:""}</div>`; }
+function sSelect(k, opts){ const v=state.settings[k]; return `<select id="s-${k}" class="input">${opts.map(([val,lab])=>`<option value="${esc(val)}" ${v===val?"selected":""}>${esc(lab)}</option>`).join("")}</select>`; }
+function sToggle(k, on){ return `<label class="switch"><input type="checkbox" id="s-${k}" data-onoff="1" ${on?"checked":""}><span></span></label>`; }
+function sTest(name, label){ return `<button class="btn sm" onclick="testConn('${name}')">${label||"Test connection"}</button><span class="hint" id="t-${name}" style="margin:0"></span>`; }
+
+async function renderSettings(h){
+  await loadSettings(); const s = state.settings, cx = s.connectors || {github:{},gitlab:{},confluence:{}};
+  const sec = ((h||"").split("/")[1]) || state.setSec || "general"; state.setSec = sec;
+  const ai = s.ai || {};
+  const tiles = [
+    ["model","Agent model", ai.available, ai.available ? esc(ai.model) : "Parser mode"],
+    ["source","GitHub", cx.github.configured, cx.github.configured ? esc(cx.github.repo) : "Not connected"],
+    ["source","GitLab", cx.gitlab.configured, cx.gitlab.configured ? esc(cx.gitlab.repo) : "Not connected"],
+    ["jira","Jira", s.jira_mode==="live", s.jira_mode==="live" ? "Project "+esc(s.jira_project_key) : "Mock tracker"],
+    ["confluence","Confluence", cx.confluence.configured, cx.confluence.configured ? "Space "+esc(cx.confluence.space) : "Not connected"],
+    ["design","Figma", !!(s.figma_token||{}).set, (s.figma_token||{}).set ? "Token saved" : "Embed only"],
+    ["design","Zephyr Scale", !!s.zephyr_configured, s.zephyr_configured ? "Project "+esc(s.zephyr_project_key) : "Not connected"],
+    ["android","Android repo", null, "…"],
+  ];
+  const P = {
+  general: `<h2>General</h2><p class="sdesc">Your workspace and how every connected system is doing.</p>
+    <div class="ctiles">${tiles.map(([sec,n,ok,t])=>`<a class="ctile" href="#settings/${sec}"><span class="dot8 ${ok===null?"":ok?"ok":"warn"}" ${n==="Android repo"?'id="tile-repo-dot"':""}></span><div><b>${n}</b><span ${n==="Android repo"?'id="tile-repo"':""}>${t}</span></div><span class="chev">›</span></a>`).join("")}</div>
+    ${sGroup("Workspace","",
+      sRow("Your name","Shown in activity, pull requests, Jira comments and the audit log.", sInput("user_name","Jane Appleseed")) +
+      sRow("Environment","Tags crashes from this backend as development, staging or production.", sSelect("runtime_environment",[["development","Development"],["staging","Staging"],["production","Production"]])))}
+    ${sGroup("Security","",
+      sRow("Secrets","Stored only in the local database (git-ignored); never returned to the browser. Changing a service URL clears its token.", `<span class="hint" style="margin:0">🔒 Encrypted at rest by your OS disk encryption</span>`) +
+      sRow("Network","Listens on localhost; LAN access requires <code>MOBILEHEAL_API_TOKEN</code>.", `<span class="hint" style="margin:0">See README → Security</span>`))}`,
+
+  model: `<h2>Agent model</h2><p class="sdesc">The LLM that powers requirements, test cases, the Android developer agent and crash fixes. Without a key the agent runs in <b>parser mode</b>.</p>
+    ${sGroup("Provider", sChip(ai.available, "Live · "+esc(ai.provider_name||""), "Parser mode", true), `<div id="llm-card" class="sgroup-b"></div>`)}`,
+
+  source: `<h2>Source control</h2><p class="sdesc">Every change and fix is committed to a local git branch. Mirror pull requests to GitHub or GitLab so reviewers work where they already are.</p>
+    ${sGroup("Pull request destination","",
+      sRow("Open pull requests on","Local keeps branches in this repository only.", sSelect("git_provider",[["local","Local git only"],["github","GitHub"],["gitlab","GitLab"]])) +
+      sRow("Local repository","", `<span class="hint" style="margin:0">${state.info&&state.info.git?(state.info.repo?"✓ "+esc(state.info.root||"")+" · branch main":"Ready — initialised on first PR"):"git not installed"}</span>`))}
+    ${sGroup(`<span class="brand-ic gh">GH</span> GitHub`, sChip(cx.github.configured,"Configured","Not connected"),
+      sRow("Repository","owner/name", sInput("github_repo","acme/mobile-app")) +
+      sRow("Personal access token","Fine-grained token with <i>Contents</i> and <i>Pull requests</i>: read & write.", sSecret("github_token","github_pat_…")) +
+      sRow("API URL","Change only for GitHub Enterprise Server.", sInput("github_api_url","https://api.github.com")), sTest("github"))}
+    ${sGroup(`<span class="brand-ic gl">GL</span> GitLab`, sChip(cx.gitlab.configured,"Configured","Not connected"),
+      sRow("Instance URL","gitlab.com or your self-managed instance.", sInput("gitlab_base_url","https://gitlab.com")) +
+      sRow("Project","group/project path (or numeric ID).", sInput("gitlab_project","acme/mobile-app")) +
+      sRow("Access token","Project or personal token with <i>api</i> and <i>write_repository</i> scopes.", sSecret("gitlab_token","glpat-…")), sTest("gitlab"))}`,
+
+  jira: `<h2>Jira</h2><p class="sdesc">Every crash files a Bug that follows the workflow: Defect → Analyze → Approve → Auto-fix → PR → Test → Merge. Without credentials, defects go to the built-in mock tracker.</p>
+    ${sGroup(`<span class="brand-ic jr">J</span> Jira Cloud`, sChip(s.jira_mode==="live","Connected","Mock tracker"),
+      sRow("Site URL","", sInput("jira_base_url","https://your-team.atlassian.net")) +
+      sRow("Account email","The Atlassian account that owns the token.", sInput("jira_email","you@company.com")) +
+      sRow("API token",`Create at id.atlassian.com → Security → API tokens.`, sSecret("jira_api_token","Atlassian API token")) +
+      sRow("Project key","Where Bugs are created.", sInput("jira_project_key","MH")), sTest("jira"))}`,
+
+  confluence: `<h2>Confluence</h2><p class="sdesc">Publish the change record or incident postmortem as a Confluence page whenever a pull request is merged.</p>
+    ${sGroup(`<span class="brand-ic cf">C</span> Confluence Cloud`, sChip(cx.confluence.configured,"Connected","Not connected"),
+      sRow("Site URL","Usually the same as Jira.", sInput("confluence_base_url","https://your-team.atlassian.net")) +
+      sRow("Account email","", sInput("confluence_email","you@company.com")) +
+      sRow("API token","Atlassian API token (can be the same as Jira's).", sSecret("confluence_api_token","Atlassian API token")) +
+      sRow("Space key","Pages are created in this space.", sInput("confluence_space_key","MOBILE")) +
+      sRow("Parent page ID","Optional — nest pages under this page.", sInput("confluence_parent_id","123456")) +
+      sRow("Publish on merge","Create or update one page per change / incident.", sToggle("confluence_publish", s.confluence_publish==="on")), sTest("confluence"))}`,
+
+  design: `<h2>Design &amp; testing</h2><p class="sdesc">Bring designs into UX review and keep test cases in your test-management tool.</p>
+    ${sGroup(`<span class="figlogo"></span> Figma`, sChip(!!(s.figma_token||{}).set,"Token saved","Embed only"),
+      sRow("Personal access token","Figma → Settings → Security. Read-only file content. Without it, links are still embedded.", sSecret("figma_token","figd_…")))}
+    ${sGroup("Zephyr Scale", sChip(!!s.zephyr_configured,"Connected","Not connected"),
+      sRow("API base URL","", sInput("zephyr_base_url","https://api.zephyrscale.smartbear.com/v2")) +
+      sRow("API token","", sSecret("zephyr_token","Zephyr Scale API access token")) +
+      sRow("Project key","", sInput("zephyr_project_key","MH")) +
+      sRow("Test cycle key","Results are exported to this cycle.", sInput("zephyr_cycle_key","MH-R1")), sTest("zephyr"))}`,
+
+  android: `<h2>Android</h2><p class="sdesc">The codebase the Android developer agent learns conventions from, and the skill it follows when writing Kotlin.</p>
+    ${sGroup("Reference repository", `<span id="repo-chip"></span>`,
+      sRow("Git URL","https only. Public repositories need no token.", sInput("android_repo_url","https://github.com/org/app")) +
+      sRow("Branch","Blank = default branch.", sInput("android_repo_branch","main")) +
+      `<div id="repo-out" class="sgroup-b"></div>`,
+      `<button class="btn sm primary" onclick="syncRepo()">Save &amp; sync</button><button class="btn sm" onclick="$('#s-android_repo_url').value='https://github.com/android/nowinandroid';$('#s-android_repo_branch').value='';markDirty()">Use sample</button><button class="btn sm" id="repo-browse" onclick="browseRepo('')" disabled>Browse files</button>`)}
+    ${sGroup("Developer agent skill", `<span id="ag-status" class="hint" style="margin:0"></span>`,
+      `<div class="sgroup-b"><textarea id="ag-skill" class="input code" style="min-height:260px" aria-label="Agent skill"></textarea></div>`,
+      `<button class="btn sm" onclick="saveSkill()">Save skill</button><span id="ag-tc" class="hint" style="margin:0"></span>`)}`,
+
+  data: `<h2>Data &amp; notifications</h2><p class="sdesc">DataWatchdog checks backend data against the requirements and tells users and the team what to fix.</p>
+    ${sGroup("🐶 DataWatchdog", sChip(s.watchdog_enabled!=="off","Watching","Off"),
+      sRow("Watch data integrity","Missing mandatory fields, invalid emails/phones/dates and duplicates, every agent cycle.", sToggle("watchdog_enabled", s.watchdog_enabled!=="off")) +
+      sRow("Auto-fix formatting","Trim stray spaces and lower-case emails automatically.", sToggle("watchdog_autofix", s.watchdog_autofix!=="off")))}
+    ${sGroup("Team notifications","",
+      sRow("Webhook URL","Slack, Microsoft Teams or Google Chat incoming webhook. Notifications always appear under 🔔.", sInput("notify_webhook_url","https://hooks.slack.com/services/…")))}`,
+
+  delivery: `<h2>Delivery &amp; approvals</h2><p class="sdesc">Guard-rails for what agents may do on their own.</p>
+    ${sGroup("Policies","",
+      sRow("Merge policy","When a change request may be merged.", sSelect("merge_policy",[["tests_required","All test cases must pass (override needs justification)"],["review_only","Tests are advisory — reviewer signs off"]])) +
+      sRow("Approve automatic fixes","A human approves each crash fix after the agent's analysis.", sToggle("require_fix_approval", s.require_fix_approval!=="off")) +
+      sRow("Agent merges","Agents never merge on their own — every PR needs a person.", `<span class="hint" style="margin:0">🔒 Always on</span>`))}`,
+  };
   $("#view").innerHTML = `
-   <div class="hdr"><div><h1>Settings</h1><div class="meta">Secrets are stored on this server and never sent back to the browser.</div></div>
-     <button class="btn primary" onclick="saveSettings()">Save settings</button></div>
-   <div class="grid g2" style="margin-top:18px">
-    <div class="card"><div class="card-h"><span>✦ Agent model (LLM)</span><span class="chip ${s.ai.available?'s-pr_open':'s-diagnosing'}">${s.ai.available?'Live · '+esc(s.ai.provider_name):'Parser mode'}</span></div><div class="card-b" id="llm-card"></div></div>
-    <div class="card" style="grid-column:1/-1"><div class="card-h"><span>📦 Android repository</span><span id="repo-chip"></span></div><div class="card-b">
-      <div class="hint" style="margin:0 0 8px">The codebase the Android Developer Agent works against. MobileHeal clones it, maps its modules and stack, and the agent follows its conventions. Public repos need no token.</div>
-      <div class="grid g2" style="gap:10px;grid-template-columns:3fr 1fr"><div class="field"><label>Git URL (https)</label><input id="s-android_repo_url" class="input" value="${esc(s.android_repo_url)}" placeholder="https://github.com/org/app"></div>
-        <div class="field"><label>Branch <span class="hint">(blank = default)</span></label><input id="s-android_repo_branch" class="input" value="${esc(s.android_repo_branch)}" placeholder="main"></div></div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" onclick="syncRepo()">Save &amp; sync</button>
-        <button class="btn" onclick="$('#s-android_repo_url').value='https://github.com/android/nowinandroid';$('#s-android_repo_branch').value=''">Use sample (Now in Android)</button>
-        <button class="btn" id="repo-browse" onclick="browseRepo('')" disabled>Browse files</button></div>
-      <div id="repo-out" style="margin-top:12px"></div></div></div>
-    <div class="card"><div class="card-h"><span><span class="jira"><i></i></span> Jira defects</span><span class="chip ${s.jira_mode==='live'?'s-pr_open':'s-closed'}">${s.jira_mode==='live'?'Connected':'Mock mode'}</span></div><div class="card-b">
-      <div class="hint" style="margin:0 0 8px">Every crash (development or production) files a Bug and is kept in sync as it moves through Analyze → Approve → Auto-fix → PR → Test → Merge. Without credentials, defects go to a built-in mock tracker.</div>
-      <div class="field"><label>Jira site URL</label><input id="s-jira_base_url" class="input" value="${esc(s.jira_base_url)}" placeholder="https://your-team.atlassian.net"></div>
-      <div class="grid g2" style="gap:10px"><div class="field"><label>Account email</label><input id="s-jira_email" class="input" value="${esc(s.jira_email)}" placeholder="you@company.com"></div>
-        <div class="field"><label>Project key</label><input id="s-jira_project_key" class="input" value="${esc(s.jira_project_key)}" placeholder="MH"></div></div>
-      <div class="field"><label>API token</label>${secret("jira_api_token","Atlassian API token")}<div class="hint">id.atlassian.com → Security → API tokens.</div></div>
-      <div class="grid g2" style="gap:10px"><div class="field"><label>Automatic fix approval</label><select id="s-require_fix_approval" class="input">
-          <option value="on" ${s.require_fix_approval!=="off"?"selected":""}>Required — a human approves after analysis</option>
-          <option value="off" ${s.require_fix_approval==="off"?"selected":""}>Not required — fix runs right after analysis</option></select></div>
-        <div class="field"><label>This backend runs in</label><select id="s-runtime_environment" class="input">
-          ${["development","staging","production"].map(e=>`<option ${s.runtime_environment===e?"selected":""}>${e}</option>`).join("")}</select></div></div>
-      <button class="btn" onclick="testJira()">Save &amp; test</button> <span id="s-j-out" class="hint"></span></div></div>
-    <div class="card"><div class="card-h"><span>🐶 DataWatchdog</span><span class="chip ${s.watchdog_enabled!=='off'?'s-pr_open':'s-closed'}">${s.watchdog_enabled!=='off'?'Watching':'Off'}</span></div><div class="card-b">
-      <div class="hint" style="margin:0 0 8px">Checks backend data against the requirements on every agent tick: missing mandatory fields, invalid emails/phones/dates, duplicates. Notifies affected users in the app and the team here.</div>
-      <div class="grid g2" style="gap:10px"><div class="field"><label>Watchdog</label><select id="s-watchdog_enabled" class="input"><option value="on" ${s.watchdog_enabled!=="off"?"selected":""}>On</option><option value="off" ${s.watchdog_enabled==="off"?"selected":""}>Off</option></select></div>
-        <div class="field"><label>Auto-fix formatting</label><select id="s-watchdog_autofix" class="input"><option value="on" ${s.watchdog_autofix!=="off"?"selected":""}>On — trim spaces, lower-case emails</option><option value="off" ${s.watchdog_autofix==="off"?"selected":""}>Off — report only</option></select></div></div>
-      <div class="field"><label>Team webhook <span class="hint">(optional — Slack/Teams/Google Chat incoming webhook)</span></label><input id="s-notify_webhook_url" class="input" value="${esc(s.notify_webhook_url)}" placeholder="https://hooks.slack.com/services/…"></div></div></div>
-    <div class="card"><div class="card-h"><span>Zephyr Scale</span><span class="chip ${s.zephyr_configured?'s-pr_open':'s-closed'}">${s.zephyr_configured?'Connected':'Not configured'}</span></div><div class="card-b">
-      <div class="field"><label>API base URL</label><input id="s-zephyr_base_url" class="input" value="${esc(s.zephyr_base_url)}"></div>
-      <div class="field"><label>API token</label>${secret("zephyr_token","Zephyr Scale API access token")}</div>
-      <div class="grid g2" style="gap:10px"><div class="field"><label>Project key</label><input id="s-zephyr_project_key" class="input" value="${esc(s.zephyr_project_key)}" placeholder="e.g. MH"></div>
-        <div class="field"><label>Test cycle key <span class="hint">(to export results)</span></label><input id="s-zephyr_cycle_key" class="input" value="${esc(s.zephyr_cycle_key)}" placeholder="e.g. MH-R1"></div></div>
-      <button class="btn" onclick="testZephyr()">Test connection</button> <span id="s-z-out" class="hint"></span></div></div>
-    <div class="card"><div class="card-h"><span><span class="figlogo"></span> Figma</span><span class="chip ${s.figma_token.set?'s-pr_open':'s-closed'}">${s.figma_token.set?'Connected':'Embed only'}</span></div><div class="card-b">
-      <div class="field"><label>Personal access token</label>${secret("figma_token","figd_…")}
-        <div class="hint">Figma → Settings → Security → Personal access tokens (scope: file content, read-only). Without it, Figma links are still embedded for visual review.</div></div></div></div>
-    <div class="card" style="grid-column:1/-1"><div class="card-h"><span>🤖 Android Developer Agent</span><span id="ag-status" class="hint" style="margin:0"></span></div><div class="card-b">
-      <div class="hint" style="margin:0 0 8px">The agent follows this skill when it turns requirements into Kotlin (Clean Architecture, Hilt, Compose, UDF, tests). Edit it to change how it codes.</div>
-      <textarea id="ag-skill" class="input code" style="min-height:220px"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;align-items:center"><button class="btn" onclick="saveSkill()">Save skill</button><span id="ag-tc" class="hint" style="margin:0"></span></div></div></div>
-    <div class="card"><div class="card-h">Delivery policy</div><div class="card-b">
-      <div class="field"><label>Your name <span class="hint">(shown in activity, PRs and the audit log)</span></label><input id="s-user_name" class="input" value="${esc(s.user_name)}"></div>
-      <div class="field"><label>Merge policy</label><select id="s-merge_policy" class="input">
-        <option value="tests_required" ${s.merge_policy==="tests_required"?"selected":""}>All test cases must pass (override needs written justification)</option>
-        <option value="review_only" ${s.merge_policy==="review_only"?"selected":""}>Tests are advisory — reviewer signs off</option></select></div></div></div>
-    <div class="card"><div class="card-h">Source control</div><div class="card-b" style="font-size:13.5px;display:grid;gap:6px">
-      <div>Git: ${state.info&&state.info.git?(state.info.repo?"local repository ✓":"ready (initialised on first PR)"):"not installed"}</div>
-      <div>GitHub mirroring: ${s.github?esc(s.github):'off — start the backend with <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> to enable'}</div></div></div>
-   </div>`;
+    <div class="hdr"><div><h1>Settings</h1><div class="meta">Workspace, AI model and enterprise integrations.</div></div></div>
+    <div class="settings">
+      <nav class="snav" aria-label="Settings sections">${SET_SECTIONS.map(([k,n,i])=>`<a href="#settings/${k}" class="${k===sec?"on":""}" ${k===sec?'aria-current="page"':""}><span aria-hidden="true">${i}</span>${n}</a>`).join("")}</nav>
+      <div class="spane" id="settings-form">${SET_SECTIONS.map(([k])=>`<div class="ssec" data-sec="${k}" ${k===sec?"":"hidden"}>${P[k]}</div>`).join("")}</div>
+    </div>
+    <div class="savebar" id="savebar" hidden><span>You have unsaved changes</span><span style="display:flex;gap:8px"><button class="btn sm" onclick="renderSettings('settings/'+state.setSec)">Discard</button><button class="btn sm primary" onclick="saveSettings()">Save changes</button></span></div>`;
+  $("#settings-form").addEventListener("input", e => { if (!e.target.closest("#ag-skill")) markDirty(); });
+  $("#settings-form").addEventListener("change", e => { if (!e.target.closest("#ag-skill")) markDirty(); });
+  if (typeof setCrumbs === "function") setCrumbs([["Settings","#settings"],[ (SET_SECTIONS.find(x=>x[0]===sec)||[0,"General"])[1], "#settings/"+sec]]);
   renderLLM(s.llm_provider || s.default_provider); loadAgentSettings(); loadRepo();
 }
+function markDirty(){ const b=$("#savebar"); if (b) b.hidden=false; }
+function collectSettings(){
+  const body = $("#s-llm_provider") ? llmBody() : {};
+  document.querySelectorAll('#settings-form [id^="s-"]').forEach(el => {
+    if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) || el.id.startsWith("s-llm")) return;
+    const k = el.id.slice(2);
+    if (el.dataset.onoff) body[k] = el.checked ? "on" : "off";
+    else if (el.type === "password") { if (el.value.trim()) body[k] = el.value.trim(); }
+    else body[k] = el.value;
+  });
+  return body;
+}
+async function saveSettings(quiet=false){
+  const body = collectSettings();
+  if (quiet) { await api("/api/settings",{method:"PUT",body}); await loadSettings(); return; }
+  await act(async()=>{ await api("/api/settings",{method:"PUT",body}); await renderSettings("settings/"+state.setSec); refreshInfo(); }, "Settings saved");
+}
+async function testConn(name){
+  const o = $("#t-"+name); o.innerHTML = `<span class="spinner"></span> Testing…`;
+  try { await saveSettings(true); const r = await api("/api/settings/test/"+name,{method:"POST"});
+    const d = r.repo ? `${esc(r.repo)} · default branch ${esc(r.default_branch||"?")}${r.can_push===false?" · ⚠ token can't push":""}`
+      : r.space ? `Space “${esc(r.space)}”` : r.user ? `${esc(r.user)} · ${esc(r.project||"")}` : r.sample ? `e.g. “${esc(r.sample)}”` : r.model ? `${esc(r.model)} in ${r.ms} ms` : "OK";
+    o.innerHTML = `<span class="ok">✓ Connected — ${d}</span>`; $("#savebar").hidden = true;
+  } catch(e){ o.innerHTML = `<span class="err">✕ ${esc(e.message)}</span>`; }
+}
+async function testJira(){ return testConn("jira"); }
+
 async function loadRepo(){
   let r; try { r = await api("/api/repo"); } catch(e){ return; }
   const chip = {synced:["s-pr_open","Synced"], syncing:["s-coding","Syncing…"], error:["s-failed","Error"], not_synced:["s-closed","Not synced"]}[r.status||"not_synced"] || ["s-closed", r.status];
+  if ($("#tile-repo")) { $("#tile-repo").textContent = r.status==="synced" ? (r.url||"").split("/").pop()+" @ "+(r.sha||"").slice(0,7) : r.status==="syncing" ? "Syncing…" : "Not synced";
+    $("#tile-repo-dot").className = "dot8 " + (r.status==="synced" ? "ok" : "warn"); }
   if (!$("#repo-chip")) return;
   $("#repo-chip").innerHTML = `<span class="chip ${chip[0]}">${chip[1]}</span>`;
   $("#repo-browse").disabled = !r.cloned;
@@ -1605,15 +1720,6 @@ async function loadAgentSettings(){
   } catch(e){}
 }
 async function saveSkill(){ await act(async()=>{ await api("/api/settings/android-skill",{method:"PUT",body:{text:$("#ag-skill").value}}); }, "Skill saved — the agent uses it on the next change"); }
-async function saveSettings(quiet=false){
-  const body = llmBody(); ["watchdog_enabled","watchdog_autofix","notify_webhook_url","jira_base_url","jira_email","jira_project_key","require_fix_approval","runtime_environment","android_repo_url","android_repo_branch","zephyr_base_url","zephyr_project_key","zephyr_cycle_key","user_name","merge_policy"].forEach(k=>body[k]=$("#s-"+k).value);
-  ["jira_api_token","zephyr_token","figma_token"].forEach(k=>{ const v=$("#s-"+k).value.trim(); if(v) body[k]=v; });
-  if (quiet) { await api("/api/settings",{method:"PUT",body}); await loadSettings(); return; }
-  await act(async()=>{ await api("/api/settings",{method:"PUT",body}); await renderSettings(); }, "Settings saved");
-}
-async function testJira(){ const o=$("#s-j-out"); o.innerHTML=`<span class="spinner"></span>`;
-  try { await saveSettings(true); const r = await api("/api/settings/test-jira",{method:"POST"}); o.innerHTML=`<span class="ok">✓ ${esc(r.user)} · project ${esc(r.project)}</span>`; }
-  catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } }
 function llmBody(){
   const pid = $("#s-llm_provider").value, b = {llm_provider: pid, llm_model: $("#s-llm_model").value.trim()};
   if ($("#s-llm_base_url")) b.llm_base_url = $("#s-llm_base_url").value.trim();
@@ -1908,7 +2014,7 @@ async function renderHome(){
     ["Agent model", !!ai.available, ai.available ? `${esc(ai.provider_name||"")} · ${esc(ai.model)}` : "parser mode — add an API key", "#settings"],
     ["Jira", jira.mode==="live", jira.mode==="live" ? `project ${esc(jira.project)}` : "mock tracker", "#settings"],
     ["Android repository", repo.status==="synced", repo.status==="synced" ? `${esc((repo.url||"").split("/").pop())} @ ${esc((repo.sha||"").slice(0,7))}` : "not synced", "#settings"],
-    ["Source control", !!(state.info&&state.info.git), state.info&&state.info.github ? `GitHub · ${esc(state.info.github)}` : state.info&&state.info.git ? "local git" : "git not found", "#settings"],
+    ["Source control", !!(state.info&&state.info.git), state.info&&state.info.github ? esc(state.info.github) : state.info&&state.info.git ? "local git" : "git not found", "#settings"],
   ];
   const summary = att.length ? `${att.length} item${att.length>1?"s":""} need${att.length>1?"":"s"} your attention.` : "Everything is running smoothly — nothing needs you right now.";
   $("#view").innerHTML = `

@@ -154,6 +154,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MobileHeal", lifespan=lifespan)
 from .security import SecurityMiddleware  # noqa: E402
+from . import connectors  # noqa: E402
 app.add_middleware(SecurityMiddleware)
 
 
@@ -482,7 +483,7 @@ def _settings():
 def settings_get():
     wf = app.state.wf
     return {**_settings().public(), "ai": wf.ai.status(), "zephyr_configured": tc.Zephyr(_settings()).configured,
-            "github": wf.git.github_repo if wf.git.github_enabled else None}
+            "github": wf.info()["github"], "connectors": connectors.status(_settings())}
 
 
 @app.put("/api/settings")
@@ -492,6 +493,28 @@ def settings_put(body: SettingsIn):
     except ValueError as e:
         raise HTTPException(400, str(e))
     return settings_get()
+
+
+@app.post("/api/settings/test/{name}")
+def settings_test(name: str):
+    from .jira import Jira
+    s = _settings()
+    try:
+        if name == "github":
+            return connectors.GitHub(s).test()
+        if name == "gitlab":
+            return connectors.GitLab(s).test()
+        if name == "confluence":
+            return connectors.Confluence(s).test()
+        if name == "jira":
+            return Jira(s).ping()
+        if name == "ai":
+            return app.state.wf.ai.ping()
+        if name == "zephyr":
+            return settings_test_zephyr()
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    raise HTTPException(404, "Unknown connector")
 
 
 @app.post("/api/settings/test-ai")

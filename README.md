@@ -79,7 +79,9 @@ database `backend/mobileheal.db`, which is git-ignored, and are never sent back 
 | **Zephyr Scale** token | import CSV/JSON exports | import/export via API |
 | **Figma** token | Figma links are embedded | colours, labels and fields extracted from frames |
 | **Team webhook** (Slack/Teams/Chat) | notifications in the 🔔 bell | also posted to the channel |
-| **GitHub** — start with `GITHUB_TOKEN` + `GITHUB_REPO` env vars | local git branches | PRs mirrored to GitHub |
+| **GitHub** (repo + token, Enterprise API URL optional) | local git branches | PRs mirrored to GitHub and merged there |
+| **GitLab** (instance URL, project, token) | local git branches | merge requests mirrored to GitLab and merged there |
+| **Confluence** (site, email, API token, space) | docs stay in `docs/` | change records / postmortems published as pages on merge |
 
 ## 6. A 5-minute tour
 

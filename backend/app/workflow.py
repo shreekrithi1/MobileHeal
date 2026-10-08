@@ -578,13 +578,45 @@ class Workflow:
             except GitError as e:
                 pr["git_error"] = str(e)
                 log.warning("git unavailable for PR: %s", e)
-        if pr["git"] and self.git.github_enabled:
+        prov = self.remote_provider()
+        if pr["git"] and prov:
+            from . import connectors as cx
             try:
-                gh = self.git.github_open_pr(branch, pr["base"], f"{cr['key']}: {cr['title']}", cr["pr_body"])
-                pr["github_url"], pr["github_number"] = gh["url"], gh["number"]
+                cx.push_branch(self.root, prov.remote(), branch)
+                r = prov.open_pr(branch, pr["base"], f"{cr['key']}: {cr['title']}", cr["pr_body"]) if isinstance(prov, cx.GitHub) \
+                    else prov.open_mr(branch, pr["base"], f"{cr['key']}: {cr['title']}", cr["pr_body"])
+                pr["provider"] = "github" if isinstance(prov, cx.GitHub) else "gitlab"
+                pr["github_url"], pr["github_number"] = r["url"], r["number"]
             except Exception as e:
                 pr["github_error"] = str(e)
         return pr
+
+    def _remote_label(self):
+        p = self.remote_provider()
+        if p is None:
+            return None
+        return ("GitHub · " + p.repo) if p.__class__.__name__ == "GitHub" else ("GitLab · " + p.project)
+
+    def remote_provider(self):
+        """Configured remote (GitHub or GitLab) that PRs are mirrored to, or None for local-only."""
+        from . import connectors as cx
+        kind = self.settings.get("git_provider") or "local"
+        p = cx.GitHub(self.settings) if kind == "github" else cx.GitLab(self.settings) if kind == "gitlab" else None
+        return p if p is not None and p.configured else None
+
+    def _publish_docs(self, cr: dict):
+        from . import connectors as cx
+        cf = cx.Confluence(self.settings)
+        if not (cf.configured and cf.publish_on_merge):
+            return
+        doc = next((f for f in cr.get("files") or [] if f["path"].startswith(("docs/changes/", "docs/incidents/"))), None)
+        md = doc["content"] if doc else f"# {cr['key']}: {cr['title']}\n\n{cr.get('description', '')}"
+        try:
+            page = cf.publish(f"{cr['key']}: {cr['title']}", md)
+            cr["confluence"] = page
+            self._event(cr, "MobileHeal", "docs", f"published to Confluence ({cf.space})")
+        except Exception as e:
+            cr["confluence"] = {"error": str(e)[:300]}
 
     # ------------------------------------------------------------ 5. test
     def mark_tested(self, cid: int, notes: str, passed: bool = True, override: bool = False) -> dict:
@@ -648,13 +680,19 @@ class Workflow:
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(content, encoding="utf-8")
         if cr["pr"].get("github_number"):
+            from . import connectors as cx
+            prov = self.remote_provider()
             try:
-                await asyncio.to_thread(self.git.github_merge, cr["pr"]["github_number"])
+                if prov is None:
+                    raise RuntimeError("remote not configured any more")
+                await asyncio.to_thread(prov.merge, cr["pr"]["github_number"])
             except Exception as e:
-                cr["pr"]["github_error"] = f"merge on GitHub failed: {e}"
+                name = "GitLab" if cr["pr"].get("provider") == "gitlab" else "GitHub"
+                cr["pr"]["github_error"] = f"merge on {name} failed: {e}"
         cr["status"], cr["stage"] = "merged", 6
         cr["merged_commit"] = merged[:10] if merged else None
         cr["merged_at"] = now()
+        await asyncio.to_thread(self._publish_docs, cr)
         self._event(cr, self.user, "merge", f"merged PR #{cr['pr']['number']}" + (f" as {cr['merged_commit']}" if merged else ""))
         if incident:
             self._hot_reload(cr)
@@ -700,5 +738,5 @@ class Workflow:
 
     def info(self) -> dict:
         return {"stages": STAGES, "git": self.git.available, "repo": self.git.is_repo(), "root": str(self.root),
-                "github": self.git.github_repo if self.git.github_enabled else None,
+                "github": self._remote_label(),
                 "log": self.git.log(6), "live_spec": self._read(codegen.SPEC_PATH) or ""}
