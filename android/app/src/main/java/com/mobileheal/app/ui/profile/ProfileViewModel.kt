@@ -75,7 +75,7 @@ class ProfileViewModel @Inject constructor(
                 when (event) {
                     is LiveEvent.HealRequired -> {
                         updateContent { c -> c.copy(fields = c.fields + event.missing.filterNot(c.fields::containsKey).associateWith { "" }, missing = event.missing) }
-                        alerts.show(event.missing)
+                        alerts.show(event.missing, event.reasons)
                     }
                     LiveEvent.HealResolved -> {
                         updateContent { it.copy(missing = emptyList()) }
@@ -109,7 +109,7 @@ class ProfileViewModel @Inject constructor(
         val content = _state.value as? ProfileUiState.Content ?: return
         if (content.saving) return
         // Normalise the phone number for the support dialler before sending
-        val phone = content.fields["phone_number"]!!.trim()  // MH-DEMO-BUG
+        val phone = content.fields["phone_number"].orEmpty().trim()  // MH-DEMO-BUG
         val fields = content.fields + ("phone_number" to phone)
         updateContent { it.copy(saving = true, message = null) }
         viewModelScope.launch {
