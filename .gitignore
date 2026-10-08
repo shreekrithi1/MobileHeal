@@ -10,3 +10,5 @@ android/local.properties
 backend/requirements.tmp
 *.db-shm
 *.db-wal
+.mh_update*.tgz
+backend/app/.codegen_fixed.py

@@ -24,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashReporter.install(this, BuildConfig.BASE_URL)  // production crashes → auto-heal
         if (Build.VERSION.SDK_INT >= 33) {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
                 .launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -41,6 +42,10 @@ fun Map<String, String>.color(key: String, default: Color): Color =
 fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
     val s by vm.state.collectAsStateWithLifecycle()
     val ui = s.ui
+    if (s.showSuccess) {                       // navigation rule: ui.after_save = success_screen
+        SuccessScreen(ui) { vm.backToProfile() }
+        return
+    }
     Scaffold(containerColor = ui.color("background_color", MaterialTheme.colorScheme.background), topBar = {
         TopAppBar(title = { Text(ui["app_title"] ?: "MobileHeal") },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = ui.color("background_color", MaterialTheme.colorScheme.surface)),
@@ -92,6 +97,34 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
                 Text(if (s.saving) "Saving…" else (ui["button_label"] ?: "Save"))
             }
             s.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SuccessScreen(ui: Map<String, String>, onBack: () -> Unit) {
+    val accent = ui.color("button_color", MaterialTheme.colorScheme.primary)
+    Scaffold(containerColor = ui.color("background_color", MaterialTheme.colorScheme.background), topBar = {
+        TopAppBar(title = { Text(ui["app_title"] ?: "MobileHeal") })
+    }) { pad ->
+        Column(
+            Modifier.padding(pad).padding(24.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+        ) {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = accent, modifier = Modifier.size(72.dp)) {
+                Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    Text("✓", color = ui.color("button_text_color", Color.White), style = MaterialTheme.typography.headlineMedium)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(ui["success_title"] ?: "Profile saved", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(ui["success_message"] ?: "Thanks — your details are up to date.",
+                style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(24.dp))
+            OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Back to profile", color = accent) }
         }
     }
 }

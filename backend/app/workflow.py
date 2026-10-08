@@ -14,13 +14,17 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
 from . import codegen
+from .ai import AI, Settings
 from .gitops import GitError, GitRepo
+from . import testcases as tc
+from . import figma as fg
 from .rules import RuleParseError, parse_spec
 
 log = logging.getLogger("mobileheal.workflow")
@@ -54,22 +58,35 @@ class Workflow:
         self.agent = agent
         self.root = Path(project_root)
         self.git = GitRepo(self.root)
+        self.settings = Settings(db)
+        self.ai = AI(self.settings)
+        self.tests = tc.TestStore(db)
         self.backend = self.root / "backend"
         with db._lock:
             db._conn.execute("""CREATE TABLE IF NOT EXISTS change_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL)""")
         self._tasks: set = set()
+        self.healer = None  # set by main
 
     # ------------------------------------------------------------ storage
     def _save(self, cr: dict) -> dict:
         cr["updated_at"] = now()
         with self.db._lock:
+            if cr.get("id") and cr.get("kind") == "incident":
+                # background heal threads hold a snapshot — never lose occurrence counts from new crashes
+                row = self.db._conn.execute("SELECT data FROM change_requests WHERE id=?", (cr["id"],)).fetchone()
+                if row:
+                    cur = json.loads(row["data"])
+                    if cur.get("occurrences", 0) > cr.get("occurrences", 0):
+                        cr["occurrences"] = cur["occurrences"]
+                        cr["last_seen"] = cur.get("last_seen", cr.get("last_seen"))
+                        cr["samples"] = cur.get("samples", cr.get("samples"))
             if cr.get("id"):
                 self.db._conn.execute("UPDATE change_requests SET data=? WHERE id=?", (json.dumps(cr), cr["id"]))
             else:
                 cur = self.db._conn.execute("INSERT INTO change_requests(data) VALUES ('{}')")
                 cr["id"] = cur.lastrowid
-                cr["key"] = f"CR-{cr['id']}"
+                cr["key"] = f"{'INC' if cr.get('kind') == 'incident' else 'CR'}-{cr['id']}"
                 self.db._conn.execute("UPDATE change_requests SET data=? WHERE id=?", (json.dumps(cr), cr["id"]))
         return cr
 
@@ -87,13 +104,21 @@ class Workflow:
         for r in rows:
             cr = json.loads(r["data"])
             out.append({k: cr.get(k) for k in ("id", "key", "title", "status", "author", "created_at",
-                                                "updated_at", "tested", "stage")} |
+                                                "updated_at", "tested", "stage", "occurrences", "last_seen")} |
+                       {"kind": cr.get("kind", "change")} |
                        {"pr": cr.get("pr"), "stats": cr.get("stats"), "checks_summary": cr.get("checks_summary")})
         return out
 
-    @staticmethod
-    def _event(cr: dict, actor: str, kind: str, text: str):
+    @property
+    def user(self) -> str:
+        return self.settings.get("user_name") or "You"
+
+    def _event(self, cr: dict, actor: str, kind: str, text: str):
         cr.setdefault("timeline", []).append({"ts": now(), "actor": actor, "kind": kind, "text": text})
+        try:
+            self.settings.audit(actor, f"{cr.get('kind', 'change')}.{kind}", cr.get("key", ""), text)
+        except Exception:
+            log.exception("audit failed")
 
     # ------------------------------------------------------------ helpers
     def _read(self, rel: str) -> Optional[str]:
@@ -113,7 +138,9 @@ class Workflow:
         return codegen.design_brief(base, new, self.db.list_profiles())
 
     # ------------------------------------------------------------ 1. requirements → 2. design
-    def create(self, title: str, description: str, spec_text: str, author: str = "You") -> dict:
+    def create(self, title: str, description: str, spec_text: str, author: Optional[str] = None,
+               requirement_text: str = "", translation: Optional[dict] = None) -> dict:
+        author = author or self.user
         title = title.strip()
         if not title:
             raise WorkflowError("Title is required")
@@ -126,7 +153,8 @@ class Workflow:
             raise WorkflowError("No changes — edit the rules before submitting")
         cr = {"title": title, "description": description.strip(), "author": author, "spec_text": spec_text,
               "base_spec": base, "status": "design_review", "stage": 1, "revision": 1, "tested": False,
-              "created_at": now(), "timeline": []}
+              "created_at": now(), "timeline": [], "requirement_text": (requirement_text or "").strip(),
+              "translation": translation}
         cr = self._save(cr)
         self._event(cr, author, "requirements", "submitted requirements")
         cr["design"] = self._design(base, spec_text)
@@ -134,7 +162,8 @@ class Workflow:
                     f"generated UX design ({len(cr['design']['changes'])} change(s)) — awaiting approval")
         return self._save(cr)
 
-    def revise(self, cid: int, spec_text: str, description: Optional[str], title: Optional[str]) -> dict:
+    def revise(self, cid: int, spec_text: str, description: Optional[str], title: Optional[str],
+               requirement_text: Optional[str] = None, translation: Optional[dict] = None, note: Optional[str] = None) -> dict:
         cr = self.get(cid)
         if cr["status"] in ("merged", "closed"):
             raise WorkflowError("This change request is closed", 409)
@@ -148,8 +177,14 @@ class Workflow:
             cr["description"] = description.strip()
         if title:
             cr["title"] = title.strip()
+        if requirement_text is not None:
+            cr["requirement_text"] = requirement_text.strip()
+        if translation is not None:
+            cr["translation"] = translation
         cr["design"] = self._design(cr["base_spec"], spec_text)
-        self._event(cr, "You", "requirements", f"revised requirements (rev {cr['revision']})")
+        if cr.get("figma") and cr["figma"].get("suggestions"):
+            cr["figma"]["suggestions"] = fg.compare(cr["figma"]["suggestions"], spec_text)
+        self._event(cr, self.user, "requirements", note or f"revised requirements (rev {cr['revision']})")
         self._event(cr, "MobileHeal", "design", "regenerated UX design — awaiting approval")
         return self._save(cr)
 
@@ -160,12 +195,15 @@ class Workflow:
             raise WorkflowError("Design is not awaiting approval", 409)
         cr["status"], cr["stage"] = "coding", 2
         cr["coding_log"] = []
-        self._event(cr, "You", "approve", "approved the UX design")
+        self._event(cr, self.user, "approve", "approved the UX design")
         self._save(cr)
-        t = asyncio.get_running_loop().create_task(asyncio.to_thread(self._run_coding, cid))
-        self._tasks.add(t)
-        t.add_done_callback(self._tasks.discard)
+        self.spawn(self._run_coding, cid)
         return cr
+
+    def spawn(self, fn, *args):
+        t = threading.Thread(target=fn, args=args, daemon=True)
+        t.start()
+        return t
 
     def _log(self, cr: dict, step: str, status: str, detail: str = ""):
         cr.setdefault("coding_log", []).append({"ts": now(), "step": step, "status": status, "detail": detail})
@@ -184,6 +222,20 @@ class Workflow:
                            "deletions": sum(f["deletions"] for f in files)}
             self._log(cr, "Generate code", "done",
                       f"{len(files)} files · +{cr['stats']['additions']} −{cr['stats']['deletions']}")
+
+            self._log(cr, "Generate test cases", "running")
+            note = self._generate_tests(cr)
+            cases = self.tests.list(cr["id"])
+            md_path = f"docs/tests/{cr['key']}.md"
+            md = tc.to_markdown(cr["key"], cases)
+            old = self._read(md_path)
+            if md != old:
+                d = codegen.unified_diff(md_path, old, md)
+                files.append({"path": md_path, "status": "added" if old is None else "modified", "content": md,
+                              "diff": d, **codegen.diff_stats(d)})
+            cr["stats"] = {"files": len(files), "additions": sum(f["additions"] for f in files),
+                           "deletions": sum(f["deletions"] for f in files)}
+            self._log(cr, "Generate test cases", "done", note)
 
             self._log(cr, "Run checks", "running")
             cr["checks"] = self._run_checks(cr, files)
@@ -211,6 +263,73 @@ class Workflow:
             self._log(cr, "Error", "fail", str(e))
             self._event(cr, "MobileHeal", "error", f"coding failed: {e}")
             self._save(cr)
+
+    def _generate_tests(self, cr: dict) -> str:
+        self.tests.delete_generated(cr["id"])
+        cases, note = None, ""
+        if self.ai.available:
+            try:
+                cases = tc.generate_with_ai(self.ai, cr)
+                note = f"{len(cases)} cases written by Claude"
+            except Exception as e:
+                log.warning("AI test generation failed: %s", e)
+                note = f"Claude unavailable ({str(e)[:80]}); "
+        if not cases:
+            cases = tc.generate_from_design(cr)
+            note += f"{len(cases)} cases generated from the design"
+        for c in cases:
+            self.tests.add(c, cr["id"])
+        imported = sum(1 for c in self.tests.list(cr["id"]) if c.get("source") not in ("generated", "claude"))
+        return note + (f" · {imported} imported/attached" if imported else "")
+
+    def regenerate_tests(self, cid: int) -> List[dict]:
+        cr = self.get(cid)
+        if not cr.get("design") or cr.get("kind") == "incident":
+            raise WorkflowError("Test cases are generated after the design is approved", 409)
+        note = self._generate_tests(cr)
+        self._event(cr, self.user, "tests", f"regenerated test cases ({note})")
+        self._save(cr)
+        return self.tests.list(cid)
+
+    # ------------------------------------------------------------ Figma
+    def attach_figma(self, cid: int, url: str) -> dict:
+        cr = self.get(cid)
+        if not url.strip():
+            cr.pop("figma", None)
+            self._event(cr, self.user, "design", "removed the Figma design")
+            return self._save(cr)
+        try:
+            f = fg.fetch(url, self.settings.get("figma_token"), self.ai)
+        except fg.FigmaError as e:
+            try:
+                f = {**fg.parse_url(url), "error": str(e), "suggestions": [], "fetched": False}
+            except fg.FigmaError:
+                raise WorkflowError(str(e))
+        f["suggestions"] = fg.compare(f.get("suggestions") or [], cr["spec_text"])
+        f["attached_at"] = now()
+        cr["figma"] = f
+        diff = sum(1 for x in f["suggestions"] if not x["match"] and x["valid"])
+        self._event(cr, self.user, "design", f"attached Figma design “{f.get('frame') or f.get('name') or f.get('slug') or 'link'}”"
+                    + (f" — {diff} difference(s) from the rules" if f.get("fetched") else ""))
+        return self._save(cr)
+
+    def apply_figma(self, cid: int, keys: List[str]) -> dict:
+        cr = self.get(cid)
+        if cr["status"] != "design_review":
+            raise WorkflowError("Figma rules can be applied while the design is in review", 409)
+        f = cr.get("figma") or {}
+        try:
+            text = fg.apply(f.get("suggestions") or [], cr["spec_text"], keys)
+        except RuleParseError as e:
+            raise WorkflowError(f"Those Figma values don't make valid rules: {e}")
+        return self.revise(cid, text, None, None, note=f"applied {len(keys)} rule(s) from the Figma design")
+
+    def test_gate(self, cr: dict) -> dict:
+        s = self.tests.summary(cr["id"])
+        s["policy"] = self.settings.get("merge_policy")
+        s["required"] = s["policy"] == "tests_required" and cr.get("kind") != "incident"
+        s["satisfied"] = (not s["required"]) or s["all_passed"] or bool(cr.get("override"))
+        return s
 
     def _run_checks(self, cr: dict, files: List[dict]) -> List[dict]:
         checks = []
@@ -244,10 +363,11 @@ class Workflow:
                                  f"{i['healed']} alert(s) clear", "ms": 1})
         return checks
 
-    def _pytest(self, args: List[str], env: dict) -> subprocess.CompletedProcess:
+    def _pytest(self, args: List[str], env: dict, cwd: Optional[Path] = None) -> subprocess.CompletedProcess:
+        cwd = Path(cwd or self.backend)
         return subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
-                              cwd=self.backend, capture_output=True, text=True, timeout=120,
-                              env={**os.environ, "PYTHONPATH": str(self.backend), "MOBILEHEAL_IN_CHECK": "1", **env})
+                              cwd=cwd, capture_output=True, text=True, timeout=120,
+                              env={**os.environ, "PYTHONPATH": str(cwd), "MOBILEHEAL_IN_CHECK": "1", **env})
 
     @staticmethod
     def _summ(out: str) -> str:
@@ -304,16 +424,17 @@ class Workflow:
                   "_Generated by the MobileHeal workflow._"]
         return "\n".join(lines)
 
-    def _open_pr(self, cr: dict, files: List[dict]) -> dict:
-        branch = cr.get("pr", {}).get("branch") or f"mobileheal/{cr['key'].lower()}-{slug(cr['title'])}"
+    def _open_pr(self, cr: dict, files: List[dict], body: Optional[str] = None, prefix: str = "mobileheal") -> dict:
+        branch = (cr.get("pr") or {}).get("branch") or f"{prefix}/{cr['key'].lower()}-{slug(cr['title'])}"
         pr = {"number": cr["id"], "branch": branch, "base": "main", "commit": None,
               "git": False, "github_url": None, "github_error": None}
-        cr["pr_body"] = self._pr_body(cr)
+        cr["pr_body"] = body or self._pr_body(cr)
         if self.git.available:
             try:
                 pr["base"] = self.git.ensure_repo()
                 cr["base_commit"] = self.git.head()
-                msg = f"{cr['key']}: {cr['title']}\n\n{cr['description']}\n\nGenerated by MobileHeal workflow."
+                msg = (f"{cr['key']}: {'fix ' if cr.get('kind') == 'incident' else ''}{cr['title']}\n\n"
+                       f"{cr['description']}\n\nGenerated by MobileHeal workflow.")
                 pr["commit"] = self.git.commit_branch(branch, {f["path"]: f["content"] for f in files}, msg)[:10]
                 pr["git"] = True
             except GitError as e:
@@ -328,15 +449,25 @@ class Workflow:
         return pr
 
     # ------------------------------------------------------------ 5. test
-    def mark_tested(self, cid: int, notes: str, passed: bool = True) -> dict:
+    def mark_tested(self, cid: int, notes: str, passed: bool = True, override: bool = False) -> dict:
         cr = self.get(cid)
         if cr["status"] != "pr_open":
             raise WorkflowError("Only open PRs can be tested", 409)
+        if passed and cr.get("kind") != "incident":
+            gate = self.test_gate(cr)
+            if gate["required"] and not gate["all_passed"]:
+                if not override or len(notes.strip()) < 10:
+                    raise WorkflowError(f"{gate['passed']}/{gate['total']} test cases passed. Run the remaining tests, "
+                                        "or override with a written justification (10+ characters).", 409)
+                cr["override"] = {"by": self.user, "reason": notes.strip(), "ts": now(),
+                                  "summary": {k: gate[k] for k in ("total", "passed", "failed", "not_run")}}
+                self._event(cr, self.user, "override", f"overrode the test gate: “{notes.strip()}”")
         cr["tested"] = bool(passed)
         cr["test_notes"] = notes.strip()
         cr["stage"] = 5 if passed else 4
-        self._event(cr, "You", "test" if passed else "test_failed",
-                    ("verified in preview" if passed else "reported a problem in preview") +
+        verb = ("approved the fix" if passed else "requested changes") if cr.get("kind") == "incident" else \
+               ("verified in preview" if passed else "reported a problem in preview")
+        self._event(cr, self.user, "test" if passed else "test_failed", verb +
                     (f": “{notes.strip()}”" if notes.strip() else ""))
         return self._save(cr)
 
@@ -347,14 +478,24 @@ class Workflow:
             raise WorkflowError("PR is not open", 409)
         if cr.get("checks_summary", {}).get("fail"):
             raise WorkflowError("Checks are failing — revise the requirements first", 409)
+        incident = cr.get("kind") == "incident"
+        if not incident and not self.test_gate(cr)["satisfied"]:
+            raise WorkflowError("Test cases haven't all passed — run them in the Test tab or record an override", 409)
         if not cr.get("tested"):
-            raise WorkflowError("Test the change in the preview and mark it as tested before merging", 409)
-        current = self._read(codegen.SPEC_PATH) or ""
-        if current != cr["base_spec"]:
-            raise WorkflowError("The live rules changed since this PR was created — click “Update branch” first", 409)
+            raise WorkflowError(("Review and approve the fix" if incident else
+                                 "Test the change in the preview and mark it as tested") + " before merging", 409)
+        if incident:
+            for path, content in (cr.get("base_files") or {}).items():
+                if self._read(path) != content:
+                    raise WorkflowError(f"{path} changed since this fix was prepared — click “Update branch” first", 409)
+        else:
+            current = self._read(codegen.SPEC_PATH) or ""
+            if current != cr["base_spec"]:
+                raise WorkflowError("The live rules changed since this PR was created — click “Update branch” first", 409)
 
         files = {f["path"]: f["content"] for f in cr["files"]}
-        await self.agent.apply_text(cr["spec_text"])  # atomic write + live push to phones
+        if not incident:
+            await self.agent.apply_text(cr["spec_text"])  # atomic write + live push to phones
         merged = None
         if cr["pr"].get("git"):
             try:
@@ -376,21 +517,37 @@ class Workflow:
         cr["status"], cr["stage"] = "merged", 6
         cr["merged_commit"] = merged[:10] if merged else None
         cr["merged_at"] = now()
-        self._event(cr, "You", "merge", f"merged PR #{cr['pr']['number']}" + (f" as {cr['merged_commit']}" if merged else ""))
-        self._event(cr, "MobileHeal", "deploy", "rules applied live and pushed to connected phones")
+        self._event(cr, self.user, "merge", f"merged PR #{cr['pr']['number']}" + (f" as {cr['merged_commit']}" if merged else ""))
+        if incident:
+            self._hot_reload(cr)
+            self._event(cr, "MobileHeal", "deploy", "fix deployed — patched module reloaded in the running server")
+        else:
+            self._event(cr, "MobileHeal", "deploy", "rules applied live and pushed to connected phones")
         return self._save(cr)
+
+    def _hot_reload(self, cr: dict):
+        import importlib
+        mod = (cr.get("incident") or {}).get("module")
+        if mod and mod in sys.modules:
+            try:
+                importlib.reload(sys.modules[mod])
+                cr["deployed"] = "hot-reloaded"
+            except Exception as e:
+                cr["deployed"] = f"restart required ({e})"
 
     def update_branch(self, cid: int) -> dict:
         """Rebase: regenerate the PR against the current live rules."""
         cr = self.get(cid)
         if cr["status"] != "pr_open":
             raise WorkflowError("PR is not open", 409)
+        if cr.get("kind") == "incident":
+            self._event(cr, self.user, "rebase", "re-ran auto-heal against the latest code")
+            self._save(cr)
+            return self.healer.start(cid, actor=self.user)
         cr["status"], cr["stage"], cr["tested"] = "coding", 2, False
-        self._event(cr, "You", "rebase", "updated branch with latest rules")
+        self._event(cr, self.user, "rebase", "updated branch with latest rules")
         self._save(cr)
-        t = asyncio.get_running_loop().create_task(asyncio.to_thread(self._run_coding, cid))
-        self._tasks.add(t)
-        t.add_done_callback(self._tasks.discard)
+        self.spawn(self._run_coding, cid)
         return cr
 
     def close(self, cid: int) -> dict:
@@ -400,7 +557,7 @@ class Workflow:
         cr["status"] = "closed"
         if cr.get("pr", {}).get("git"):
             self.git.delete_branch(cr["pr"]["branch"])
-        self._event(cr, "You", "close", "closed the change request")
+        self._event(cr, self.user, "close", "closed " + ("the incident" if cr.get("kind") == "incident" else "the change request"))
         return self._save(cr)
 
     def info(self) -> dict:

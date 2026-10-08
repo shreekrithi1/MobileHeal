@@ -125,6 +125,11 @@ class GitRepo:
         self.git("commit", "-q", "-m", message, "--allow-empty")
         return self.head()
 
+    def commit_paths(self, paths: List[str], message: str) -> str:
+        self.git("add", "-A", "--", *paths)
+        self.git("commit", "-q", "-m", message, "--allow-empty")
+        return self.head()
+
     def delete_branch(self, branch: str) -> None:
         self.git("branch", "-D", branch, check=False)
 

@@ -33,7 +33,11 @@ UI_KEYS = {
     "banner_text_color": "Alert banner text colour (#RRGGBB)",
     "background_color": "Screen background (#RRGGBB)",
     "banner_message": "Custom alert banner message",
+    "after_save": "What happens after a successful save: stay | success_screen",
+    "success_title": "Heading on the success screen",
+    "success_message": "Message on the success screen",
 }
+AFTER_SAVE = {"stay", "success_screen"}
 
 
 class RuleParseError(ValueError):
@@ -74,6 +78,8 @@ def parse_spec(text: str) -> Spec:
                 raise RuleParseError(f"line {lineno}: invalid ui key {key!r}")
             if not value:
                 raise RuleParseError(f"line {lineno}: ui.{key} has no value")
+            if key == "after_save" and value not in AFTER_SAVE:
+                raise RuleParseError(f"line {lineno}: ui.after_save must be one of {', '.join(sorted(AFTER_SAVE))}, got {value!r}")
             if key.endswith("_color") and not COLOR_RE.match(value):
                 raise RuleParseError(f"line {lineno}: ui.{key} must be a hex colour like #1E88E5, got {value!r}")
             if key in spec.ui:

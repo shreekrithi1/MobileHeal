@@ -74,7 +74,12 @@ def test_end_to_end_change_request(wf):
     assert "phone_number" not in (root / "backend/requirements.txt").read_text()
 
     assert c.post(f"/api/cr/{cr['id']}/merge").status_code == 409  # not tested yet
-    c.post(f"/api/cr/{cr['id']}/test", json={"notes": "Looks good", "passed": True})
+    tests = c.get(f"/api/cr/{cr['id']}/tests").json()
+    assert tests["gate"]["total"] >= 2 and tests["gate"]["required"]
+    assert any(f["path"] == "docs/tests/CR-1.md" for f in cr["files"])
+    for case in tests["cases"]:
+        c.post(f"/api/tests/{case['id']}/runs", json={"cr_id": cr["id"], "status": "passed", "steps": []})
+    assert c.get(f"/api/cr/{cr['id']}").json()["tested"] is True
     r = c.post(f"/api/cr/{cr['id']}/merge")
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "merged"

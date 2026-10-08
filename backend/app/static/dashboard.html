@@ -64,6 +64,22 @@
     <button id="runNow">Run check now</button>
   </section>
 
+  <section class="card" id="health">
+    <div class="row"><h3 style="margin:0">Production health</h3>
+      <label style="display:flex;gap:8px;align-items:center" class="muted">Auto-heal
+        <span class="switch"><input type="checkbox" id="ahToggle"><span class="slider"></span></span></label></div>
+    <p class="muted" style="margin:6px 0 12px">Unhandled errors in the backend and crashes in the Android app become incidents. Auto-heal reproduces each crash, fixes it, and opens a PR for your review.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div style="background:var(--bg);border-radius:10px;padding:10px 12px"><div style="font-size:22px;font-weight:700" id="hOpen">–</div><div class="muted" style="font-size:13px">open incidents</div></div>
+      <div style="background:var(--bg);border-radius:10px;padding:10px 12px"><div style="font-size:22px;font-weight:700" id="hReview">–</div><div class="muted" style="font-size:13px">fixes awaiting review</div></div>
+      <div style="background:var(--bg);border-radius:10px;padding:10px 12px"><div style="font-size:22px;font-weight:700" id="hFixed">–</div><div class="muted" style="font-size:13px">resolved</div></div>
+    </div>
+    <div id="hRecent" style="margin-top:12px"></div>
+    <div class="row" style="margin-top:12px">
+      <span class="muted" style="font-size:13px">Try it: create a user without a name and open their greeting. It crashes in the real code path.</span>
+      <span style="display:flex;gap:8px"><a href="/workflow#demo"><button>Guided crash demo →</button></a><button id="chaos">Simulate production crash</button></span></div>
+  </section>
+
   <section class="card">
     <div class="row"><h3 style="margin:0">Business rules editor</h3>
       <span><button id="reload">Revert</button> <button id="save" class="btn-primary">Save &amp; apply</button></span></div>
@@ -176,6 +192,27 @@ $("save").addEventListener("click", async () => {
   $("save").disabled = false; refresh();
 });
 $("reload").addEventListener("click", loadSpec);
+async function refreshHealth(){
+  try {
+    const h = await fetch("/api/healer").then(r=>r.json());
+    $("hOpen").textContent = h.open; $("hReview").textContent = h.awaiting_review; $("hFixed").textContent = h.resolved;
+    $("ahToggle").checked = h.autoheal;
+    const lbl = {detected:"Detected", diagnosing:"Auto-healing…", needs_engineer:"Needs engineer", pr_open:"Fix PR ready for review", merged:"Fixed", closed:"Closed"};
+    $("hRecent").innerHTML = h.recent.map(i => `<div class="row" style="border-top:1px solid var(--line);padding:8px 0;font-size:14px">
+      <span><b>${esc(i.key)}</b> ${esc(i.title)} ${i.occurrences>1?`<span class="muted">×${i.occurrences}</span>`:""}</span>
+      <a href="/workflow#cr/${i.id}" style="color:inherit">${lbl[i.status]||i.status} →</a></div>`).join("");
+  } catch(e) {}
+}
+$("ahToggle").addEventListener("change", async e => { await fetch("/api/healer/autoheal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({on:e.target.checked})}); refreshHealth(); });
+$("chaos").addEventListener("click", async () => {
+  const b = $("chaos"); b.disabled = true; b.textContent = "Crashing…";
+  const p = await fetch("/api/profiles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"no-name-"+Date.now()%10000+"@example.com"})}).then(r=>r.json());
+  const r = await fetch(`/api/profiles/${p.id}/greeting`); const body = await r.json();
+  b.textContent = r.status===500 ? `HTTP 500 → ${body.incident} opened` : `HTTP ${r.status} (no crash — already fixed?)`;
+  setTimeout(()=>{ b.disabled=false; b.textContent="Simulate production crash"; }, 4000);
+  refreshHealth(); refresh();
+});
+refreshHealth(); setInterval(refreshHealth, 3000);
 loadSpec(); refresh(); setInterval(refresh, 3000);
 </script>
 </body>

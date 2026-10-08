@@ -93,7 +93,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
 .card-h{padding:12px 16px;border-bottom:1px solid var(--line);font-weight:650;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .card-b{padding:16px}
-.grid{display:grid;gap:16px} .g2{grid-template-columns:1fr 1fr} .g-side{grid-template-columns:1fr 330px}
+.grid{display:grid;gap:16px} .grid>*{min-width:0} .g2{grid-template-columns:1fr 1fr} .g-side{grid-template-columns:1fr 330px}
 @media (max-width:980px){.g2,.g-side{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}.app.list-open .side{display:flex}}
 .label{font-size:12px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
 .field{margin-bottom:14px} .field label{display:block;font-weight:600;margin-bottom:5px}
@@ -189,20 +189,91 @@ pre.out{background:var(--sunk);border-radius:8px;padding:10px;font-size:11.5px;o
 .skel{background:linear-gradient(90deg,var(--sunk),var(--line),var(--sunk));background-size:200% 100%;animation:sh 1.2s infinite;border-radius:6px;height:12px;margin:8px 0}
 @keyframes sh{to{background-position:-200% 0}}
 .hide{display:none!important}
+.s-detected,.s-needs_engineer{background:var(--red-soft);color:var(--red)} .s-diagnosing{background:var(--amber-soft);color:var(--amber)}
+.filters{display:flex;gap:4px;padding:8px 8px 0} .filters button{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:4px 0;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.filters button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.inc-ico{width:18px;height:18px;border-radius:5px;display:inline-grid;place-items:center;font-size:11px;background:var(--red-soft);color:var(--red);font-weight:800}
+.inc-ico.ok{background:var(--green-soft);color:var(--green)}
+.errbox{background:var(--red-soft);border:1px solid color-mix(in srgb,var(--red) 25%,transparent);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:13px;color:var(--red);word-break:break-word}
+pre.trace{background:#0f141a;color:#d7dde5;border-radius:10px;padding:12px;font-size:11.5px;line-height:1.55;overflow:auto;max-height:340px;margin:0}
+pre.trace .hl{background:rgba(248,113,113,.18);display:block;color:#fecaca}
+.attempt{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.attempt-h{display:flex;gap:10px;align-items:center;padding:9px 12px;background:var(--sunk);font-weight:600;font-size:13px}
+.attempt-b{padding:10px 12px;font-size:13px}
+.codeline{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:5px;margin:3px 0;white-space:pre-wrap;word-break:break-all}
+.codeline.r{background:var(--del)} .codeline.a{background:var(--add)}
+.ah{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.switch{position:relative;width:34px;height:20px;display:inline-block} .switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;background:var(--line);border-radius:20px;cursor:pointer;transition:.2s}
+.switch span:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+span{background:#1a7f37} .switch input:checked+span:before{transform:translateX(14px)}
 .mobile-list{display:none} @media (max-width:980px){.mobile-list{display:inline-flex}}
 @media (max-width:640px){.repo{display:none}.top{gap:10px;padding:0 12px}.wrap{padding:16px 16px 48px}.nav a{padding:6px 7px}.mobile-list{margin-left:auto}.hdr h1{font-size:19px}.step{font-size:11px}}
+
+/* ---- modal, runner, tests ---- */
+.modal{position:fixed;inset:0;background:rgba(15,20,26,.45);z-index:30;display:grid;place-items:center;padding:20px;animation:fade .15s}
+@keyframes fade{from{opacity:0}}
+.modal-card{background:var(--panel);border-radius:14px;box-shadow:0 24px 60px -12px rgba(0,0,0,.35);width:min(560px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;border:1px solid var(--line)}
+.modal-card.wide{width:min(860px,100%)} .modal-card.xwide{width:min(1280px,100%)}
+.modal-h{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:650;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modal-b{padding:16px 18px;overflow:auto} .modal-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:var(--sunk);border-radius:0 0 14px 14px;flex-wrap:wrap}
+.runner{display:grid;grid-template-columns:minmax(0,1.1fr) 300px minmax(0,.8fr);gap:16px;padding:16px 18px;overflow:auto;min-height:0}
+@media (max-width:1100px){.runner{grid-template-columns:1fr}}
+.rsteps{display:flex;flex-direction:column;gap:6px;min-width:0}
+.rstep{display:flex;gap:10px;padding:9px 10px;border-radius:9px;border:1px solid transparent}
+.rstep.cur{border-color:var(--accent);background:var(--accent-soft)}
+.rdot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none;background:var(--sunk);color:var(--muted)}
+.st-pass .rdot{background:#1a7f37;color:#fff} .st-fail .rdot{background:#d92d20;color:#fff} .st-blocked .rdot{background:#d97706;color:#fff}
+.st-running .rdot{border:2px solid var(--accent);border-top-color:transparent;animation:spin .9s linear infinite;background:none}
+.ra{font-weight:550;font-size:13.5px} .re{font-size:12.5px;color:var(--muted);margin-top:2px} .ract{font-size:12.5px;margin-top:4px;color:var(--green)} .ract.err{color:var(--red)}
+.ask{margin-top:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
+.rside{min-width:0;display:flex;flex-direction:column;gap:8px}
+.tdata{display:grid;gap:6px} .tdata label{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)} .tdata .input{padding:5px 8px;font-size:13px}
+.rlog{font-family:var(--mono);font-size:11.5px;background:var(--sunk);border-radius:8px;padding:8px;height:180px;overflow:auto;line-height:1.6} .rlog .err{color:var(--red)}
+.row2{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.progress{height:8px;background:var(--sunk);border-radius:8px;margin-top:12px;overflow:hidden;display:flex} .progress i{background:#1a7f37;height:100%} .progress i.f{background:#d92d20}
+.prio-High{background:var(--red-soft);color:var(--red)} .prio-Medium{background:var(--amber-soft);color:var(--amber)} .prio-Low{background:var(--sunk);color:var(--muted)}
+.steps-ro{margin:6px 0 0;padding-left:20px;font-size:13px} .steps-ro li{margin:3px 0}
+.steprow{display:grid;grid-template-columns:20px 1.3fr 1fr 22px auto;gap:6px;align-items:center;margin-bottom:6px} .steprow .n{color:var(--faint);font-size:12px;text-align:right}
+@media (max-width:700px){.steprow{grid-template-columns:20px 1fr}}
+.pickrow{display:flex;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer}
+textarea.big{font-size:15px;line-height:1.55}
+.figgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px} @media (max-width:900px){.figgrid{grid-template-columns:1fr}}
+.figframe{background:var(--sunk);border-radius:10px;overflow:hidden;min-height:300px;display:grid;place-items:center}
+.figframe img{max-width:100%;max-height:560px;display:block} .figframe iframe{width:100%;height:520px;border:0}
+.figt tr.m td{color:var(--muted)} .figlogo{display:inline-block;width:10px;height:15px;border-radius:5px;background:linear-gradient(180deg,#f24e1e 0 33%,#a259ff 33% 66%,#1abcfe 66%);vertical-align:-2px;margin-right:4px}
+.scen{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px} @media (max-width:1000px){.scen{grid-template-columns:1fr}}
+.scard.on{outline:2px solid var(--accent)}
+.dsteps{list-style:none;margin:0;padding:0} .ds{display:flex;gap:12px;padding:0 0 14px;position:relative}
+.ds:not(:last-child)::before{content:"";position:absolute;left:12px;top:26px;bottom:0;width:2px;background:var(--line)} .ds.done:not(:last-child)::before{background:#1a7f37}
+.dsn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;background:var(--sunk);color:var(--faint);z-index:1}
+.ds.done .dsn{background:#1a7f37;color:#fff} .ds.fail .dsn{background:#d92d20;color:#fff} .ds.wait .dsn{background:#d97706;color:#fff}
+.ds.running .dsn{border:2px solid var(--accent);border-top-color:transparent;animation:spin .9s linear infinite;background:var(--panel)}
+.ds.pending{opacity:.55} .dst{display:flex;justify-content:space-between;gap:10px}
+.stat2{flex-wrap:wrap} .stat2 div{min-width:120px}
+.demo-ctl{display:flex;gap:10px;align-items:center}
+.pbody.success{align-items:center;justify-content:center;text-align:center;gap:12px}
+.succ-ico{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:700}
+.succ-t{font-weight:700;font-size:18px} .succ-m{font-size:13px;color:#5f6b7a;max-width:200px} .pbody.success .pbtn{width:100%}
+details.adv{border:1px dashed var(--line);border-radius:10px;padding:10px 12px} details.adv summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(--muted)}
+.trbox{background:var(--sunk);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.dsrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-1px}
+.app.full{grid-template-columns:1fr} .app.full .side{display:none}
+table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child(4),table.lib td:nth-child(5){white-space:nowrap}
 </style>
 </head>
 <body>
 <header class="top">
   <div class="brand"><div class="logo">✚</div>MobileHeal</div>
-  <nav class="nav"><a href="/">Dashboard</a><a href="/workflow" class="on">Delivery</a></nav>
+  <nav class="nav" id="nav"><a href="/">Dashboard</a><a href="/workflow#" data-r="delivery">Delivery</a><a href="/workflow#tests" data-r="tests">Test library</a><a href="/workflow#demo" data-r="demo">Crash demo</a><a href="/workflow#settings" data-r="settings">Settings</a><a href="/workflow#audit" data-r="audit">Audit</a></nav>
   <button class="btn sm mobile-list" onclick="document.querySelector('.app').classList.toggle('list-open')">Requests</button>
   <div class="repo" id="repo"></div>
 </header>
 <div class="app">
   <aside class="side">
     <div class="side-h"><button class="btn primary block" onclick="go('new')">＋ New change request</button></div>
+    <div class="filters"><button data-f="all" class="on">All</button><button data-f="change">Changes</button><button data-f="incident">Incidents</button></div>
     <div class="list" id="list"></div>
   </aside>
   <main class="main"><div class="wrap" id="view"></div></main>
@@ -212,11 +283,14 @@ pre.out{background:var(--sunk);border-radius:8px;padding:10px;font-size:11.5px;o
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const label = k => k.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
-const STATUS = {design_review:"Design review", coding:"Coding", pr_open:"PR open", merged:"Merged", closed:"Closed", failed:"Failed"};
-const UI_DEF = {app_title:"MobileHeal", button_label:"Save", button_color:"#6750A4", button_text_color:"#FFFFFF",
+const SMALL = new Set(["of","and","the","or","to","in","on","for","a","an"]);
+const label = k => k.split("_").filter(Boolean).map((w,i) => i && SMALL.has(w) ? w : w[0].toUpperCase() + w.slice(1)).join(" ");
+const STATUS = {design_review:"Design review", coding:"Coding", pr_open:"PR open", merged:"Merged", closed:"Closed", failed:"Failed",
+  detected:"Detected", diagnosing:"Auto-healing", needs_engineer:"Needs engineer"};
+const isInc = cr => cr && cr.kind === "incident";
+const UI_DEF = {after_save:"stay", success_title:"Profile saved", success_message:"Thanks — your details are up to date.", app_title:"MobileHeal", button_label:"Save", button_color:"#6750A4", button_text_color:"#FFFFFF",
   banner_color:"#FFF4E5", banner_text_color:"#B54708", background_color:"#FFFFFF"};
-let state = {list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
+let state = {filter:"all", healer:null, seen:null, list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
 async function api(path, opts={}) {
@@ -226,7 +300,9 @@ async function api(path, opts={}) {
   return data;
 }
 function ago(ts){ const s=(Date.now()-new Date(ts))/1000; if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+"m ago"; if(s<86400) return Math.floor(s/3600)+"h ago"; return new Date(ts).toLocaleDateString(); }
-function chip(cr){ if(cr.status==="pr_open" && cr.tested) return `<span class="chip s-tested">✓ Tested</span>`;
+function chip(cr){ if(cr.status==="pr_open" && cr.tested) return `<span class="chip s-tested">✓ ${isInc(cr)?"Approved":"Tested"}</span>`;
+  if (isInc(cr) && cr.status==="merged") return `<span class="chip s-merged">Fixed</span>`;
+  if (isInc(cr) && cr.status==="pr_open") return `<span class="chip s-pr_open">Fix ready</span>`;
   return `<span class="chip s-${cr.status}">${STATUS[cr.status]||cr.status}</span>`; }
 
 /* ---------------- routing ---------------- */
@@ -236,6 +312,10 @@ async function route(){
   const h = location.hash.slice(1) || "";
   clearInterval(state.poll);
   document.querySelector('.app').classList.remove('list-open');
+  const page = ["tests","settings","audit","demo"].find(p => h===p || h.startsWith(p+"/"));
+  document.querySelectorAll("#nav a[data-r]").forEach(a => a.classList.toggle("on", a.dataset.r === (page || "delivery")));
+  document.querySelector(".app").classList.toggle("full", !!page);
+  if (page) { state.route = page; state.cr = null; await ({tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo})[page](h); return; }
   if (h === "new" || (!h && !state.list.length)) { state.route="new"; renderNew(); }
   else if (h.startsWith("cr/")) { const [, id, tab] = h.split("/"); state.route="cr"; await loadCR(+id, tab); }
   else if (state.list.length) { go("cr/" + state.list[0].id); return; }
@@ -250,12 +330,34 @@ async function refreshInfo(){
     (i.github ? `<span class="pill">GitHub · ${esc(i.github)}</span>` : "");
 }
 function renderList(){
-  $("#list").innerHTML = state.list.length ? state.list.map(c => `
+  document.querySelectorAll(".filters button").forEach(b => b.classList.toggle("on", b.dataset.f===state.filter));
+  const items = state.list.filter(c => state.filter==="all" || c.kind===state.filter);
+  $("#list").innerHTML = items.length ? items.map(c => `
     <button class="item ${state.cr && state.cr.id===c.id && state.route==='cr' ? 'on':''}" onclick="go('cr/${c.id}')">
-      <div class="m"><span>${esc(c.key)}</span>${chip(c)}</div>
+      <div class="m">${c.kind==="incident"?`<span class="inc-ico ${c.status==='merged'?'ok':''}">${c.status==='merged'?'✓':'!'}</span>`:""}<span>${esc(c.key)}</span>${chip(c)}${c.kind==="incident"&&c.occurrences>1?`<span>×${c.occurrences}</span>`:""}</div>
       <div class="t">${esc(c.title)}</div>
       <div class="m">${c.pr ? `<span>PR #${c.pr.number}</span>` : ""}${c.stats ? `<span><span class="plus">+${c.stats.additions}</span> <span class="minus">−${c.stats.deletions}</span></span>`:""}<span style="margin-left:auto">${ago(c.updated_at)}</span></div>
-    </button>`).join("") : `<div class="empty">No change requests yet.<br>Create one to start the pipeline.</div>`;
+    </button>`).join("") : `<div class="empty">${state.filter==="incident"?"No production incidents. 🎉":"No change requests yet.<br>Create one to start the pipeline."}</div>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest(".filters button"); if (b){ state.filter=b.dataset.f; renderList(); } });
+async function refreshHealer(){
+  try { state.healer = await api("/api/healer"); } catch(e){ return; }
+  const h = state.healer;
+  let el = document.getElementById("ah");
+  if (!el){ el = document.createElement("label"); el.id="ah"; el.className="ah"; $("#repo").before(el); }
+  el.innerHTML = `<span>Auto-heal</span><span class="switch"><input type="checkbox" ${h.autoheal?"checked":""} onchange="toggleAutoheal(this.checked)"><span></span></span>`;
+}
+async function toggleAutoheal(on){ await api("/api/healer/autoheal",{method:"POST",body:{on}}); toast(on?"Auto-heal on — crashes get fix PRs automatically":"Auto-heal off — crashes are only recorded"); refreshHealer(); }
+async function watchIncidents(){
+  const prev = state.seen; await refreshList();
+  const incs = state.list.filter(c=>c.kind==="incident");
+  const sig = incs.map(c=>c.id+":"+c.status+":"+c.occurrences).join("|");
+  if (prev!==null && sig!==prev){
+    const newest = incs[0];
+    if (newest && !prev.includes(newest.id+":")) toast(`🚨 ${newest.key} detected in production — auto-healing`);
+    if (state.cr && state.route==="cr" && !["coding","diagnosing"].includes(state.cr.status)) { const fresh = await api(`/api/cr/${state.cr.id}`); if (fresh.status!==state.cr.status || fresh.occurrences!==state.cr.occurrences){ state.cr=fresh; renderCR(); } }
+  }
+  state.seen = sig;
 }
 
 /* ---------------- phone renderer ---------------- */
@@ -265,59 +367,75 @@ function profileFields(rules){
   return fs;
 }
 function missingOf(rules, values){ return rules.filter(r => r.constraint==="required" && !(values[r.field]||"").trim()).map(r=>r.field); }
-function phone({rules, ui, values, interactive=false, highlight=[], id=""}){
+function phone({rules, ui, values, interactive=false, highlight=[], id="", onInput="pvInput", onTap="pvSave", errors=null, screen="profile", onBack="pvBack"}){
   ui = {...UI_DEF, ...ui};
+  if (screen === "success") return `<div class="phone"><div class="screen" style="background:${esc(ui.background_color)}" id="${id}">
+    <div class="sb"><span>9:41</span><span>●●● ▮</span></div>
+    <div class="appbar"><span>${esc(ui.app_title)}</span><span class="live">● Live</span></div>
+    <div class="pbody success"><div class="succ-ico" style="background:${esc(ui.button_color)};color:${esc(ui.button_text_color)}">✓</div>
+      <div class="succ-t">${esc(ui.success_title)}</div><div class="succ-m">${esc(ui.success_message)}</div>
+      <button class="pbtn" style="background:transparent;color:${esc(ui.button_color)};border:1.5px solid ${esc(ui.button_color)}" ${interactive?`onclick="${onBack}()"`:''}>Back to profile</button>
+    </div><div class="ptoast" id="${id}-toast"></div></div></div>`;
   const miss = missingOf(rules, values);
   const fields = profileFields(rules);
+  const errs = errors || miss;
   const banner = miss.length ? `<div class="banner" style="background:${esc(ui.banner_color)};color:${esc(ui.banner_text_color)}">
       <b>Action needed</b>${esc(ui.banner_message || "Your profile is missing: " + miss.map(label).join(", ") + ". Please fill in the highlighted fields and tap " + ui.button_label + ".")}</div>` : "";
-  const f = fields.map(k => `<div class="pf ${miss.includes(k)?'miss':''} ${highlight.includes(k)?'new':''}" style="background:${esc(ui.background_color)}">
+  const f = fields.map(k => `<div class="pf ${errs.includes(k)?'miss':''} ${highlight.includes(k)?'new':''}" style="background:${esc(ui.background_color)}">
       <span>${esc(label(k))}${rules.find(r=>r.field===k&&r.constraint==='required')?' *':''}</span>
-      ${interactive ? `<input data-k="${k}" value="${esc(values[k]||"")}" oninput="pvInput(this)" inputmode="${k.includes('phone')?'tel':k.includes('email')?'email':'text'}">`
+      ${interactive ? `<input data-k="${k}" value="${esc(values[k]||"")}" oninput="${onInput}(this)" inputmode="${k.includes('phone')?'tel':k.includes('email')?'email':'text'}">`
                     : `<div style="color:${values[k]?'#1b1f24':'#9aa3ad'}">${esc(values[k]||" ")}</div>`}</div>`).join("");
   return `<div class="phone"><div class="screen" style="background:${esc(ui.background_color)}" id="${id}">
     <div class="sb"><span>9:41</span><span>●●● ▮</span></div>
     <div class="appbar"><span>${esc(ui.app_title)}</span><span class="live">● Live</span></div>
     <div class="pbody">${banner}<div class="ptitle">Your profile</div>${f}
-      <button class="pbtn" style="background:${esc(ui.button_color)};color:${esc(ui.button_text_color)}" ${interactive?'onclick="pvSave()"':''}>${esc(ui.button_label)}</button>
+      <button class="pbtn" style="background:${esc(ui.button_color)};color:${esc(ui.button_text_color)}" ${interactive?`onclick="${onTap}()"`:''}>${esc(ui.button_label)}</button>
     </div><div class="ptoast" id="${id}-toast"></div></div></div>`;
 }
 
 /* ---------------- new CR (Requirements) ---------------- */
 async function renderNew(prefill){
-  state.cr = null;
+  state.cr = null; state.translation = null; state.lastTranslated = null;
   const live = (state.info && state.info.live_spec) || "";
+  const ai = state.settings && state.settings.ai.available;
   $("#view").innerHTML = `
     <div class="hdr"><div><div class="meta" style="margin-bottom:6px"><span class="chip s-design_review">Step 1 · Requirements</span></div>
-      <h1>New change request</h1><div class="meta">Describe the business need and edit the rules. MobileHeal will design, code, test and open a PR.</div></div></div>
+      <h1>What do you need?</h1><div class="meta">Write it in plain English. MobileHeal turns it into rules, designs it, writes the code and tests, and opens a PR.</div></div></div>
     ${stepper(0)}
     <div class="grid g-side" style="margin-top:18px">
       <div class="card"><div class="card-b">
-        <div class="field"><label for="f-title">Title</label><input id="f-title" class="input" placeholder="e.g. Collect phone numbers and rebrand the save button" value="${esc(prefill?.title||"")}"></div>
-        <div class="field"><label for="f-desc">Business requirement</label>
-          <textarea id="f-desc" class="input" rows="3" placeholder="Why is this needed? Who asked for it? What does success look like?">${esc(prefill?.description||"")}</textarea></div>
-        <div class="field" style="margin-bottom:0"><label for="f-spec">Rules <span style="color:var(--faint);font-weight:400">— edits to <code>requirements.txt</code></span></label>
-          <textarea id="f-spec" class="input code" spellcheck="false">${esc(prefill?.spec_text ?? live)}</textarea>
-          <div class="hint" id="f-msg">&nbsp;</div>
+        <div class="field"><label for="f-eng" style="display:flex;justify-content:space-between;align-items:center">Requirement
+            <span class="chip ${ai?'s-coding':'s-closed'}" title="${ai?'Claude reads your requirement':'Add an Anthropic key in Settings for smarter translation'}">${ai?'✦ Claude':'Built-in parser'}</span></label>
+          <textarea id="f-eng" class="input big" rows="5" placeholder="e.g. Support needs a callback number for every customer, so make phone number required. Marketing wants the save button in brand red with the label “Update profile”. Date of birth is optional.">${esc(prefill?.requirement_text||"")}</textarea>
+          <div class="quick" style="margin-top:8px"><span class="hint" style="margin:0">Try:</span>
+            ${["Collect phone numbers from every customer","Make the save button green and call it “Save changes”","Date of birth is optional; the banner should be light yellow"].map(x=>`<button class="btn sm" onclick="$('#f-eng').value=this.textContent;translateEng()">${esc(x)}</button>`).join("")}</div>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn" id="f-tr" onclick="translateEng()">Preview what will change ↓</button></div>
+          <div id="f-trout"></div></div>
+        <div class="grid g2" style="gap:12px">
+          <div class="field"><label for="f-title">Title <span style="color:var(--faint);font-weight:400">(optional)</span></label><input id="f-title" class="input" placeholder="Generated from your requirement" value="${esc(prefill?.title||"")}"></div>
+          <div class="field"><label for="f-figma">Figma design <span style="color:var(--faint);font-weight:400">(optional)</span></label><input id="f-figma" class="input" placeholder="https://www.figma.com/design/…" value="${esc(prefill?.figma_url||"")}"></div>
+        </div>
+        <div class="field"><label for="f-desc">Business context <span style="color:var(--faint);font-weight:400">(optional — who asked, why, success criteria)</span></label>
+          <textarea id="f-desc" class="input" rows="2">${esc(prefill?.description||"")}</textarea></div>
+        <details id="f-adv" class="adv"><summary>Advanced: view or edit the generated rules <span class="hint" style="margin:0" id="f-msg"></span></summary>
+          <textarea id="f-spec" class="input code" spellcheck="false" style="margin-top:10px">${esc(prefill?.spec_text ?? live)}</textarea>
           <div class="quick">
-            <span class="hint" style="margin:0">Quick add:</span>
             <input id="q-field" class="input" style="width:150px;padding:4px 9px" placeholder="field_name">
             <button class="btn sm" onclick="qField('required')">+ Required</button>
             <button class="btn sm" onclick="qField('optional')">+ Optional</button>
-            <span style="width:1px;height:20px;background:var(--line)"></span>
             <label class="hint" style="margin:0;display:flex;gap:6px;align-items:center">Button <input type="color" value="#6750a4" onchange="qUi('button_color', this.value.toUpperCase())"></label>
             <label class="hint" style="margin:0;display:flex;gap:6px;align-items:center">Banner <input type="color" value="#fff4e5" onchange="qUi('banner_color', this.value.toUpperCase())"></label>
-            <button class="btn sm" onclick="qLabel()">Button label…</button>
-          </div>
-        </div>
+            <button class="btn sm" onclick="$('#f-spec').value=state.info.live_spec;validateNew()">Reset</button>
+          </div></details>
       </div>
       <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--sunk);border-radius:0 0 12px 12px">
-        <button class="btn" onclick="$('#f-spec').value=state.info.live_spec;validateNew()">Reset rules</button>
         <button class="btn primary" id="f-submit" onclick="submitNew()">Generate UX design →</button>
       </div></div>
       <div><div class="label" style="text-align:center">Live preview</div><div id="f-phone" class="phones"></div></div>
     </div>`;
-  $("#f-spec").addEventListener("input", validateNew);
+  $("#f-spec").addEventListener("input", () => { state.manualRules = true; validateNew(); });
+  $("#f-eng").addEventListener("input", () => { clearTimeout(state.engT); state.engT = setTimeout(() => { if ($("#f-eng").value.trim().length > 12) translateEng(true); }, 1400); });
+  state.manualRules = false;
   validateNew();
 }
 let vT;
@@ -327,38 +445,50 @@ function validateNew(){
     const text = $("#f-spec").value;
     const r = await api("/api/requirements/validate", {method:"POST", body:{text}});
     $("#f-spec").classList.toggle("bad", !r.valid);
-    $("#f-submit").disabled = !r.valid;
     const changed = text.trim() !== (state.info.live_spec||"").trim();
-    $("#f-msg").innerHTML = r.valid ? (changed ? `<span class="ok">✓ Valid</span> — ${r.rules.length} field rules, ${Object.keys(r.ui).length} UI rules` : "No changes from the live rules yet") : `<span class="err">✕ ${esc(r.error)}</span>`;
-    if (r.valid) $("#f-phone").innerHTML = phone({rules:r.rules, ui:r.ui, values:{name:"Jane Doe", email:"jane@example.com"}});
+    $("#f-msg").innerHTML = r.valid ? (changed ? `· <span class="ok">✓ ${r.rules.length} field rules, ${Object.keys(r.ui).length} UI rules</span>` : "· no changes yet") : `· <span class="err">✕ ${esc(r.error)}</span>`;
+    if (!r.valid) $("#f-adv").open = true;
+    if (r.valid) $("#f-phone").innerHTML = phone({rules:r.rules, ui:r.ui, values:{name:"Jane Doe", email:"jane@example.com"}})
+      + (r.ui.after_save==="success_screen" ? `<div class="pcol"><div class="pcap">After save →</div>${phone({rules:r.rules, ui:r.ui, values:{}, screen:"success"})}</div>` : "");
   }, 200);
 }
-function setLine(re, line){ const ta=$("#f-spec"); let t=ta.value; if (re.test(t)) t=t.replace(re, line); else t=t.replace(/\n*$/,"\n")+line+"\n"; ta.value=t; validateNew(); }
+function setLine(re, line){ const ta=$("#f-spec"); let t=ta.value; if (re.test(t)) t=t.replace(re, line); else t=t.replace(/\n*$/,"\n")+line+"\n"; ta.value=t; state.manualRules=true; validateNew(); }
 function qField(c){ const f=$("#q-field").value.trim().toLowerCase().replace(/[^a-z0-9_]+/g,"_"); if(!f) return toast("Type a field name first");
   setLine(new RegExp("^"+f+"\\s*:.*$","m"), `${f}: ${c}`); $("#q-field").value=""; }
 function qUi(k,v){ setLine(new RegExp("^ui\\."+k+"\\s*=.*$","m"), `ui.${k} = ${v}`); }
 function qLabel(){ const v=prompt("Button label", "Save"); if(v) qUi("button_label", v.trim()); }
 async function submitNew(){
-  const b=$("#f-submit"); b.disabled=true; b.textContent="Generating design…";
+  const b=$("#f-submit"); b.disabled=true;
   try {
-    const cr = await api("/api/cr", {method:"POST", body:{title:$("#f-title").value, description:$("#f-desc").value, spec_text:$("#f-spec").value}});
+    const eng = $("#f-eng").value.trim();
+    if (!eng && !state.manualRules) throw new Error("Describe what you need first");
+    if (eng && eng !== state.lastTranslated && !state.manualRules) { b.innerHTML = `<span class="spinner"></span> Understanding your requirement…`; await translateEng(); }
+    if (eng && !state.translation && !state.manualRules) throw new Error("Couldn't turn that into rules — rephrase it or edit the rules under Advanced");
+    b.innerHTML = `<span class="spinner"></span> Generating design…`;
+    const title = $("#f-title").value.trim() || shortTitle(eng) || "Rules change";
+    const cr = await api("/api/cr", {method:"POST", body:{title, description:$("#f-desc").value || eng, spec_text:$("#f-spec").value,
+      requirement_text: eng, translation: state.translation, figma_url: $("#f-figma").value.trim()}});
+    if (cr.figma_error) toast("Figma: " + cr.figma_error);
     await refreshList(); go(`cr/${cr.id}/design`); toast(`${cr.key} created — review the design`);
-  } catch(e){ toast(e.message); b.disabled=false; b.textContent="Generate UX design →"; }
+  } catch(e){ toast(e.message); }
+  b.disabled=false; b.textContent="Generate UX design →";
 }
 
 /* ---------------- CR detail ---------------- */
-function stageOf(cr){ return cr.status==="merged" ? 6 : cr.status==="coding" ? 2 : cr.status==="design_review" ? 1 :
+function stageOf(cr){
+  if (isInc(cr)) return ({detected:1, diagnosing:2, needs_engineer:2, pr_open: cr.tested?5:4, merged:6, closed:cr.pr?4:1})[cr.status] ?? 1;
+  return cr.status==="merged" ? 6 : cr.status==="coding" ? 2 : cr.status==="design_review" ? 1 :
   cr.status==="pr_open" ? (cr.tested ? 5 : 4) : cr.status==="failed" ? 2 : cr.stage||1; }
 function stepper(cur, cr){
-  const names = ["Requirements","UX Design","Coding","Pull Request","Test","Merge"];
+  const names = isInc(cr) ? ["Detected","Diagnosis","Fix","Pull Request","Review","Deploy"] : ["Requirements","UX Design","Coding","Pull Request","Test","Merge"];
   return `<div class="steps">${names.map((n,i)=>{
     let cls = i<cur ? "done" : i===cur ? "cur" : "";
-    if (cr && cr.status==="coding" && i===2) cls += " spin";
-    if (cr && cr.status==="failed" && i===2) cls = "err";
+    if (cr && ["coding","diagnosing"].includes(cr.status) && i===2) cls += " spin";
+    if (cr && ["failed","needs_engineer"].includes(cr.status) && i===2) cls = "err";
     if (cr && cr.status==="closed") cls = i<cur ? "done" : "";
     return `<div class="step ${cls}"><div class="n">${i<cur?"✓":i+1}</div>${n}</div>`; }).join("")}</div>`;
 }
-const defaultTab = cr => ({design_review:"design", coding:"code", failed:"code", pr_open: cr.tested ? "pr" : "test", merged:"pr", closed:"overview"})[cr.status] || "overview";
+const defaultTab = cr => isInc(cr) ? ({detected:"overview", diagnosing:"diagnosis", needs_engineer:"diagnosis", pr_open: cr.tested?"pr":"test", merged:"pr", closed:"overview"})[cr.status]||"overview" : ({design_review:"design", coding:"code", failed:"code", pr_open: cr.tested ? "pr" : "test", merged:"pr", closed:"overview"})[cr.status] || "overview";
 
 async function loadCR(id, tab){
   try { state.cr = await api(`/api/cr/${id}`); } catch(e){ $("#view").innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
@@ -368,13 +498,14 @@ async function loadCR(id, tab){
     state.testChecks = {};
   }
   state.tab = tab || defaultTab(state.cr);
+  if (!isInc(state.cr)) await loadTests(); else state.tests = null;
   renderCR();
-  if (state.cr.status === "coding") state.poll = setInterval(async () => {
+  if (["coding","diagnosing"].includes(state.cr.status)) state.poll = setInterval(async () => {
     const cr = await api(`/api/cr/${id}`);
     if (JSON.stringify(cr.coding_log) !== JSON.stringify(state.cr.coding_log) || cr.status !== state.cr.status) {
-      const done = cr.status !== "coding"; state.cr = cr;
-      if (done) { clearInterval(state.poll); state.tab = defaultTab(cr); await refreshList(); await refreshInfo();
-        toast(cr.status==="pr_open" ? `PR #${cr.pr.number} opened — try it in the Test tab` : "Coding failed"); }
+      const done = !["coding","diagnosing"].includes(cr.status); state.cr = cr;
+      if (done) { clearInterval(state.poll); state.tab = defaultTab(cr); await refreshList(); await refreshInfo(); if (!isInc(cr)) await loadTests();
+        toast(cr.status==="pr_open" ? (isInc(cr) ? `Fix PR #${cr.pr.number} is ready for your review` : `PR #${cr.pr.number} opened — try it in the Test tab`) : isInc(cr) ? "Couldn't auto-fix — needs an engineer" : "Coding failed"); }
       renderCR();
     }
   }, 700);
@@ -383,8 +514,10 @@ function setTab(t){ state.tab=t; history.replaceState(null,"",`#cr/${state.cr.id
 
 function renderCR(){
   const cr = state.cr, st = stageOf(cr);
-  const tabs = [["overview","Overview"],["design","UX Design"],["code","Code", cr.stats?cr.stats.files:null],
-    ["checks","Checks", cr.checks?cr.checks.length:null],["test","Test"],["pr","Pull request"]];
+  const tabs = isInc(cr) ? [["overview","Incident"],["diagnosis","Diagnosis & fix"],["code","Code", cr.stats?cr.stats.files:null],
+      ["checks","Checks", cr.checks?cr.checks.length:null],["test","Review"],["pr","Pull request"]]
+    : [["overview","Overview"],["design","UX Design"],["code","Code", cr.stats?cr.stats.files:null],
+    ["checks","Checks", cr.checks?cr.checks.length:null],["test","Tests", state.tests?state.tests.cases.length:null],["pr","Pull request"]];
   const prLine = cr.pr ? `<span>PR <b>#${cr.pr.number}</b></span><span class="branch">${esc(cr.pr.branch)}</span><span>→</span><span class="branch">${esc(cr.pr.base)}</span>
      ${cr.stats?`<span><span class="plus">+${cr.stats.additions}</span> <span class="minus">−${cr.stats.deletions}</span></span>`:""}
      ${cr.pr.github_url?`<a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">View on GitHub ↗</a>`:""}` : "";
@@ -395,13 +528,21 @@ function renderCR(){
       <div class="meta">${prLine}</div></div>
       <div style="display:flex;gap:8px">${headerActions(cr)}</div></div>
     ${stepper(st, cr)}
-    ${cr.status==="merged"?`<div class="banner-ok" style="margin-top:16px"><span style="font-size:20px">⇡</span><div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} — rules are live and were pushed to connected phones.</div></div>`:""}
+    ${cr.status==="merged"?`<div class="banner-ok" style="margin-top:16px"><span style="font-size:20px">⇡</span><div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} — ${isInc(cr) ? (cr.deployed==="hot-reloaded" ? "fix is live in the running server." : "restart the backend to load the fix.") : "rules are live and were pushed to connected phones."}</div></div>`:""}
+    ${cr.status==="needs_engineer"?`<div class="banner-err" style="margin-top:16px"><b>Auto-heal couldn't produce a verified fix.</b> ${esc(cr.error||"See Diagnosis for what was tried.")}</div>`:""}
     ${cr.status==="failed"?`<div class="banner-err" style="margin-top:16px"><b>Coding failed:</b> ${esc(cr.error)}</div>`:""}
     <div class="tabs">${tabs.map(([k,n,c])=>`<button class="tab ${state.tab===k?'on':''}" onclick="setTab('${k}')">${n}${c!=null?`<span class="count">${c}</span>`:""}</button>`).join("")}</div>
-    <div id="tabbody">${({overview:tOverview, design:tDesign, code:tCode, checks:tChecks, test:tTest, pr:tPR})[state.tab](cr)}</div>`;
+    <div id="tabbody">${(isInc(cr) ? {overview:iOverview, diagnosis:iDiagnosis, code:tCode, checks:tChecks, test:iReview, pr:tPR} : {overview:tOverview, design:tDesign, code:tCode, checks:tChecks, test:tTests, pr:tPR})[state.tab](cr)}</div>`;
   renderList();
 }
 function headerActions(cr){
+  if (isInc(cr)) {
+    if (cr.status==="detected") return `<button class="btn primary" onclick="heal()">Start auto-heal</button>`;
+    if (cr.status==="needs_engineer") return `<button class="btn" onclick="heal()">Retry auto-heal</button>`;
+    if (cr.status==="pr_open" && !cr.tested) return `<button class="btn primary" onclick="setTab('test')">Review fix →</button>`;
+    if (cr.status==="pr_open") return `<button class="btn green" onclick="setTab('pr')">Merge fix →</button>`;
+    return "";
+  }
   if (cr.status==="design_review") return `<button class="btn" onclick="editCR()">Edit requirements</button><button class="btn primary" onclick="approve()">Approve design & start coding</button>`;
   if (cr.status==="pr_open" && !cr.tested) return `<button class="btn primary" onclick="setTab('test')">Test in preview →</button>`;
   if (cr.status==="pr_open" && cr.tested) return `<button class="btn green" onclick="setTab('pr')">Review & merge →</button>`;
@@ -414,7 +555,11 @@ function tOverview(cr){
   const icon = {requirements:"✎", design:"◧", approve:"✓", pr:"⇄", checks:"✔", test:"▶", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
   return `<div class="grid g-side">
     <div class="grid">
-      <div class="card"><div class="card-h">Business requirement</div><div class="card-b">${cr.description?esc(cr.description).replace(/\n/g,"<br>"):'<span style="color:var(--faint)">No description</span>'}</div></div>
+      <div class="card"><div class="card-h">Requirement ${cr.requirement_text?'<span class="chip s-closed">plain English</span>':""}</div><div class="card-b">
+        ${cr.requirement_text?`<p style="margin:0 0 10px;font-size:15px">${esc(cr.requirement_text).replace(/\n/g,"<br>")}</p>`:""}
+        ${cr.description && cr.description!==cr.requirement_text?`<div class="hint" style="margin:0">${esc(cr.description).replace(/\n/g,"<br>")}</div>`:""}
+        ${!cr.requirement_text&&!cr.description?'<span style="color:var(--faint)">No description</span>':""}
+        ${cr.translation?translationHtml(cr.translation):""}</div></div>
       <div class="card"><div class="card-h">Requested rules <span class="hint" style="margin:0">backend/requirements.txt</span></div>
         <div class="card-b" style="padding:0"><pre class="out" style="margin:0;border-radius:0 0 12px 12px;max-height:none">${esc(cr.spec_text)}</pre></div></div>
     </div>
@@ -440,12 +585,14 @@ function tDesign(cr){
       <div class="card-b"><div class="phones">
         <div class="pcol"><div class="pcap">Live today</div>${phone({...d.before, values:sample})}</div>
         <div class="pcol"><div class="pcap" style="color:var(--accent)">Proposed</div>${phone({...d.after, values:sample, highlight:added})}</div>
+        ${(d.after.ui||{}).after_save==="success_screen"?`<div class="pcol"><div class="pcap" style="color:var(--accent)">After save →</div>${phone({...d.after, values:sample, screen:"success"})}</div>`:""}
       </div></div></div>
     <div class="grid" style="align-content:start">
       <div class="card"><div class="card-h">UX changes <span class="count">${d.changes.length}</span></div><div class="card-b" style="padding-top:6px;padding-bottom:6px">${d.changes.map(changeRow).join("")||'<div class="hint">No visible changes</div>'}</div></div>
       <div class="card"><div class="card-h">User impact</div><div class="card-b"><div class="stat">
         <div><b>${d.impact.newly_flagged}</b><span>newly prompted</span></div><div><b>${d.impact.healed}</b><span>alerts cleared</span></div><div><b>${d.impact.total_profiles}</b><span>profiles</span></div></div></div></div>
     </div>
+    ${figmaCard(cr)}
     <div class="card"><div class="card-h">Design notes</div><div class="card-b"><ul class="notes">${d.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div></div>
     <div class="card"><div class="card-h">Accessibility</div><div class="card-b" style="padding:6px 8px"><table class="t"><tr><th>Element</th><th>Colours</th><th>Ratio</th><th>WCAG</th></tr>
       ${d.contrast.map(r=>`<tr><td>${esc(r.element)}</td><td><span class="sw" style="background:${esc(r.fg)}"></span><span class="sw" style="background:${esc(r.bg)}"></span></td><td>${r.ratio}:1</td><td class="lvl ${esc(r.level)}">${esc(r.level)}</td></tr>`).join("")}</table></div></div>
@@ -471,16 +618,17 @@ function diffTable(diff){
 function bar5(a,r){ const t=a+r||1, na=Math.round(5*a/t); return `<span class="bar5">${[0,1,2,3,4].map(i=>`<i class="${i<na?'a':i<5&&r?'r':''}"></i>`).join("")}</span>`; }
 function codingLog(cr){
   const log = cr.coding_log||[];
-  const steps = ["Generate code","Run checks","Open pull request"];
+  const steps = isInc(cr) ? ["Diagnose","Reproduce","Fix","Run checks","Open pull request"] : ["Generate code","Run checks","Open pull request"];
   return `<div class="card" style="margin-bottom:16px"><div class="card-h">Build pipeline ${cr.status==="coding"?'<span class="chip s-coding">running</span>':""}</div>
-    ${steps.map(s=>{ const ev=[...log].reverse().find(e=>e.step===s); const st=ev?ev.status:"pending";
+    ${steps.map(s=>{ const ev=[...log].reverse().find(e=>e.step===s); let st=ev?ev.status:"pending"; if(st==="warn") st="warn";
       return `<div class="chk"><div class="dot d-${st==='pending'?'info':st}" style="${st==='pending'?'opacity:.35':''}">${st==='done'?'✓':st==='fail'?'✕':''}</div>
         <div><div class="nm">${s}</div><div class="dt">${esc(ev&&ev.detail||(st==='pending'?'waiting':''))}</div></div></div>`; }).join("")}
     ${log.filter(e=>e.step==="Error").map(e=>`<div class="chk"><div class="dot d-fail">✕</div><div><div class="nm">Error</div><div class="dt">${esc(e.detail)}</div></div></div>`).join("")}</div>`;
 }
 function tCode(cr){
+  if (!cr.files && isInc(cr)) return codingLog(cr) + (cr.status==="diagnosing"?`<div class="skel"></div><div class="skel" style="width:70%"></div>`:"");
   if (!cr.files) return cr.status==="design_review" ? `<div class="empty">Code is generated after the design is approved.</div>` : codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:70%"></div>`;
-  return `${cr.status==="coding"||cr.status==="failed"?codingLog(cr):""}
+  return `${["coding","failed","diagnosing"].includes(cr.status)?codingLog(cr):""}
     <div class="meta" style="margin-bottom:12px">Showing <b>${cr.files.length} changed files</b> with <span class="plus">${cr.stats.additions} additions</span> and <span class="minus">${cr.stats.deletions} deletions</span>${cr.pr&&cr.pr.commit?` · commit <code>${esc(cr.pr.commit)}</code>`:""}</div>
     ${cr.files.map((f,i)=>`<div class="file"><div class="file-h" onclick="this.nextElementSibling.classList.toggle('hide')">
         <span class="p">${esc(f.path)}</span>${f.status==="added"?'<span class="chip s-pr_open">new</span>':""}
@@ -539,12 +687,14 @@ function tTest(cr){
     </div></div>`;
 }
 const p_id = () => state.preview.profile ? state.preview.profile.id : "blank";
-function pvMode(m){ state.preview.mode=m; renderCR(); }
+function pvMode(m){ state.preview.mode=m; state.preview.screen="profile"; renderCR(); }
 function pvProfile(v){ const p=state.preview; if (v==="blank"){ p.profile=null; p.values={}; } else { p.profile=p.profiles.find(x=>x.id==v); p.values={...p.profile}; } renderCR(); }
 function pvInput(el){ state.preview.values[el.dataset.k]=el.value; }
+function pvBack(){ state.preview.screen="profile"; renderCR(); }
 function pvSave(){
   const cr=state.cr, side = state.preview.mode==="after"?cr.design.after:cr.design.before;
   const miss = missingOf(side.rules, state.preview.values);
+  if (!miss.length && (side.ui||{}).after_save==="success_screen") { state.preview.screen="success"; renderCR(); return; }
   renderCR();
   const t=document.getElementById("pv-toast");
   if (t){ t.textContent = miss.length ? `Still missing: ${miss.map(label).join(", ")}` : "✓ Saved — profile complete (preview only)"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
@@ -565,10 +715,12 @@ function md(src){
 function tPR(cr){
   if (!cr.pr) return `<div class="empty">The pull request is opened automatically after coding.</div>`;
   const live = (state.info&&state.info.live_spec)||"";
-  const upToDate = live === cr.base_spec, checksOk = !(cr.checks_summary&&cr.checks_summary.fail);
+  const upToDate = isInc(cr) ? true : live === cr.base_spec, checksOk = !(cr.checks_summary&&cr.checks_summary.fail);
   const reqs = [[checksOk, checksOk?"All checks have passed":"Some checks are failing", "checks"],
-    [cr.tested, cr.tested?"Tested in the preview environment":"Not yet tested in the preview", "test"],
-    [upToDate, upToDate?"Branch is up to date with live rules":"Live rules changed since this PR was created", null]];
+    isInc(cr) ? [cr.tested, cr.tested?"Approved by a reviewer":"Waiting for human review — auto-heal never merges by itself", "test"]
+              : [cr.tested, cr.tested ? (cr.override ? `Test gate overridden by ${cr.override.by}: “${cr.override.reason}”` : `All ${state.tests?state.tests.gate.total:""} test cases passed`)
+                              : `${state.tests?state.tests.gate.passed:0}/${state.tests?state.tests.gate.total:0} test cases passed`, "test"],
+    [upToDate, upToDate?"Branch is up to date":"Code changed since this PR was created", null]];
   const can = cr.status==="pr_open" && reqs.every(r=>r[0]);
   return `<div class="grid g-side">
     <div class="card"><div class="card-h"><span>Description</span><button class="btn sm" onclick="navigator.clipboard.writeText(state.cr.pr_body);toast('Copied as Markdown')">Copy Markdown</button></div>
@@ -583,31 +735,737 @@ function tPR(cr){
         ${cr.pr.github_error?`<div class="hint err">GitHub: ${esc(cr.pr.github_error)}</div>`:""}
       </div></div>
       ${cr.status==="pr_open"?`<div class="mergebox">${reqs.map(([ok,t,tab])=>`<div class="req"><div class="dot d-${ok?'pass':'warn'}">${ok?"✓":"!"}</div><span style="flex:1">${esc(t)}</span>${!ok&&tab?`<a href="#cr/${cr.id}/${tab}">Fix</a>`:""}</div>`).join("")}
-        <div class="act"><button class="btn green" style="flex:1" ${can?"":"disabled"} onclick="merge()">Merge pull request</button>
+        <div class="act"><button class="btn green" style="flex:1" ${can?"":"disabled"} onclick="merge()">${isInc(cr)?"Merge & deploy fix":"Merge pull request"}</button>
           ${upToDate?"":`<button class="btn" onclick="updateBranch()">Update branch</button>`}
           <button class="btn danger" onclick="closeCR()">Close</button></div></div>`:""}
     </div></div>`;
 }
 
+/* ---------------- incident views ---------------- */
+function traceHtml(d){
+  const t = esc(d.traceback||"");
+  if (!d.file) return t;
+  const needle = esc(`${d.file.split("/").pop()}", line ${d.line}`);
+  return t.split("\n").map(l => l.includes(needle) ? `<span class="hl">${l}</span>` : l).join("\n");
+}
+function iOverview(cr){
+  const d = cr.incident, r = d.request||{};
+  const icon = {detect:"!", heal:"✚", pr:"⇄", test:"✓", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
+  return `<div class="grid g-side">
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h"><span>Error</span><span class="chip s-${d.source==='android'?'coding':'detected'}">${d.source==='android'?'Android app':'Backend'}</span></div>
+        <div class="card-b"><div class="errbox">${esc(d.exc_type)}: ${esc(d.message)}</div>
+        ${d.file?`<div class="hint" style="margin-top:10px">at <code>${esc(d.file)}:${d.line}</code> in <code>${esc(d.function)}()</code></div>`:""}
+        ${d.code_line?`<div class="codeline r" style="margin-top:8px">${esc(d.code_line)}</div>`:""}
+        ${d.regression_of?`<div class="hint err" style="margin-top:8px">Regression of ${esc(d.regression_of)} — this crash had been fixed before.</div>`:""}</div></div>
+      <div class="card"><div class="card-h">Stack trace</div><div class="card-b" style="padding:0"><pre class="trace" style="border-radius:0 0 12px 12px">${traceHtml(d)}</pre></div></div>
+      ${d.repro_kwargs?`<div class="card"><div class="card-h">Captured input <span class="hint" style="margin:0">used to reproduce the crash</span></div><div class="card-b" style="padding:0"><pre class="out" style="margin:0;border-radius:0 0 12px 12px">${esc(JSON.stringify(d.repro_kwargs,null,2))}</pre></div></div>`:""}
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Impact</div><div class="card-b"><div class="stat">
+        <div><b>${cr.occurrences||1}</b><span>occurrences</span></div><div><b style="font-size:14px;line-height:2.1">${ago(cr.last_seen||cr.created_at)}</b><span>last seen</span></div></div>
+        <div class="hint" style="margin-top:10px">First seen ${new Date(cr.first_seen||cr.created_at).toLocaleString()}</div>
+        ${r.path?`<div class="hint">Endpoint <code>${esc(r.method)} ${esc(r.path)}</code></div>`:""}
+        ${r.device?`<div class="hint">Device ${esc(r.device)} · app ${esc(r.app_version||"?")}</div>`:""}</div></div>
+      <div class="card"><div class="card-h">Activity</div><div class="card-b"><ul class="tl">${(cr.timeline||[]).map(e=>`
+        <li><div class="av ${e.actor==='MobileHeal'?'bot':''}">${icon[e.kind]||"•"}</div><div><b>${esc(e.actor)}</b> ${esc(e.text)}<div class="when">${ago(e.ts)}</div></div></li>`).join("")}</ul></div></div>
+    </div></div>`;
+}
+function iDiagnosis(cr){
+  const dg = cr.diagnosis, rp = cr.reproduction||{};
+  if (!dg) return codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:60%"></div>`;
+  return `${["diagnosing","needs_engineer"].includes(cr.status)?codingLog(cr):""}
+  <div class="grid g-side">
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Root cause</div><div class="card-b">
+        <p style="margin:0 0 10px;font-size:15px">${md(dg.summary).replace(/^<p>|<\/p>$/g,"")}</p>
+        <ul class="notes">${dg.details.map(x=>`<li>${md(x).replace(/^<p>|<\/p>$/g,"")}</li>`).join("")}</ul>
+        ${dg.context?`<pre class="trace" style="margin-top:10px">${esc(dg.context).split("\n").map(l=>l.startsWith("→")?`<span class="hl">${l}</span>`:l).join("\n")}</pre>`:""}</div></div>
+      <div class="card"><div class="card-h">Fix attempts <span class="count">${(cr.attempts||[]).length}</span></div><div class="card-b">
+        ${(cr.attempts||[]).map(a=>`<div class="attempt"><div class="attempt-h"><div class="dot d-${a.fixed?'pass':a.patched?'warn':'fail'}">${a.fixed?'✓':a.patched?'→':'✕'}</div>
+            Attempt ${a.n}${a.engine?` <span class="chip s-closed">${a.engine}</span>`:""}<span class="hint" style="margin:0 0 0 auto;font-weight:400">${a.fixed?"crash gone":a.fixed===null&&a.patched?"static fix — verify on device":a.patched?"next error surfaced":"no fix found"}</span></div>
+          <div class="attempt-b"><div class="hint" style="margin:0 0 6px">Was: <code>${esc(a.error)}</code></div>
+            ${a.patched?`<div class="codeline r">- ${esc(a.line)}</div><div class="codeline a">+ ${esc(a.patched)}</div><div style="margin-top:8px">${md(a.why).replace(/^<p>|<\/p>$/g,"")}</div>
+              <div class="hint" style="margin-top:6px">Replay after patch: <b class="${a.fixed?'ok':''}">${esc(a.after)}</b></div>`:`<div>${esc(a.note||"")}</div>`}
+          </div></div>`).join("") || '<div class="hint">No attempts yet.</div>'}
+      </div></div>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Reproduction</div><div class="card-b" style="display:grid;gap:10px;font-size:13px">
+        <div><div class="label">Current code</div>${rp.before?(rp.before.ok?'<span class="hint">No crash with captured input</span>':`<div class="errbox" style="font-size:12px">${esc(rp.before.type)}: ${esc(rp.before.msg)}</div>`):'<span class="hint">pending</span>'}</div>
+        <div><div class="label">With fix</div>${rp.after?`<div class="codeline a">✓ returned ${esc(rp.after.result)}</div>`:rp.note?`<span class="hint">Not replayable: ${esc(rp.note)}</span>`:'<span class="hint">pending</span>'}</div>
+      </div></div>
+    </div>
+  </div>`;
+}
+function iReview(cr){
+  if (!cr.pr) return `<div class="empty">The fix will be ready for review once auto-heal opens a pull request.</div>`;
+  const src = (cr.files||[]).find(f=>f.path===cr.incident.file);
+  const items = ["The root cause explanation matches the stack trace", "The patch only guards the failing case and keeps normal behaviour",
+                 "The regression test uses the real captured input", "All checks pass"];
+  return `<div class="grid g-side">
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Proposed fix <span class="hint" style="margin:0">${esc(cr.incident.file)}</span></div><div class="card-b" style="padding:0">${src?diffTable(src.diff):""}</div></div>
+      <div class="card"><div class="card-h">Before / after with the production input</div><div class="card-b grid g2">
+        <div><div class="label">main</div><div class="errbox" style="font-size:12px">${esc(cr.reproduction.before.type)}${cr.reproduction.before.msg?": "+esc(cr.reproduction.before.msg):""}</div></div>
+        <div><div class="label">this PR</div>${cr.reproduction.after?`<div class="codeline a" style="padding:10px">✓ ${esc(cr.reproduction.after.result)}</div>`
+          :`<div class="trbox" style="margin:0;font-size:12.5px">⚠ Can't be replayed here (${esc(cr.reproduction.note||"")}). Verify on a device or in CI before merging.</div>`}</div></div></div>
+    </div>
+    <div class="card" style="align-self:start"><div class="card-h">Review checklist <span class="count">${items.filter((_,i)=>state.testChecks[i]).length}/${items.length}</span></div><div class="card-b checklist">
+      ${items.map((t,i)=>`<label><input type="checkbox" ${state.testChecks[i]?'checked':''} onchange="state.testChecks[${i}]=this.checked;renderCR()"><span>${esc(t)}</span></label>`).join("")}
+      ${cr.status==="pr_open" ? `<textarea id="t-notes" class="input" rows="2" placeholder="Review comment (optional)" style="margin-top:10px">${esc(cr.test_notes||"")}</textarea>
+        <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="markTested(false)">Request changes</button>
+        <button class="btn primary" style="flex:1" onclick="markTested(true)">${cr.tested?"✓ Approved":"Approve fix ✓"}</button></div>` :
+        `<div class="hint">${cr.tested?"✓ Approved"+(cr.test_notes?`: “${esc(cr.test_notes)}”`:""):""}</div>`}
+    </div></div></div>`;
+}
+async function heal(){ await act(async()=>{ await api(`/api/incidents/${state.cr.id}/heal`,{method:"POST"}); await loadCR(state.cr.id,"diagnosis"); }, "Auto-heal started"); }
+
 /* ---------------- actions ---------------- */
 async function act(fn, ok){ try { await fn(); if (ok) toast(ok); } catch(e){ toast(e.message); } }
 async function approve(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/approve`,{method:"POST"}); await refreshList(); await loadCR(state.cr.id,"code"); }, "Coding started"); }
-async function markTested(passed){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/test`,{method:"POST",body:{notes:($("#t-notes")||{}).value||"",passed}}); await refreshList(); state.tab=passed?"pr":"test"; renderCR(); }, passed?"Marked as tested — ready to merge":"Problem recorded"); }
-async function merge(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/merge`,{method:"POST"}); await refreshList(); await refreshInfo(); renderCR(); }, "Merged — change is live on phones"); }
+async function markTested(passed, override=false, notes=null){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/test`,{method:"POST",body:{notes:notes ?? (($("#t-notes")||{}).value||""),passed,override}}); if(!isInc(state.cr)) await loadTests(); await refreshList(); state.tab=passed?"pr":"test"; renderCR(); }, passed?(isInc(state.cr)?"Fix approved — ready to merge":"Marked as tested — ready to merge"):"Feedback recorded"); }
+async function merge(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/merge`,{method:"POST"}); await refreshList(); await refreshInfo(); renderCR(); }, isInc(state.cr)?"Fix merged and deployed":"Merged — change is live on phones"); }
 async function updateBranch(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/update-branch`,{method:"POST"}); await loadCR(state.cr.id,"code"); }, "Regenerating against latest rules"); }
 async function closeCR(){ if(!confirm("Close this change request?")) return; await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/close`,{method:"POST"}); await refreshList(); renderCR(); }, "Closed"); }
 function editCR(){
-  const cr = state.cr;
+  const cr = state.cr; state.editTr = cr.translation || null; state.editTrText = cr.requirement_text || "";
   $("#tabbody").innerHTML = `<div class="card"><div class="card-b">
+    <div class="field"><label>Requirement in plain English</label><textarea id="e-eng" class="input big" rows="4">${esc(cr.requirement_text||cr.description||"")}</textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn" id="e-tr" onclick="retranslate()">Update rules from this ↓</button></div><div id="e-trout">${cr.translation?translationHtml(cr.translation):""}</div></div>
     <div class="field"><label>Title</label><input id="e-title" class="input" value="${esc(cr.title)}"></div>
-    <div class="field"><label>Business requirement</label><textarea id="e-desc" class="input" rows="3">${esc(cr.description)}</textarea></div>
-    <div class="field"><label>Rules</label><textarea id="e-spec" class="input code" spellcheck="false">${esc(cr.spec_text)}</textarea></div>
-    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" onclick="renderCR()">Cancel</button>
-    <button class="btn primary" onclick="saveRevision()">Regenerate design</button></div></div></div>`;
+    <details class="adv"><summary>Advanced: rules</summary><textarea id="e-spec" class="input code" spellcheck="false" style="margin-top:10px">${esc(cr.spec_text)}</textarea></details>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="renderCR()">Cancel</button>
+    <button class="btn primary" id="e-save" onclick="saveRevision()">Regenerate design</button></div></div></div>`;
 }
-async function saveRevision(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/revise`,{method:"POST",body:{title:$("#e-title").value,description:$("#e-desc").value,spec_text:$("#e-spec").value}}); state.tab="design"; await refreshList(); renderCR(); }, "Design regenerated"); }
+async function retranslate(){
+  const text=$("#e-eng").value.trim(); if(!text) return toast("Describe the requirement");
+  const b=$("#e-tr"); b.disabled=true; b.innerHTML=`<span class="spinner"></span> Translating…`;
+  try { const r = await api("/api/requirements/translate",{method:"POST",body:{text}});
+    state.editTr = {summary:r.summary, assumptions:r.assumptions, questions:r.questions, engine:r.engine}; state.editTrText = text;
+    $("#e-spec").value = r.spec_text; $("#e-trout").innerHTML = translationHtml(state.editTr); } catch(e){ toast(e.message); }
+  b.disabled=false; b.textContent="Update rules from this ↓";
+}
+async function saveRevision(){
+  const eng = $("#e-eng").value.trim();
+  if (eng && eng !== state.editTrText) await retranslate();
+  await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/revise`,{method:"POST",body:{title:$("#e-title").value, description:state.cr.description,
+    spec_text:$("#e-spec").value, requirement_text: eng, translation: state.editTr}}); state.tab="design"; await refreshList(); renderCR(); }, "Design regenerated"); }
 
-(async () => { await refreshInfo(); await refreshList(); await route(); setInterval(refreshInfo, 15000); })();
+window.__init = async () => { await refreshInfo(); await refreshHealer(); await loadSettings(); await refreshList(); state.seen = state.list.filter(c=>c.kind==="incident").map(c=>c.id+":"+c.status+":"+c.occurrences).join("|");
+  await route(); setInterval(refreshInfo, 15000); setInterval(watchIncidents, 4000); setInterval(refreshHealer, 15000); };
 </script>
+<script>
+/* =====================================================================
+   Settings, plain-English translation, test cases, interactive runner,
+   test library, audit
+   ===================================================================== */
+async function loadSettings(){
+  try { state.settings = await api("/api/settings"); } catch(e){ return; }
+  const ai = state.settings.ai;
+  let el = document.getElementById("aipill");
+  if (!el){ el = document.createElement("a"); el.id="aipill"; el.href="#settings"; el.style.textDecoration="none"; $("#repo").prepend(el); }
+  el.innerHTML = `<span class="pill" title="${ai.available?'Claude is powering translation, test generation and crash fixes':'Add an Anthropic API key in Settings'}"><span class="d" style="background:${ai.available?'var(--accent)':'var(--faint)'}"></span>${ai.available?'Claude · '+esc(ai.model):'Claude off'}</span>`;
+}
+
+/* ---------- modal ---------- */
+function modal(html, cls=""){
+  const ex=document.getElementById("modal");
+  if (ex && ex.dataset.cls===cls && ex.dataset.kind===(state.run?"run":"x")) {   // update in place: no flicker, keeps scroll
+    const card=ex.firstChild, sc=card.querySelector(".rsteps"), top=sc?sc.scrollTop:0;
+    card.innerHTML=html; const sc2=card.querySelector(".rsteps"); if(sc2) sc2.scrollTop=top; return; }
+  closeModal(); const m=document.createElement("div"); m.className="modal"; m.id="modal"; m.dataset.cls=cls; m.dataset.kind=state.run?"run":"x";
+  m.innerHTML=`<div class="modal-card ${cls}">${html}</div>`; m.addEventListener("mousedown",e=>{ if(e.target===m && !state.run) closeModal(); }); document.body.appendChild(m); }
+function closeModal(){ const m=document.getElementById("modal"); if(m) m.remove(); }
+document.addEventListener("keydown", e => { if (e.key==="Escape" && !state.run) closeModal(); });
+
+/* ---------- plain English → rules ---------- */
+function translationHtml(t){
+  return `<div class="trbox">${t.summary?`<div><b>${t.engine==='claude'?'✦ Claude':'Parser'}:</b> ${esc(t.summary)}</div>`:""}
+    ${(t.assumptions||[]).length?`<div class="label" style="margin:10px 0 4px">Assumptions</div><ul class="notes">${t.assumptions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>`:""}
+    ${(t.questions||[]).length?`<div class="label" style="margin:10px 0 4px;color:var(--amber)">Open questions</div><ul class="notes">${t.questions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>`:""}</div>`;
+}
+async function translateEng(silent=false){
+  const text = $("#f-eng").value.trim(); if (!text) { if(!silent) toast("Describe the requirement first"); return; }
+  if (silent && text === state.lastTranslated) return;
+  const b = $("#f-tr"); if (b){ b.disabled = true; b.innerHTML = `<span class="spinner"></span> ${state.settings&&state.settings.ai.available?"Claude is reading…":"Translating…"}`; }
+  try {
+    const r = await api("/api/requirements/translate", {method:"POST", body:{text}});
+    if ($("#f-eng").value.trim() !== text) return;           // user kept typing
+    state.translation = {summary:r.summary, assumptions:r.assumptions, questions:r.questions, engine:r.engine};
+    state.lastTranslated = text; state.manualRules = false;
+    $("#f-spec").value = r.spec_text; validateNew();
+    $("#f-trout").innerHTML = translationHtml(state.translation);
+  } catch(e){ if(!silent) toast(e.message); }
+  if (b){ b.disabled = false; b.textContent = "Preview what will change ↓"; }
+}
+function shortTitle(t){ t=(t||"").split(/[.!?\n]/)[0].trim(); if (t.length<=70) return t; return t.slice(0, t.lastIndexOf(" ", 68)) + "…"; }
+
+
+/* ---------- Figma ---------- */
+function figmaCard(cr){
+  const f = cr.figma, inReview = cr.status==="design_review";
+  if (!f) return `<div class="card" style="grid-column:1/-1"><div class="card-h"><span><span class="figlogo"></span> Figma design</span></div><div class="card-b">
+    <div class="hint" style="margin:0 0 8px">Share the designer's Figma frame to review it beside the generated screen${state.settings&&state.settings.figma_token&&state.settings.figma_token.set?" — MobileHeal will read colours, labels and fields from it":" (add a Figma token in Settings to also extract rules from it)"}.</div>
+    <div style="display:flex;gap:8px"><input id="fg-url" class="input" placeholder="https://www.figma.com/design/…?node-id=…"><button class="btn primary" onclick="attachFigma()">Attach</button></div></div></div>`;
+  const sug = f.suggestions||[]; const diff = sug.filter(x=>!x.match && x.valid);
+  return `<div class="card" style="grid-column:1/-1"><div class="card-h"><span><span class="figlogo"></span> Figma · ${esc(f.frame||f.name||f.slug||"design")}</span>
+      <span style="display:flex;gap:6px"><a class="btn sm" href="${esc(f.url)}" target="_blank" rel="noopener">Open in Figma ↗</a><button class="btn sm" onclick="replaceFigma()">Replace</button><button class="btn sm danger" onclick="removeFigma()">Remove</button></span></div>
+    <div class="card-b"><div class="figgrid">
+      <div class="figframe">${f.image?`<img src="${esc(f.image)}" alt="Figma frame snapshot">`:`<iframe src="${esc(f.embed)}" allowfullscreen loading="lazy" title="Figma embed"></iframe>`}</div>
+      <div>
+        ${f.error?`<div class="banner-err" style="margin:0 0 10px;font-size:13px">${esc(f.error)}</div>`:""}
+        ${!f.fetched?`<div class="hint" style="margin:0 0 8px">Embedded for visual comparison. Add a Figma personal access token in <a href="#settings">Settings</a> to extract rules automatically.</div>`:""}
+        ${sug.length?`<div class="label">Design ↔ rules <span style="text-transform:none;font-weight:400">· read ${f.engine==="claude"?"by ✦ Claude":"from layer names"}</span></div>
+          <table class="t figt"><tr><th></th><th>Rule</th><th>Figma</th><th>Rules today</th></tr>
+          ${sug.map((x,i)=>`<tr class="${x.match?'m':''}"><td>${x.match?'<span class="ok">✓</span>':x.valid&&inReview?`<input type="checkbox" class="fg-pick" value="${esc(x.key)}" checked>`:'<span class="hint">—</span>'}</td>
+            <td><code>${esc(x.key)}</code>${x.layer?`<div class="hint" style="margin:0">layer “${esc(x.layer)}”</div>`:""}</td>
+            <td>${sw(x)}${esc(x.value)}</td><td>${x.current?sw({...x,value:x.current})+esc(x.current):'<span class="hint">not set</span>'}</td></tr>`).join("")}</table>
+          ${diff.length&&inReview?`<button class="btn primary" style="margin-top:10px" onclick="applyFigma()">Apply ${diff.length} selected to rules</button>`:diff.length?"":`<div class="ok" style="margin-top:8px">✓ Rules match the Figma design</div>`}`
+        : f.fetched?`<div class="hint">No profile-screen elements recognised in this frame.</div>`:""}
+      </div></div></div></div>`;
+}
+const sw = x => /_color$/.test(x.key) && /^#[0-9a-f]{6}$/i.test(x.value) ? `<span class="sw" style="background:${esc(x.value)}"></span>` : "";
+async function attachFigma(url){ url = url ?? $("#fg-url").value.trim(); if(!url) return toast("Paste a Figma link");
+  toast("Reading the Figma design…");
+  await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/figma`,{method:"POST",body:{url}}); renderCR(); }, "Figma design attached"); }
+function replaceFigma(){ const u = prompt("New Figma link", state.cr.figma.url); if (u) attachFigma(u); }
+async function removeFigma(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/figma`,{method:"POST",body:{url:""}}); renderCR(); }, "Removed"); }
+async function applyFigma(){ const keys=[...document.querySelectorAll(".fg-pick:checked")].map(x=>x.value); if(!keys.length) return toast("Select at least one rule");
+  await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/figma/apply`,{method:"POST",body:{keys}}); await refreshList(); renderCR(); }, "Rules updated from Figma — design regenerated"); }
+
+/* ---------- test cases on a CR ---------- */
+async function loadTests(){ try { state.tests = await api(`/api/cr/${state.cr.id}/tests`); } catch(e){ state.tests = null; } }
+const SRC = {claude:["✦ Claude","s-coding"], generated:["Generated","s-closed"], zephyr:["Zephyr","s-design_review"], manual:["Manual","s-closed"], library:["Library","s-closed"]};
+function srcChip(c){ const [t,k] = SRC[c.source]||[c.source||"—","s-closed"]; return `<span class="chip ${k}">${t}${c.source==="zephyr"&&c.external_key?" · "+esc(c.external_key):""}</span>`; }
+function runChip(r){ if(!r) return `<span class="chip s-closed">Not run</span>`;
+  return `<span class="chip ${r.status==='passed'?'s-pr_open':r.status==='failed'?'s-failed':'s-diagnosing'}">${r.status==='passed'?'✓ Passed':r.status==='failed'?'✕ Failed':'Blocked'}</span>`; }
+function autoCount(c){ return c.steps.filter(s=>s.auto).length; }
+function tTests(cr){
+  if (!cr.pr) return `<div class="empty">Test cases are generated with the code once the design is approved.<br><br>
+    <button class="btn" onclick="openImport(${cr.id})">Import from Zephyr now</button></div>`;
+  const T = state.tests || {cases:[], gate:{total:0,passed:0,failed:0,not_run:0}}; const g = T.gate;
+  const pct = g.total ? Math.round(100*g.passed/g.total) : 0;
+  const added = cr.design.changes.filter(c=>c.kind==="field_added").map(c=>c.field);
+  const p = state.preview, side = p.mode==="after" ? cr.design.after : cr.design.before;
+  return `<div class="grid g-side">
+   <div class="grid" style="align-content:start">
+    <div class="card"><div class="card-b">
+      <div class="row2"><div><div style="font-size:20px;font-weight:700;letter-spacing:-.02em">${g.passed}/${g.total} passed</div>
+        <div class="hint" style="margin:2px 0 0">${g.failed?`<span class="err">${g.failed} failed</span> · `:""}${g.not_run} not run · ${g.required?"all must pass before merge":"tests are advisory (Settings → merge policy)"}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${cr.status==="pr_open"?`<button class="btn primary" onclick="runAll()" ${T.cases.length?"":"disabled"}>▶ Run all</button>`:""}
+          <button class="btn" onclick="openImport(${cr.id})">Import…</button>
+          <button class="btn" onclick="openAttach()">From library</button>
+          <button class="btn" onclick="openCaseEditor(null, ${cr.id})">+ Add case</button>
+          <button class="btn" title="Regenerate generated cases" onclick="regenTests()">↻</button></div></div>
+      <div class="progress"><i style="width:${pct}%"></i>${g.failed?`<i class="f" style="width:${Math.round(100*g.failed/g.total)}%"></i>`:""}</div>
+    </div></div>
+    ${T.cases.map(c=>`<div class="card case"><div class="card-b">
+      <div class="row2"><div style="min-width:0"><div class="meta" style="gap:7px;margin-bottom:4px"><span>${esc(c.key)}</span>
+          <span class="chip prio-${c.priority}">${esc(c.priority)}</span>${srcChip(c)}${runChip(c.last_run)}</div>
+        <div style="font-weight:650">${esc(c.title)}</div>
+        ${c.objective?`<div class="hint" style="margin:2px 0 0">${esc(c.objective)}</div>`:""}
+        <div class="hint" style="margin:6px 0 0">${c.steps.length} steps · ${autoCount(c)} automated 🤖 · ${c.steps.length-autoCount(c)} manual 👤${Object.keys(c.test_data||{}).length?` · data: ${Object.keys(c.test_data).map(label).join(", ")}`:""}</div></div>
+        <div style="display:flex;gap:6px;flex:none">${cr.status==="pr_open"?`<button class="btn sm primary" onclick="openRunner(${c.id})">▶ Run</button>`:""}
+          <button class="btn sm" onclick="openCaseEditor(${c.id})">Edit</button>
+          <button class="btn sm danger" title="Remove from this change" onclick="removeCase(${c.id})">✕</button></div></div>
+      <details style="margin-top:8px"><summary class="hint" style="cursor:pointer;margin:0">Steps</summary><ol class="steps-ro">${c.steps.map(s=>`<li><span>${s.auto?"🤖":"👤"} ${esc(s.action)}</span>${s.expected?`<span class="hint" style="margin:0"> → ${esc(s.expected)}</span>`:""}</li>`).join("")}</ol></details>
+    </div></div>`).join("") || `<div class="empty">No test cases yet.</div>`}
+   </div>
+   <div class="grid" style="align-content:start">
+    <div class="card"><div class="card-h">Sign-off</div><div class="card-b">
+      ${cr.override?`<div class="banner-err" style="margin:0 0 10px;background:var(--amber-soft);color:var(--amber)"><b>Override</b> by ${esc(cr.override.by)}: “${esc(cr.override.reason)}”</div>`:""}
+      ${cr.status==="pr_open" ? (cr.tested ? `<div class="ok" style="font-weight:600">✓ Ready to merge</div><button class="btn green block" style="margin-top:10px" onclick="setTab('pr')">Review & merge →</button>`
+        : `<div class="hint" style="margin:0 0 10px">${g.required?"Merging unlocks automatically when every test case passes.":"Tests are advisory; you can sign off manually."}</div>
+           ${g.required?`<button class="btn block" onclick="openOverride()">Override with justification…</button>`:`<button class="btn primary block" onclick="markTested(true)">Mark as tested ✓</button>`}`) :
+        `<div class="hint">${cr.status==="merged"?"Merged.":"—"}</div>`}
+    </div></div>
+    <div class="card"><div class="card-h"><span>Explore freely</span><div class="seg"><button class="${p.mode==='before'?'on':''}" onclick="pvMode('before')">Before</button><button class="${p.mode==='after'?'on':''}" onclick="pvMode('after')">After</button></div></div>
+      <div class="card-b"><div class="phones">${phone({...side, values:p.values, interactive:true, highlight:p.mode==='after'?added:[], id:"pv", screen:p.screen||"profile"})}</div>
+      <div class="hint" style="text-align:center">Type and tap — nothing is written to the live database.</div></div></div>
+   </div></div>`;
+}
+async function regenTests(){ await act(async()=>{ state.tests = await api(`/api/cr/${state.cr.id}/tests/regenerate`,{method:"POST"}); renderCR(); }, "Test cases regenerated"); }
+async function removeCase(id){ if(!confirm("Remove this test case from the change?")) return; await act(async()=>{ await api(`/api/tests/${id}`,{method:"DELETE"}); await loadTests(); renderCR(); }); }
+function openOverride(){
+  modal(`<div class="modal-h">Override the test gate</div><div class="modal-b">
+    <p class="hint" style="margin-top:0">${state.tests.gate.passed}/${state.tests.gate.total} test cases passed. Overrides are recorded in the PR and the audit log.</p>
+    <textarea id="ov-reason" class="input" rows="3" placeholder="Why is it safe to merge without all tests passing? (required)"></textarea></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="doOverride()">Record override & mark tested</button></div>`);
+}
+async function doOverride(){ const r=$("#ov-reason").value.trim(); if (r.length<10) return toast("Write at least a sentence of justification"); closeModal(); await markTested(true, true, r); }
+
+/* ---------- import (Zephyr API / file) ---------- */
+function openImport(crId=null){
+  const z = state.settings && state.settings.zephyr_configured;
+  modal(`<div class="modal-h">Import test cases</div><div class="modal-b">
+    <div class="seg" style="margin-bottom:14px"><button class="on" id="im-t1" onclick="imTab(1)">Zephyr Scale API</button><button id="im-t2" onclick="imTab(2)">CSV / JSON file</button></div>
+    <div id="im-p1">${z?`<p class="hint" style="margin-top:0">Fetch test cases from Zephyr project <b>${esc(state.settings.zephyr_project_key)}</b>.</p>
+        <div style="display:flex;gap:8px"><input id="im-folder" class="input" placeholder="Folder ID (optional)"><input id="im-max" class="input" type="number" value="50" style="width:100px"></div>`
+      : `<p class="hint" style="margin-top:0">Zephyr isn't connected yet. <a href="#settings" onclick="closeModal()">Add your Zephyr API token and project key in Settings</a>, or import an exported file instead.</p>`}</div>
+    <div id="im-p2" class="hide"><p class="hint" style="margin-top:0">Zephyr exports (CSV or JSON) with Name, Step, Test Data and Expected Result columns. One row per step.</p>
+      <input type="file" id="im-file" accept=".csv,.json,text/csv,application/json" class="input">
+      <textarea id="im-paste" class="input code" rows="5" style="min-height:0;margin-top:8px" placeholder="…or paste CSV/JSON here"></textarea></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="im-auto" checked> ${state.settings&&state.settings.ai.available?"Use Claude to make steps runnable in the preview":"Auto-detect runnable steps"}</label>
+    <div id="im-out"></div></div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Close</button><button class="btn primary" id="im-go" onclick="doImport(${crId===null?"null":crId})" ${z?"":""}>Import</button></div>`);
+  state.imTab = 1;
+}
+function imTab(n){ state.imTab=n; $("#im-t1").classList.toggle("on",n===1); $("#im-t2").classList.toggle("on",n===2); $("#im-p1").classList.toggle("hide",n!==1); $("#im-p2").classList.toggle("hide",n!==2); }
+async function doImport(crId){
+  const b=$("#im-go"); b.disabled=true; b.innerHTML=`<span class="spinner"></span> Importing…`;
+  try {
+    let r;
+    if (state.imTab===1) {
+      if (!(state.settings&&state.settings.zephyr_configured)) throw new Error("Connect Zephyr in Settings, or use the file tab");
+      r = await api("/api/tests/import/zephyr",{method:"POST",body:{cr_id:crId, folder_id:$("#im-folder").value||null, max_results:+$("#im-max").value||50, automate:$("#im-auto").checked}});
+    } else {
+      const f = $("#im-file").files[0]; let content = $("#im-paste").value, format;
+      if (f) { content = await f.text(); format = f.name.toLowerCase().endsWith(".json") ? "json" : "csv"; }
+      else format = content.trim().startsWith("{")||content.trim().startsWith("[") ? "json" : "csv";
+      if (!content.trim()) throw new Error("Choose a file or paste its contents");
+      r = await api("/api/tests/import",{method:"POST",body:{format, content, cr_id:crId, automate:$("#im-auto").checked}});
+    }
+    $("#im-out").innerHTML = `<div class="trbox ok" style="margin-top:12px">✓ Imported ${r.imported} case(s) · ${r.automated_steps}/${r.total_steps} steps runnable automatically</div>`;
+    if (crId && state.cr) { await loadTests(); renderCR(); } else if (state.route==="tests") renderLibrary();
+  } catch(e){ toast(e.message); }
+  b.disabled=false; b.textContent="Import";
+}
+async function openAttach(){
+  const lib = (await api("/api/tests")).filter(c => !c.cr_id);
+  modal(`<div class="modal-h">Add from test library</div><div class="modal-b">${lib.length?lib.map(c=>`<label class="pickrow"><input type="checkbox" value="${c.id}">
+      <span><b>${esc(c.key)}</b> ${esc(c.title)} ${srcChip(c)}</span></label>`).join(""):`<div class="hint">The library is empty. Import or create cases on the <a href="#tests" onclick="closeModal()">Test library</a> page.</div>`}</div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="doAttach()" ${lib.length?"":"disabled"}>Add selected</button></div>`);
+}
+async function doAttach(){ const ids=[...document.querySelectorAll(".pickrow input:checked")].map(i=>+i.value); if(!ids.length) return toast("Pick at least one");
+  await act(async()=>{ state.tests = await api(`/api/cr/${state.cr.id}/tests/attach`,{method:"POST",body:{case_ids:ids}}); closeModal(); renderCR(); }, `${ids.length} case(s) added`); }
+
+/* ---------- case editor ---------- */
+async function openCaseEditor(id, crId=null){
+  const c = id ? await api(`/api/tests/${id}`) : {title:"", priority:"Medium", objective:"", preconditions:"", test_data:{}, steps:[{action:"",expected:"",auto:null}], cr_id:crId};
+  state.edit = JSON.parse(JSON.stringify(c));
+  renderEditor();
+}
+function renderEditor(){
+  const c = state.edit;
+  modal(`<div class="modal-h">${c.id?esc(c.key)+" · Edit test case":"New test case"} ${c.id?srcChip(c):""}</div><div class="modal-b">
+    <div class="grid" style="grid-template-columns:1fr 140px;gap:10px"><input id="ce-title" class="input" placeholder="Title" value="${esc(c.title)}">
+      <select id="ce-prio" class="input">${["High","Medium","Low"].map(p=>`<option ${c.priority===p?"selected":""}>${p}</option>`).join("")}</select></div>
+    <textarea id="ce-obj" class="input" rows="2" style="margin-top:10px" placeholder="Objective (plain English)">${esc(c.objective)}</textarea>
+    <input id="ce-pre" class="input" style="margin-top:10px" placeholder="Preconditions" value="${esc(c.preconditions)}">
+    <div class="label" style="margin:14px 0 6px">Test data <span style="text-transform:none;font-weight:400">— one per line, e.g. phone_number = 555-0100</span></div>
+    <textarea id="ce-data" class="input code" rows="3" style="min-height:0">${esc(Object.entries(c.test_data||{}).map(([k,v])=>`${k} = ${v}`).join("\n"))}</textarea>
+    <div class="label" style="margin:14px 0 6px">Steps</div>
+    <div id="ce-steps">${c.steps.map((s,i)=>`<div class="steprow"><span class="n">${i+1}</span>
+      <input class="input" data-i="${i}" data-k="action" placeholder="Action (e.g. Leave Phone Number empty and tap Save)" value="${esc(s.action)}">
+      <input class="input" data-i="${i}" data-k="expected" placeholder="Expected result" value="${esc(s.expected)}">
+      <span title="${s.auto?esc(s.auto.map(o=>o.op).join(', ')):'manual'}">${s.auto?"🤖":"👤"}</span>
+      <button class="btn sm" onclick="ceDel(${i})">✕</button></div>`).join("")}</div>
+    <button class="btn sm" style="margin-top:6px" onclick="ceAdd()">+ Step</button>
+    <div class="hint">🤖 = runs automatically in the preview · 👤 = you judge it. After saving, use “Make runnable” to let ${state.settings&&state.settings.ai.available?"Claude":"the parser"} automate edited steps.</div></div>
+    <div class="modal-f">${c.id?`<button class="btn" onclick="ceAutomate()">✦ Make runnable</button>`:""}<span style="flex:1"></span>
+      <button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="ceSave()">Save</button></div>`, "wide");
+}
+function ceCollect(){ const c=state.edit; c.title=$("#ce-title").value; c.priority=$("#ce-prio").value; c.objective=$("#ce-obj").value; c.preconditions=$("#ce-pre").value;
+  c.test_data = Object.fromEntries($("#ce-data").value.split("\n").map(l=>l.split(/\s*[=:]\s*/)).filter(x=>x[0]&&x.length>1).map(([k,...v])=>[k.trim(),v.join("=").trim()]));
+  document.querySelectorAll("#ce-steps input").forEach(inp=>{ const s=c.steps[+inp.dataset.i]; if (s[inp.dataset.k]!==inp.value){ s[inp.dataset.k]=inp.value; s.auto=null; } }); }
+function ceAdd(){ ceCollect(); state.edit.steps.push({action:"",expected:"",auto:null}); renderEditor(); }
+function ceDel(i){ ceCollect(); state.edit.steps.splice(i,1); renderEditor(); }
+async function ceSave(){ ceCollect(); const c=state.edit; if(!c.title.trim()) return toast("Give the test a title");
+  c.steps = c.steps.filter(s=>s.action.trim()||s.expected.trim());
+  await act(async()=>{ if (c.id) await api(`/api/tests/${c.id}`,{method:"PUT",body:c});
+    else if (c.cr_id) await api(`/api/cr/${c.cr_id}/tests`,{method:"POST",body:c}); else await api(`/api/tests`,{method:"POST",body:c});
+    closeModal(); if (state.cr && state.route==="cr"){ await loadTests(); renderCR(); } else renderLibrary(); }, "Test case saved"); }
+async function ceAutomate(){ ceCollect(); await api(`/api/tests/${state.edit.id}`,{method:"PUT",body:state.edit});
+  await act(async()=>{ state.edit = await api(`/api/tests/${state.edit.id}/automate`,{method:"POST"}); renderEditor(); }, "Steps updated"); }
+
+/* ---------- interactive runner ---------- */
+function rnUI(){ return {...UI_DEF, ...(state.run.ui||{})}; }
+function rnBannerText(){ const r=state.run, ui=rnUI(), miss=missingOf(r.rules, r.values);
+  return miss.length ? (ui.banner_message || "Your profile is missing: " + miss.map(label).join(", ")) : ""; }
+async function openRunner(caseId, queue=[]){
+  const c = await api(`/api/tests/${caseId}`); const cr = state.cr;
+  const datasets = await api("/api/datasets");
+  const rules = cr.design.after.rules, ui = cr.design.after.ui;
+  state.run = {case:c, queue, rules, ui, datasets, data:{...(c.test_data||{})}, values:{...(c.test_data||{})}, idx:0, op:0, answers:{},
+    results:c.steps.map(()=>({status:"pending", actual:"", log:[]})), toast:"", waiting:null, running:false, started:new Date().toISOString(), log:[]};
+  renderRunner();
+}
+function renderRunner(){
+  const r = state.run, c = r.case;
+  const done = r.results.filter(x=>["pass","fail","blocked"].includes(x.status)).length;
+  const overall = r.results.some(x=>x.status==="fail") ? "failed" : r.results.some(x=>x.status==="blocked") ? "blocked" : done===c.steps.length ? "passed" : null;
+  const fieldsInRules = profileFields(r.rules);
+  modal(`<div class="modal-h"><span><span class="hint" style="margin:0">${esc(c.key)}</span> ${esc(c.title)} <span class="chip prio-${c.priority}">${esc(c.priority)}</span> ${srcChip(c)}</span>
+      <span style="display:flex;gap:8px;align-items:center">${r.queue.length?`<span class="hint" style="margin:0">${r.queue.length} more queued</span>`:""}<button class="btn sm" onclick="rnClose()">Close</button></span></div>
+    <div class="runner">
+      <div class="rsteps">${c.preconditions?`<div class="hint" style="margin:0 0 8px"><b>Preconditions:</b> ${esc(c.preconditions)}</div>`:""}
+        ${c.steps.map((s,i)=>{ const res=r.results[i], cur=i===r.idx&&!overall;
+          return `<div class="rstep ${cur?'cur':''} st-${res.status}"><div class="rdot">${{pass:"✓",fail:"✕",blocked:"!",running:"",pending:i+1}[res.status]??i+1}</div>
+          <div style="min-width:0;flex:1"><div class="ra">${s.auto?'<span title="automated">🤖</span>':'<span title="manual">👤</span>'} ${esc(s.action)}</div>
+            ${s.expected?`<div class="re">Expected: ${esc(s.expected)}</div>`:""}
+            ${res.actual?`<div class="ract ${res.status==='fail'?'err':''}">${esc(res.actual)}</div>`:""}
+            ${cur && r.waiting && r.waiting.type==="ask" ? `<div class="ask"><div class="hint" style="margin:0 0 4px">✋ ${esc(r.waiting.prompt)}</div>
+                <div style="display:flex;gap:6px"><input id="rn-ans" class="input" value="${esc(r.waiting.suggest||"")}" placeholder="Type a value" onkeydown="if(event.key==='Enter')rnAnswer()"><button class="btn primary sm" onclick="rnAnswer()">Use</button></div></div>`:""}
+            ${cur && r.waiting && r.waiting.type==="manual" ? `<div class="ask"><div class="hint" style="margin:0 0 4px">👤 Check this on the phone, then record the result.</div>
+                <input id="rn-actual" class="input" placeholder="Actual result (optional)" style="margin-bottom:6px">
+                <div style="display:flex;gap:6px"><button class="btn sm green" onclick="rnManual('pass')">✓ Pass</button><button class="btn sm danger" onclick="rnManual('fail')">✕ Fail</button><button class="btn sm" onclick="rnManual('blocked')">Blocked</button></div></div>`:""}
+            ${cur && r.waiting && r.waiting.type==="failed" ? `<div class="ask"><div style="display:flex;gap:6px"><button class="btn sm" onclick="rnContinue()">Continue anyway</button><button class="btn sm" onclick="rnRetry()">Retry step</button></div></div>`:""}
+          </div></div>`; }).join("")}
+      </div>
+      <div class="rphone"><div class="phones">${phone({rules:r.rules, ui:r.ui, values:r.values, interactive:true, id:"rn", onInput:"rnInput", onTap:"rnTapUser", screen:r.screen||"profile", onBack:"rnBackUser",
+          highlight: r.focus?[r.focus]:[]})}</div>
+        <div class="hint" style="text-align:center">Starts with the test data, like a user's saved profile. You can type on the phone at any time.</div></div>
+      <div class="rside">
+        <div class="label">Test data</div>
+        <select class="input" onchange="rnDataset(this.value)"><option value="">Apply a dataset…</option>${r.datasets.map((d,i)=>`<option value="${i}">${esc(d.name)}</option>`).join("")}</select>
+        <div class="tdata">${[...new Set([...Object.keys(r.data), ...fieldsInRules])].map(k=>`<label><span>${esc(label(k))}</span><input class="input" value="${esc(r.data[k]??"")}" oninput="state.run.data['${k}']=this.value"></label>`).join("")}</div>
+        <button class="btn sm" onclick="rnSaveDataset()">Save as dataset</button>
+        <div class="label" style="margin-top:14px">Log</div><div class="rlog" id="rn-log">${r.log.slice(-40).map(l=>`<div class="${l.k}">${esc(l.t)}</div>`).join("")}</div>
+      </div>
+    </div>
+    <div class="modal-f">${overall?`<span class="chip ${overall==='passed'?'s-pr_open':overall==='failed'?'s-failed':'s-diagnosing'}" style="font-size:13px;padding:3px 12px">Result: ${overall}</span>`:`<span class="hint" style="margin:0">${done}/${c.steps.length} steps done</span>`}
+      <span style="flex:1"></span>
+      <button class="btn" onclick="rnRestart()">Restart</button>
+      ${overall ? `<input id="rn-notes" class="input" placeholder="Run notes (optional)" style="max-width:260px"><button class="btn primary" onclick="rnFinish('${overall}')">Save result${r.queue.length?" & next":""}</button>`
+        : `<button class="btn" onclick="rnStep()" ${r.running||r.waiting?"disabled":""}>Step</button><button class="btn primary" onclick="rnRun()" ${r.running||r.waiting?"disabled":""}>▶ Run</button>`}
+    </div>`, "xwide");
+  const lg=document.getElementById("rn-log"); if(lg) lg.scrollTop=lg.scrollHeight;
+  const a=document.getElementById("rn-ans"); if(a) a.focus();
+}
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function rnLog(t,k=""){ state.run.log.push({t,k}); }
+function rnInput(el){ state.run.values[el.dataset.k]=el.value; }
+function rnTapUser(){ rnTap(); renderRunner(); }
+function rnBackUser(){ state.run.screen="profile"; rnLog("tap Back to profile"); renderRunner(); }
+function rnTap(){ const r=state.run, miss=missingOf(r.rules, r.values); r.toast = miss.length ? `Still missing: ${miss.map(label).join(", ")}` : "Saved — profile complete";
+  if (!miss.length && rnUI().after_save==="success_screen") r.screen = "success"; rnLog(`tap ${rnUI().button_label} → ${r.toast}`); }
+function rnDataset(i){ if(i==="") return; const d=state.run.datasets[+i]; Object.assign(state.run.data, d.values); rnLog(`dataset “${d.name}” applied`); renderRunner(); }
+async function rnSaveDataset(){ const name=prompt("Dataset name","My test data"); if(!name) return;
+  const d = await api("/api/datasets",{method:"POST",body:{name, values:state.run.data}}); state.run.datasets.unshift(d); toast("Dataset saved"); renderRunner(); }
+function rnResolve(v, field){
+  const r=state.run; const m=/^\{\{\s*(ask:)?(.+?)\s*\}\}$/.exec(String(v??""));
+  if (!m) return {value:String(v??"")};
+  const key = `${r.idx}:${r.op}`;
+  if (key in r.answers) return {value:r.answers[key]};
+  if (m[1]) return {ask:m[2], suggest:r.data[field]||r.data[snakeOf(m[2])]||""};
+  const f = m[2].trim(); if (r.data[f]!==undefined && r.data[f]!=="") return {value:r.data[f]};
+  return {ask:`No test data for “${label(f)}”. Enter a value:`, suggest:""};
+}
+const snakeOf = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
+function rnExec(o){
+  const r=state.run, ui=rnUI(); r.focus = o.field || null;
+  const fail = msg => ({ok:false, msg}), ok = msg => ({ok:true, msg});
+  switch(o.op){
+    case "set": { const v = rnResolve(o.value, o.field); if (v.ask!==undefined) return {wait:{type:"ask", prompt:v.ask, suggest:v.suggest, field:o.field}};
+      r.values[o.field]=v.value; return ok(`set ${label(o.field)} = “${v.value}”`); }
+    case "clear": r.values[o.field]=""; return ok(`clear ${label(o.field)}`);
+    case "tap": rnTap(); return ok(`tapped ${ui.button_label}`);
+    case "expect_banner": { const t=rnBannerText(), vis=!!t;
+      if (vis!==!!o.visible) return fail(`expected banner ${o.visible?"visible":"hidden"} but it is ${vis?"visible: “"+t+"”":"hidden"}`);
+      if (o.contains && !t.toLowerCase().includes(String(o.contains).toLowerCase())) return fail(`banner doesn't mention “${o.contains}”: “${t}”`);
+      return ok(`banner ${vis?"visible":"hidden"}${o.contains?` and mentions “${o.contains}”`:""} ✓`); }
+    case "expect_field_error": { const err = missingOf(r.rules, r.values).includes(o.field);
+      return err===(o.error!==false) ? ok(`${label(o.field)} ${err?"highlighted":"not highlighted"} ✓`) : fail(`${label(o.field)} is ${err?"":"not "}highlighted`); }
+    case "expect_field_visible": { const vis = profileFields(r.rules).includes(o.field);
+      return vis===(o.visible!==false) ? ok(`${label(o.field)} ${vis?"shown":"not shown"} ✓`) : fail(`${label(o.field)} is ${vis?"shown":"not shown"}`); }
+    case "expect_ui": { const actual = String(ui[o.key]??""); return actual.toLowerCase()===String(o.value).toLowerCase() ? ok(`${label(o.key)} is ${actual} ✓`) : fail(`${label(o.key)} is “${actual}”, expected “${o.value}”`); }
+    case "expect_screen": { const cur = r.screen||"profile"; return cur===o.screen ? ok(`${label(cur)} screen showing ✓`) : fail(`expected the ${o.screen} screen but the ${cur} screen is showing`); }
+    case "tap_back": r.screen="profile"; return ok("tapped Back to profile");
+    case "expect_toast": return r.toast.toLowerCase().includes(String(o.contains||"").toLowerCase()) ? ok(`message “${r.toast}” ✓`) : fail(`message was “${r.toast||"(none)"}”, expected “${o.contains}”`);
+  }
+  return ok("skipped unknown op");
+}
+async function rnStepInner(){
+  const r=state.run, s=r.case.steps[r.idx]; if (!s) return "end";
+  const res=r.results[r.idx];
+  if (!s.auto){ r.waiting={type:"manual"}; res.status="running"; return "wait"; }
+  res.status="running";
+  for (; r.op < s.auto.length; r.op++){
+    const out = rnExec(s.auto[r.op]);
+    if (out.wait){ r.waiting=out.wait; return "wait"; }
+    rnLog((out.ok?"✓ ":"✕ ")+out.msg, out.ok?"":"err"); res.log.push(out.msg);
+    renderRunner(); await sleep(260);
+    if (!out.ok){ res.status="fail"; res.actual=out.msg; r.waiting={type:"failed"}; return "wait"; }
+  }
+  res.status="pass"; res.actual = res.log.filter(x=>x.includes("✓")).slice(-1)[0] || "done";
+  r.idx++; r.op=0; return "next";
+}
+async function rnStep(){ const r=state.run; r.running=true; renderRunner(); await rnStepInner(); r.running=false; renderRunner(); }
+async function rnRun(){ const r=state.run; r.running=true; renderRunner();
+  while (true){ const o = await rnStepInner(); if (o!=="next") break; renderRunner(); await sleep(150); }
+  r.running=false; renderRunner(); }
+async function rnAnswer(){ const r=state.run, v=$("#rn-ans").value; if(!v.trim()) return toast("Enter a value");
+  r.answers[`${r.idx}:${r.op}`]=v; if (r.waiting.field) r.data[r.waiting.field] = r.data[r.waiting.field] || v; rnLog(`tester entered “${v}”`); r.waiting=null; await rnRun(); }
+async function rnManual(st){ const r=state.run, res=r.results[r.idx]; res.status=st; res.actual=($("#rn-actual").value||"").trim() || ({pass:"Verified by tester",fail:"Failed (tester)",blocked:"Blocked"})[st];
+  rnLog(`👤 step ${r.idx+1}: ${st}`, st==="pass"?"":"err"); r.waiting=null; r.idx++; r.op=0; await rnRun(); }
+async function rnContinue(){ const r=state.run; r.waiting=null; r.idx++; r.op=0; await rnRun(); }
+function rnRetry(){ const r=state.run; r.waiting=null; r.results[r.idx]={status:"pending",actual:"",log:[]}; r.op=0; renderRunner(); }
+function rnRestart(){ const r=state.run; openRunner(r.case.id, r.queue); }
+async function rnFinish(overall){
+  const r=state.run, notes=($("#rn-notes")||{}).value||"";
+  const steps = r.case.steps.map((s,i)=>({n:i+1, status:r.results[i].status, actual:r.results[i].actual, log:r.results[i].log}));
+  try {
+    const out = await api(`/api/tests/${r.case.id}/runs`,{method:"POST",body:{cr_id:state.cr.id, status:overall, steps, data_used:r.data, notes, started_at:r.started}});
+    toast(`${r.case.key} ${overall}${out.run.exported&&out.run.exported.zephyr?" · sent to Zephyr":""}`);
+    const queue = r.queue; state.run = null; closeModal();
+    state.cr = await api(`/api/cr/${state.cr.id}`); await loadTests(); await refreshList(); renderCR();
+    if (queue.length) openRunner(queue[0], queue.slice(1));
+    else if (state.tests.gate.all_passed) toast("🎉 All test cases passed — ready to merge");
+  } catch(e){ toast(e.message); }
+}
+function rnClose(){ if (state.run && state.run.results.some(x=>x.status!=="pending") && !confirm("Discard this test run?")) return; state.run=null; closeModal(); }
+function runAll(){ const ids = state.tests.cases.filter(c=>!(c.last_run&&c.last_run.status==="passed")).map(c=>c.id);
+  const list = ids.length ? ids : state.tests.cases.map(c=>c.id); openRunner(list[0], list.slice(1)); }
+
+/* ---------- test library page ---------- */
+async function renderLibrary(){
+  $("#view").innerHTML = `<div class="skel"></div>`;
+  const [cases, datasets] = await Promise.all([api("/api/tests"), api("/api/datasets")]);
+  const crs = state.list.filter(c=>c.kind!=="incident");
+  const byCr = id => (crs.find(c=>c.id===id)||{}).key || "";
+  $("#view").innerHTML = `
+   <div class="hdr"><div><h1>Test library</h1><div class="meta">Plain-English test cases from MobileHeal, Claude and Zephyr. ${cases.length} case(s).</div></div>
+     <div style="display:flex;gap:8px"><button class="btn" onclick="openImport(null)">Import from Zephyr…</button><button class="btn primary" onclick="openCaseEditor(null,null)">+ New test case</button></div></div>
+   <div class="grid g-side" style="margin-top:18px">
+    <div class="card"><div class="card-b" style="padding:0">
+      <table class="t lib"><tr><th>Key</th><th>Title</th><th>Source</th><th>Steps</th><th>Last run</th><th>Change</th><th></th></tr>
+      ${cases.map(c=>`<tr><td><b>${esc(c.key)}</b></td><td>${esc(c.title)}<div class="hint" style="margin:0"><span class="chip prio-${c.priority}">${c.priority}</span></div></td><td>${srcChip(c)}</td>
+        <td>${c.steps.length} <span class="hint">(${autoCount(c)} 🤖)</span></td><td>${runChip(c.last_run)}</td>
+        <td>${c.cr_id?`<a href="#cr/${c.cr_id}/test">${esc(byCr(c.cr_id)||"CR-"+c.cr_id)}</a>`:'<span class="hint">library</span>'}</td>
+        <td style="white-space:nowrap"><button class="btn sm" onclick="openCaseEditor(${c.id})">Edit</button> <button class="btn sm danger" onclick="libDelete(${c.id})">✕</button></td></tr>`).join("")
+        || `<tr><td colspan="7"><div class="empty">No test cases yet. Import from Zephyr or create one.</div></td></tr>`}</table></div></div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Test datasets <span class="count">${datasets.length}</span></div><div class="card-b">
+        ${datasets.map(d=>`<div class="dsrow"><div style="min-width:0"><b>${esc(d.name)}</b><div class="hint" style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(Object.entries(d.values).map(([k,v])=>`${label(k)}: ${v}`).join(" · "))}</div></div>
+          ${d.builtin?'<span class="chip s-closed">live profile</span>':`<button class="btn sm danger" onclick="dsDelete(${d.id})">✕</button>`}</div>`).join("")}
+        <div class="label" style="margin:14px 0 6px">New dataset</div>
+        <input id="ds-name" class="input" placeholder="Name, e.g. UK customer">
+        <textarea id="ds-vals" class="input code" rows="3" style="min-height:0;margin-top:6px" placeholder="name = Ada Lovelace&#10;phone_number = +44 20 7946 0000"></textarea>
+        <button class="btn sm" style="margin-top:6px" onclick="dsAdd()">Save dataset</button></div></div>
+    </div></div>`;
+}
+async function libDelete(id){ if(!confirm("Delete this test case and its history?")) return; await act(async()=>{ await api(`/api/tests/${id}`,{method:"DELETE"}); renderLibrary(); }, "Deleted"); }
+async function dsAdd(){ const values = Object.fromEntries($("#ds-vals").value.split("\n").map(l=>l.split(/\s*[=:]\s*/)).filter(x=>x[0]&&x.length>1).map(([k,...v])=>[k.trim(),v.join("=").trim()]));
+  if (!$("#ds-name").value.trim() || !Object.keys(values).length) return toast("Give the dataset a name and at least one value");
+  await act(async()=>{ await api("/api/datasets",{method:"POST",body:{name:$("#ds-name").value, values}}); renderLibrary(); }, "Dataset saved"); }
+async function dsDelete(id){ await act(async()=>{ await api(`/api/datasets/${id}`,{method:"DELETE"}); renderLibrary(); }); }
+
+/* ---------- settings ---------- */
+async function renderSettings(){
+  await loadSettings(); const s = state.settings;
+  const secret = (k, ph) => `<input id="s-${k}" class="input" type="password" autocomplete="off" placeholder="${s[k].set?esc(s[k].hint)+(s[k].from_env?" (from environment)":""):ph}">`;
+  $("#view").innerHTML = `
+   <div class="hdr"><div><h1>Settings</h1><div class="meta">Secrets are stored on this server and never sent back to the browser.</div></div>
+     <button class="btn primary" onclick="saveSettings()">Save settings</button></div>
+   <div class="grid g2" style="margin-top:18px">
+    <div class="card"><div class="card-h"><span>✦ Anthropic (Claude)</span><span class="chip ${s.ai.available?'s-pr_open':'s-closed'}">${s.ai.available?'Connected':'Not configured'}</span></div><div class="card-b">
+      <div class="field"><label>API key</label>${secret("anthropic_api_key","sk-ant-…")}<div class="hint">Get one at console.anthropic.com. Leave blank to keep the current key.</div></div>
+      <div class="field"><label>Model</label><select id="s-anthropic_model" class="input">${s.models.map(m=>`<option ${s.anthropic_model===m?"selected":""}>${m}</option>`).join("")}</select></div>
+      <div class="hint" style="margin-bottom:10px">Used for: plain-English → rules, test case generation, automating imported Zephyr steps, and fixing crashes no built-in pattern covers.</div>
+      <button class="btn" onclick="testAI()">Test connection</button> <span id="s-ai-out" class="hint"></span>
+      ${s.ai.last_error?`<div class="hint err">Last error: ${esc(s.ai.last_error)}</div>`:""}</div></div>
+    <div class="card"><div class="card-h"><span>Zephyr Scale</span><span class="chip ${s.zephyr_configured?'s-pr_open':'s-closed'}">${s.zephyr_configured?'Connected':'Not configured'}</span></div><div class="card-b">
+      <div class="field"><label>API base URL</label><input id="s-zephyr_base_url" class="input" value="${esc(s.zephyr_base_url)}"></div>
+      <div class="field"><label>API token</label>${secret("zephyr_token","Zephyr Scale API access token")}</div>
+      <div class="grid g2" style="gap:10px"><div class="field"><label>Project key</label><input id="s-zephyr_project_key" class="input" value="${esc(s.zephyr_project_key)}" placeholder="e.g. MH"></div>
+        <div class="field"><label>Test cycle key <span class="hint">(to export results)</span></label><input id="s-zephyr_cycle_key" class="input" value="${esc(s.zephyr_cycle_key)}" placeholder="e.g. MH-R1"></div></div>
+      <button class="btn" onclick="testZephyr()">Test connection</button> <span id="s-z-out" class="hint"></span></div></div>
+    <div class="card"><div class="card-h"><span><span class="figlogo"></span> Figma</span><span class="chip ${s.figma_token.set?'s-pr_open':'s-closed'}">${s.figma_token.set?'Connected':'Embed only'}</span></div><div class="card-b">
+      <div class="field"><label>Personal access token</label>${secret("figma_token","figd_…")}
+        <div class="hint">Figma → Settings → Security → Personal access tokens (scope: file content, read-only). Without it, Figma links are still embedded for visual review.</div></div></div></div>
+    <div class="card"><div class="card-h">Delivery policy</div><div class="card-b">
+      <div class="field"><label>Your name <span class="hint">(shown in activity, PRs and the audit log)</span></label><input id="s-user_name" class="input" value="${esc(s.user_name)}"></div>
+      <div class="field"><label>Merge policy</label><select id="s-merge_policy" class="input">
+        <option value="tests_required" ${s.merge_policy==="tests_required"?"selected":""}>All test cases must pass (override needs written justification)</option>
+        <option value="review_only" ${s.merge_policy==="review_only"?"selected":""}>Tests are advisory — reviewer signs off</option></select></div></div></div>
+    <div class="card"><div class="card-h">Source control</div><div class="card-b" style="font-size:13.5px;display:grid;gap:6px">
+      <div>Git: ${state.info&&state.info.git?(state.info.repo?"local repository ✓":"ready (initialised on first PR)"):"not installed"}</div>
+      <div>GitHub mirroring: ${s.github?esc(s.github):'off — start the backend with <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> to enable'}</div></div></div>
+   </div>`;
+}
+async function saveSettings(){
+  const body = {}; ["anthropic_model","zephyr_base_url","zephyr_project_key","zephyr_cycle_key","user_name","merge_policy"].forEach(k=>body[k]=$("#s-"+k).value);
+  ["anthropic_api_key","zephyr_token","figma_token"].forEach(k=>{ const v=$("#s-"+k).value.trim(); if(v) body[k]=v; });
+  await act(async()=>{ await api("/api/settings",{method:"PUT",body}); await renderSettings(); }, "Settings saved");
+}
+async function testAI(){ const o=$("#s-ai-out"); o.innerHTML=`<span class="spinner"></span>`;
+  try { const r = await api("/api/settings/test-ai",{method:"POST"}); o.innerHTML=`<span class="ok">✓ ${esc(r.model)} replied in ${r.ms} ms</span>`; } catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } loadSettings(); }
+async function testZephyr(){ const o=$("#s-z-out"); o.innerHTML=`<span class="spinner"></span>`;
+  try { const r = await api("/api/settings/test-zephyr",{method:"POST"}); o.innerHTML=`<span class="ok">✓ Connected${r.sample?` — e.g. “${esc(r.sample)}”`:""}</span>`; } catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } }
+
+/* ---------- audit ---------- */
+async function renderAudit(){
+  const rows = await api("/api/audit?limit=300");
+  $("#view").innerHTML = `<div class="hdr"><div><h1>Audit log</h1><div class="meta">Every decision, override, test run, merge and settings change.</div></div>
+    <button class="btn" onclick="exportAudit()">Export CSV</button></div>
+    <div class="card" style="margin-top:18px"><div class="card-b" style="padding:0;overflow-x:auto"><table class="t"><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th></tr>
+    ${rows.map(r=>`<tr><td style="white-space:nowrap">${esc(new Date(r.ts+"Z").toLocaleString())}</td><td>${esc(r.actor)}</td><td><code>${esc(r.action)}</code></td><td>${esc(r.target)}</td><td>${esc(r.detail)}</td></tr>`).join("")
+     || `<tr><td colspan="5"><div class="empty">Nothing yet.</div></td></tr>`}</table></div></div>`;
+  state.auditRows = rows;
+}
+function exportAudit(){ const rows=state.auditRows||[]; const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const csv = ["ts,actor,action,target,detail", ...rows.map(r=>[r.ts,r.actor,r.action,r.target,r.detail].map(q).join(","))].join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="mobileheal-audit.csv"; a.click(); }
+
+/* =====================================================================
+   Guided production-crash demo
+   ===================================================================== */
+const DEMO_STEPS = [
+  ["traffic","Production traffic","A real user request hits the live backend"],
+  ["crash","Crash","Unhandled exception → HTTP 500 for the user"],
+  ["detect","Incident detected","Grouped by fingerprint, input captured"],
+  ["diagnose","Diagnosis","Failing line, values and root cause"],
+  ["reproduce","Reproduced","Replayed with the exact production input"],
+  ["fix","Fix found","Patch → replay loop until the crash is gone"],
+  ["checks","Checks","Regression test + full suite on patched code"],
+  ["pr","Pull request","Branch, commit and postmortem — never auto-merged"],
+  ["review","Human review","Approve the fix"],
+  ["deploy","Merged & deployed","Committed and hot-reloaded into the running server"],
+  ["verify","Verified","Same request now succeeds"],
+];
+const ANDROID_STEPS = ["traffic","crash","detect","diagnose","fix","checks","pr","review","deploy"];
+async function renderDemo(){
+  const d = await api("/api/demo"); state.demo = state.demo || {}; state.demo.data = d;
+  const D = state.demo, h = d.healer;
+  $("#view").innerHTML = `
+   <div class="hdr"><div><h1>Production crash demo</h1><div class="meta">Trigger a real crash through the real code path and watch MobileHeal detect it, fix it and open a PR for review.</div></div>
+     <div class="demo-ctl"><label class="ah"><span>Auto-play review & merge</span><span class="switch"><input type="checkbox" id="dm-auto" ${D.autoplay?"checked":""} onchange="state.demo.autoplay=this.checked"><span></span></span></label></div></div>
+   ${h.autoheal?"":`<div class="banner-err" style="margin-top:14px">Auto-heal is off, so crashes will only be recorded. <button class="btn sm" onclick="toggleAutoheal(true).then(renderDemo)">Turn it on</button></div>`}
+   <div class="scen">${d.scenarios.map(sc=>`<div class="card scard ${D.active&&D.active.id===sc.id?'on':''}"><div class="card-b">
+      <div class="meta" style="margin-bottom:6px"><span class="chip ${sc.kind==='android'?'s-coding':'s-detected'}">${sc.kind==='android'?'Android app':'Backend'}</span>
+        ${sc.fixed?'<span class="chip s-pr_open">✓ bug fixed</span>':'<span class="chip s-failed">bug present</span>'}</div>
+      <div style="font-weight:650;font-size:15px">${esc(sc.title)}</div>
+      <div class="hint" style="margin:4px 0 8px">${esc(sc.story)}</div>
+      <div class="hint" style="margin:0 0 10px"><b>Expect:</b> ${esc(sc.expect)}</div>
+      <div class="hint" style="margin:0 0 10px"><code>${esc(sc.endpoint)}</code> · <code>${esc(sc.file.split("/").slice(-1)[0])}</code></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary sm" onclick="runDemo('${sc.id}')" ${D.running?"disabled":""}>▶ Run scenario</button>
+        ${sc.fixed?`<button class="btn sm" onclick="resetDemo('${sc.id}')">↺ Reset bug</button>`:""}
+        ${sc.incidents.length?`<a class="btn sm" href="#cr/${sc.incidents[0].id}">${esc(sc.incidents[0].key)} →</a>`:""}</div>
+    </div></div>`).join("")}</div>
+   <div id="dm-run">${demoRunHtml()}</div>`;
+}
+function demoRunHtml(){
+  const D = state.demo, a = D.active; if (!a) return `<div class="empty">Pick a scenario to start. Tip: put this page and the Android emulator side by side.</div>`;
+  const steps = DEMO_STEPS.filter(s => a.kind!=="android" || ANDROID_STEPS.includes(s[0]));
+  const t0 = a.t0, fmt = t => t==null ? "" : `+${((t-t0)/1000).toFixed(1)}s`;
+  const m = a.marks;
+  const metric = (lbl, from, to) => m[from]!=null && m[to]!=null ? `<div><b>${((m[to]-m[from])/1000).toFixed(1)}s</b><span>${lbl}</span></div>` : `<div><b>—</b><span>${lbl}</span></div>`;
+  return `<div class="grid g-side" style="margin-top:16px">
+    <div class="card"><div class="card-h"><span>${esc(a.title)}</span><span>${a.done?`<span class="chip ${a.outcome==='fixed'?'s-pr_open':'s-diagnosing'}">${esc(a.outcomeText)}</span>`:'<span class="chip s-coding"><span class="spinner"></span> running</span>'}</span></div>
+      <div class="card-b"><ol class="dsteps">${steps.map(([k,t,sub])=>{ const st = a.status[k]||"pending";
+        return `<li class="ds ${st}"><div class="dsn">${st==="done"?"✓":st==="fail"?"✕":st==="wait"?"⏸":st==="running"?"":"·"}</div>
+          <div style="flex:1;min-width:0"><div class="dst"><b>${t}</b><span class="hint" style="margin:0">${fmt(m[k])}</span></div>
+          <div class="hint" style="margin:1px 0 0">${esc(a.detail[k]||sub)}</div>
+          ${k==="review"&&st==="wait"?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm green" onclick="demoApprove()">Approve & merge fix</button><a class="btn sm" href="#cr/${a.incId}/test">Review in detail →</a></div>`:""}
+          ${a.extra[k]?`<pre class="out">${esc(a.extra[k])}</pre>`:""}</div></li>`; }).join("")}</ol></div></div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Timings</div><div class="card-b"><div class="stat stat2">
+        ${metric("crash → detected","crash","detect")}${metric("detected → fix PR","detect","pr")}${metric("crash → verified fix","crash","verify")}</div></div></div>
+      ${a.incKey?`<div class="card"><div class="card-h">Incident</div><div class="card-b" style="display:grid;gap:8px">
+        <div><a href="#cr/${a.incId}"><b>${esc(a.incKey)}</b></a> ${a.regression?`<span class="chip s-failed">regression of ${esc(a.regression)}</span>`:""}</div>
+        ${a.prBranch?`<div><span class="branch">${esc(a.prBranch)}</span></div>`:""}
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="#cr/${a.incId}/diagnosis">Diagnosis</a><a class="btn sm" href="#cr/${a.incId}/code">Diff</a><a class="btn sm" href="#cr/${a.incId}/checks">Checks</a></div></div></div>`:""}
+      <div class="card"><div class="card-h">Live requests</div><div class="card-b"><div class="rlog" style="height:220px">${a.log.map(l=>`<div class="${l.k||""}">${esc(l.t)}</div>`).join("")}</div></div></div>
+    </div></div>`;
+}
+function dmPaint(){ const el=document.getElementById("dm-run"); if (el && state.route==="demo") el.innerHTML = demoRunHtml(); }
+function dmMark(k, st="done", detail=null, extra=null){ const a=state.demo.active; a.status[k]=st; if (st!=="running" && st!=="wait" && a.marks[k]==null) a.marks[k]=Date.now();
+  if (st==="wait" && a.marks[k]==null) a.marks[k]=Date.now(); if (detail) a.detail[k]=detail; if (extra) a.extra[k]=extra; dmPaint(); }
+function dmLog(t,k){ state.demo.active.log.push({t:`${new Date().toLocaleTimeString()}  ${t}`,k}); dmPaint(); }
+async function resetDemo(id){ await act(async()=>{ const r = await api(`/api/demo/${id}/reset`,{method:"POST"}); await renderDemo(); }, "Bug re-introduced — ready to demo again"); }
+
+async function runDemo(id){
+  const D = state.demo, sc = D.data.scenarios.find(s=>s.id===id);
+  if (sc.fixed){ if (!confirm("This bug is already fixed. Re-introduce it and run the scenario?")) return; await api(`/api/demo/${id}/reset`,{method:"POST"}); }
+  D.running = true; D.autoplay = $("#dm-auto").checked;
+  D.active = {id, title:sc.title, kind:sc.kind, t0:Date.now(), marks:{}, status:{}, detail:{}, extra:{}, log:[], done:false};
+  await renderDemo();
+  try {
+    let incKey;
+    dmMark("traffic","running");
+    if (sc.kind === "android") {
+      dmLog("📱 Pixel 8 · user taps Save on the Profile screen…");
+      dmMark("traffic","done","User taps Save in the Android app");
+      dmLog("💥 java.lang.NullPointerException in ProfileViewModel.save", "err");
+      dmMark("crash","done","App crashed — CrashReporter uploads the report on next launch", D.data.android_report.stack.split("\n").slice(0,3).join("\n"));
+      const r = await api("/api/crashes",{method:"POST",body:D.data.android_report}); incKey = r.incident;
+      dmLog(`POST /api/crashes → 201 ${incKey}`);
+    } else {
+      const body = id==="greeting" ? {email:`demo-${Date.now()%100000}@example.com`} : {name:"Partner Demo", email:`partner-${Date.now()%100000}@example.com`};
+      const prof = await api("/api/profiles",{method:"POST",body}); dmLog(`POST /api/profiles → 201 #${prof.id} ${JSON.stringify(body)}`);
+      const url = id==="greeting" ? `/api/profiles/${prof.id}/greeting` : `/api/profiles/${prof.id}/completion?fields=`;
+      dmMark("traffic","done", `GET ${url}`);
+      const res = await fetch(url); const j = await res.json();
+      dmLog(`GET ${url} → ${res.status} ${JSON.stringify(j)}`, res.status>=500?"err":"");
+      if (res.status < 500) { dmMark("crash","fail","No crash — the bug is already fixed. Reset it and run again."); throw new Error("no crash"); }
+      dmMark("crash","done",`HTTP ${res.status}: ${j.detail}`);
+      incKey = j.incident; D.active.url = url;
+    }
+    const inc0 = (await api("/api/cr")).find(c=>c.key===incKey);
+    D.active.incKey = incKey; D.active.incId = inc0.id;
+    let inc = await api(`/api/cr/${inc0.id}`);
+    D.active.regression = inc.incident.regression_of;
+    dmMark("detect","done", `${incKey}: ${inc.incident.exc_type}${inc.incident.message?": "+inc.incident.message:""}` + (inc.occurrences>1?` (×${inc.occurrences})`:""));
+    // follow the healer
+    const seen = new Set();
+    while (true) {
+      inc = await api(`/api/cr/${inc0.id}`);
+      for (const e of inc.coding_log||[]) {
+        const key = e.ts+e.step+e.status+e.detail; if (seen.has(key)) continue; seen.add(key);
+        const map = {"Diagnose":"diagnose","Reproduce":"reproduce","Fix":"fix","Run checks":"checks","Open pull request":"pr","Error":"fix"}; const k = map[e.step]; if (!k) continue;
+        dmMark(k, e.status==="running"?"running":e.status==="fail"?"fail":"done", e.detail || null);
+        if (e.detail) dmLog(`🤖 ${e.step}: ${e.detail}`, e.status==="fail"?"err":"");
+      }
+      if (["pr_open","needs_engineer","merged","closed"].includes(inc.status)) break;
+      await sleep(400);
+    }
+    if (inc.attempts) dmMark("fix","done", `${inc.attempts.filter(x=>x.patched).length} patch(es) · ${inc.attempts.map(x=>x.why).filter(Boolean).map(w=>w.split(". ")[0]).join(" → ")}`,
+       inc.attempts.filter(x=>x.patched).map(x=>`- ${x.line}\n+ ${x.patched}`).join("\n"));
+    if (inc.status === "needs_engineer") {
+      if (sc.kind==="android") dmMark("diagnose","done", inc.diagnosis ? inc.diagnosis.summary : "Stack trace recorded");
+      dmMark("pr","fail","No verified automatic fix — routed to an engineer" + (state.settings.ai.available?"":" (add an Anthropic key so Claude can propose one)"));
+      D.active.done = true; D.active.outcome = "engineer"; D.active.outcomeText = "Needs engineer"; D.running=false; await renderDemo(); return;
+    }
+    D.active.prBranch = inc.pr && inc.pr.branch;
+    if (inc.checks) dmMark("checks","done", inc.checks.map(c=>`${c.status==="pass"?"✓":c.status==="fail"?"✕":"•"} ${c.name}`).join(" · "));
+    dmMark("pr","done", `PR #${inc.pr.number} · ${inc.stats.files} files +${inc.stats.additions} −${inc.stats.deletions}`);
+    // review
+    if (D.autoplay) { dmMark("review","running","Auto-play: approving in 2s…"); await sleep(2000); await demoApprove(true); }
+    else { dmMark("review","wait","Waiting for your approval — the agent never merges on its own"); D.waitTimer = setInterval(demoWatchReview, 1500); }
+  } catch(e) { if (e.message!=="no crash") toast(e.message); D.running=false; D.active.done = true; D.active.outcome="error"; D.active.outcomeText="Stopped"; await renderDemo(); }
+}
+async function demoWatchReview(){
+  const D=state.demo, a=D.active; if(!a||a.done){ clearInterval(D.waitTimer); return; }
+  const inc = await api(`/api/cr/${a.incId}`);
+  if (inc.status==="merged"){ clearInterval(D.waitTimer); dmMark("review","done","Approved"); await demoAfterMerge(inc); }
+}
+async function demoApprove(auto=false){
+  const D=state.demo, a=D.active; clearInterval(D.waitTimer);
+  try {
+    dmMark("review","running", auto?"Auto-play approving":"Approving…");
+    await api(`/api/cr/${a.incId}/test`,{method:"POST",body:{passed:true, notes: auto?"Approved by demo auto-play":"Approved from the crash demo"}});
+    dmMark("review","done", auto?"Approved (auto-play)":"Approved by "+(state.settings.user_name||"you")); dmLog("✅ fix approved");
+    const inc = await api(`/api/cr/${a.incId}/merge`,{method:"POST"});
+    await demoAfterMerge(inc);
+  } catch(e){ toast(e.message); dmMark("review","wait"); }
+}
+async function demoAfterMerge(inc){
+  const D=state.demo, a=D.active;
+  dmMark("deploy","done", `Merged${inc.merged_commit?" as "+inc.merged_commit:""} · ${inc.deployed==="hot-reloaded"?"hot-reloaded, no restart":"restart the backend to load it"}`);
+  dmLog(`⇡ merged ${inc.key}${inc.merged_commit?" "+inc.merged_commit:""}`);
+  if (a.kind!=="android" && a.url) {
+    const res = await fetch(a.url); const j = await res.json();
+    dmLog(`GET ${a.url} → ${res.status} ${JSON.stringify(j)}`, res.status>=500?"err":"");
+    dmMark("verify", res.status<500?"done":"fail", res.status<500?`HTTP ${res.status} — the same request now succeeds`:`Still HTTP ${res.status} — restart the backend`, JSON.stringify(j));
+    a.outcome = res.status<500?"fixed":"error"; a.outcomeText = res.status<500?"Healed":"Restart needed";
+  } else { a.outcome="fixed"; a.outcomeText="Fix merged — ship & verify on device"; dmLog("📦 next: build the app (./gradlew assembleDebug) and verify on a device"); }
+  a.done = true; D.running=false; refreshList(); await renderDemo();
+}
+
+window.__init();
+</script>
+
 </body>
 </html>

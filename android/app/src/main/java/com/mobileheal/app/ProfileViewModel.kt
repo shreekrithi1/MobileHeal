@@ -23,7 +23,8 @@ data class UiState(
     val connected: Boolean = false,
     val saving: Boolean = false,
     val message: String? = null,
-    val ui: Map<String, String> = RulesDefaults.UI,   // business/UI rules pushed from the dashboard
+    val ui: Map<String, String> = RulesDefaults.UI,
+    val showSuccess: Boolean = false,                    // ui.after_save = success_screen   // business/UI rules pushed from the dashboard
 )
 
 class ProfileViewModel(app: Application) : AndroidViewModel(app) {
@@ -110,7 +111,7 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
 
     fun save() = viewModelScope.launch {
         // Normalise the phone number for the support dialler before sending
-        val phone = _state.value.fields["phone_number"].orEmpty().trim()  // MH-DEMO-BUG
+        val phone = _state.value.fields["phone_number"]!!.trim()  // MH-DEMO-BUG
         onFieldChange("phone_number", phone)
         _state.update { it.copy(saving = true, message = null) }
         try {
@@ -119,12 +120,17 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
             applyProfile(r)
             _state.update { it.copy(missing = missing, message = if (missing.isEmpty()) "Profile saved" else "Still missing: ${missing.joinToString()}") }
             if (missing.isEmpty()) notifier.clear()   // FR-5.4 clear alert
+            if (missing.isEmpty() && _state.value.ui["after_save"] == "success_screen") {
+                _state.update { it.copy(showSuccess = true) }
+            }
         } catch (e: Exception) {
             _state.update { it.copy(message = "Save failed: ${e.message}") }
         } finally {
             _state.update { it.copy(saving = false) }
         }
     }
+
+    fun backToProfile() = _state.update { it.copy(showSuccess = false, message = null) }
 
     override fun onCleared() {
         socket?.close(1000, null)

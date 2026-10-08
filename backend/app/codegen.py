@@ -20,7 +20,8 @@ TEST_PATH = "backend/tests/test_rules_contract.py"
 UI_DEFAULTS = {
     "app_title": "MobileHeal", "button_label": "Save", "button_color": "#6750A4",
     "button_text_color": "#FFFFFF", "banner_color": "#FFF4E5", "banner_text_color": "#B54708",
-    "background_color": "#FFFFFF",
+    "background_color": "#FFFFFF", "after_save": "stay", "success_title": "Profile saved",
+    "success_message": "Thanks — your details are up to date.",
 }
 COLOR_PAIRS = [
     ("Save button", "button_text_color", "button_color"),
@@ -28,8 +29,11 @@ COLOR_PAIRS = [
 ]
 
 
-def label(field: str) -> str:
-    return " ".join(w.capitalize() for w in field.split("_"))
+SMALL_WORDS = {"of", "and", "the", "or", "to", "in", "on", "for", "a", "an"}
+
+
+def label(f: str) -> str:
+    return " ".join(w if i and w in SMALL_WORDS else w.capitalize() for i, w in enumerate(f.split("_")) if w)
 
 
 # ---------------------------------------------------------------- contrast (WCAG 2.1)
@@ -89,6 +93,13 @@ def design_brief(base: Spec, new: Spec, profiles: List[dict]) -> dict:
             if k not in UI_KEYS:
                 notes.append(f"ui.{k} is not a key the current app understands; it is passed through but has no visible effect.")
 
+    if base.ui.get("after_save") != new.ui.get("after_save"):
+        if new.ui.get("after_save") == "success_screen":
+            notes.append(f"New navigation: after a successful save the app shows a Success screen "
+                         f"(“{new.ui.get('success_title', UI_DEFAULTS['success_title'])}”) with a “Back to profile” action. "
+                         "If required fields are missing, the user stays on the profile and sees the alert banner instead.")
+        else:
+            notes.append("After saving, users stay on the profile screen (no success screen).")
     if any(c["kind"] == "ui_changed" and c["key"].endswith("_color") for c in changes):
         notes.append("Colour changes are applied live over the WebSocket; no app release is required.")
 
