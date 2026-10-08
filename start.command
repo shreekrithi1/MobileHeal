@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # MobileHeal launcher — double-click in Finder, or run ./start.command from Terminal.
-#   ./start.command            start the server, open the web app and Android Studio
+#   ./start.command            EVERYTHING: server + web app + Android Studio + Xcode (iOS)
+#   ./start.command --demo     everything, in demo mode (isolated workspace, integrations simulated)
 #   ./start.command --server   server + web app only
 #   ./start.command --android  open Android Studio only
 #   ./start.command --ios      open the iOS app in Xcode (generates the project with XcodeGen)
 #   ./start.command --test     run the backend test suite
-#   ./start.command --demo     demo mode: isolated demo workspace, every integration simulated (no keys needed)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PORT="${MOBILEHEAL_PORT:-8000}"
@@ -29,7 +29,8 @@ open_android_studio() {
 }
 
 open_xcode() {
-  [ "$(uname)" = "Darwin" ] || { warn "Xcode needs macOS"; return; }
+  [ -d "$ROOT/ios" ] || return 0
+  [ "$(uname)" = "Darwin" ] || { warn "Xcode needs macOS — skipping the iOS app"; return 0; }
   [ -d "/Applications/Xcode.app" ] || { warn "Xcode not found — install it from the Mac App Store"; return; }
   cd "$ROOT/ios"
   if [ ! -d MobileHeal.xcodeproj ]; then
@@ -82,7 +83,7 @@ prepare_demo() {
 }
 
 case "$MODE" in
-  --demo) prepare_demo; MODE="--server" ;;
+  --demo) prepare_demo; MODE="all" ;;
   --demo-reset) rm -rf "$ROOT/.mobileheal/demo-workspace" "$ROOT"/backend/mobileheal-demo.db*; ok "Demo workspace removed"; exit 0 ;;
   --android) open_android_studio; exit 0 ;;
   --ios) open_xcode; exit 0 ;;
@@ -93,7 +94,7 @@ setup_python
 if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
   warn "Port $PORT is already in use — MobileHeal may already be running. Opening it…"
   open "http://localhost:$PORT" 2>/dev/null || true
-  [ "$MODE" = "--server" ] || open_android_studio
+  [ "$MODE" = "--server" ] || { open_android_studio || true; open_xcode || warn "Couldn't open Xcode — run ./start.command --ios later"; }
   exit 0
 fi
 
@@ -117,12 +118,13 @@ else
   warn "Add a key any time under Settings → Agent model."
 fi
 open "http://localhost:$PORT" 2>/dev/null || xdg-open "http://localhost:$PORT" 2>/dev/null || true
-[ "$MODE" = "--server" ] || open_android_studio
+[ "$MODE" = "--server" ] || { open_android_studio || true; open_xcode || warn "Couldn't open Xcode — run ./start.command --ios later"; }
 
 echo
 ok "MobileHeal is running"
 echo "    Web app       http://localhost:$PORT"
 echo "    API docs      http://localhost:$PORT/docs"
 echo "    Android app   emulator connects to http://10.0.2.2:$PORT"
+echo "    iOS app       simulator connects to http://localhost:$PORT"
 echo "    Press Ctrl+C (or close this window) to stop."
 wait $SERVER

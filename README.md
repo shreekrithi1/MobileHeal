@@ -60,17 +60,18 @@ chmod +x start.command          # first time only
 ./start.command                 # or double-click start.command in Finder
 ```
 
-The script creates a Python virtual environment, installs dependencies, starts the server, opens the
-web app at **http://localhost:8000**, and opens the `android/` project in Android Studio. Press **Ctrl+C**
-(or close the window) to stop.
+**One command launches everything:** it creates the Python environment, installs dependencies, starts the
+server, opens the web app at **http://localhost:8000**, opens the Android app in **Android Studio** and the
+iOS app in **Xcode** (generating the Xcode project with XcodeGen when needed). Tools that aren't installed are
+skipped with a hint. Press **Ctrl+C** (or close the window) to stop.
 
 | Command | Does |
 |---|---|
-| `./start.command` | server + web app + Android Studio |
+| `./start.command` | **everything** — server + web app + Android Studio + Xcode |
+| `./start.command --demo` | everything, in demo mode (isolated workspace, integrations simulated) |
 | `./start.command --server` | server + web app only |
 | `./start.command --android` | open Android Studio only |
 | `./start.command --ios` | open the iOS app in Xcode (generates the project with XcodeGen) |
-| `./start.command --demo` | demo mode — isolated workspace, every integration simulated |
 | `./start.command --demo-reset` | delete the demo workspace and database |
 | `./start.command --test` | run the backend test suite |
 
