@@ -3,9 +3,9 @@
 package com.mobileheal.app.generated
 
 object RulesDefaults {
-    const val SPEC_VERSION = "CR-17"
+    const val SPEC_VERSION = "CR-19"
 
-    val REQUIRED_FIELDS: List<String> = listOf("name", "email", "zip", "phone_number", "nationality")
+    val REQUIRED_FIELDS: List<String> = listOf("name", "email")
 
     val OPTIONAL_FIELDS: List<String> = listOf()
 

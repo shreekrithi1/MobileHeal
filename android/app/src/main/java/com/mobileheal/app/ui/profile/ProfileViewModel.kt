@@ -108,9 +108,13 @@ class ProfileViewModel @Inject constructor(
     private fun save() {
         val content = _state.value as? ProfileUiState.Content ?: return
         if (content.saving) return
-        // Normalise the phone number for the support dialler before sending
-        val phone = content.fields["phone_number"].orEmpty().trim()  // MH-DEMO-BUG
-        val fields = content.fields + ("phone_number" to phone)
+        // Only normalize phone_number if it's part of the active fields; don't inject or overwrite when absent
+        val fields = if ("phone_number" in content.fields) {
+            val phone = content.fields.getValue("phone_number").trim()
+            content.fields + ("phone_number" to phone)
+        } else {
+            content.fields
+        }
         updateContent { it.copy(saving = true, message = null) }
         viewModelScope.launch {
             saveProfile(Profile(profileId, fields)).fold(
