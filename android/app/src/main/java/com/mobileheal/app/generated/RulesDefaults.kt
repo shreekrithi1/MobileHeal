@@ -3,7 +3,7 @@
 package com.mobileheal.app.generated
 
 object RulesDefaults {
-    const val SPEC_VERSION = "CR-6"
+    const val SPEC_VERSION = "CR-10"
 
     val REQUIRED_FIELDS: List<String> = listOf("name", "email", "zip")
 
@@ -11,6 +11,6 @@ object RulesDefaults {
 
     val UI: Map<String, String> = mapOf(
         "button_color" to "#079455",
-        "button_label" to "Save changes"
+        "button_label" to "This is for testing"
     )
 }
