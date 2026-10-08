@@ -43,20 +43,28 @@ def _call(url: str, method: str = "GET", body: Optional[dict] = None, headers: O
 
 
 # ---------------------------------------------------------------- GitHub
+def _demo(s) -> bool:
+    from .demomode import is_on
+    return is_on(s)
+
+
 class GitHub:
     def __init__(self, s):
-        self.repo = (s.get("github_repo") or "").strip().strip("/")
+        self.s, self.demo = s, _demo(s)
+        self.repo = (s.get("github_repo") or "").strip().strip("/") or ("acme/mobileheal-app" if self.demo else "")
         self.token = s.get("github_token")
         self.api = (s.get("github_api_url") or "https://api.github.com").rstrip("/")
 
     @property
     def configured(self) -> bool:
-        return bool(re.fullmatch(r"[\w.-]+/[\w.-]+", self.repo) and self.token)
+        return self.demo or bool(re.fullmatch(r"[\w.-]+/[\w.-]+", self.repo) and self.token)
 
     def _h(self):
         return {"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json"}
 
     def test(self) -> dict:
+        if self.demo:
+            return {"ok": True, "repo": self.repo + " (demo)", "default_branch": "main", "private": True, "can_push": True}
         if not self.configured:
             raise ConnectorError("Enter the repository (owner/name) and a token")
         r = _call(f"{self.api}/repos/{self.repo}", headers=self._h(), name="GitHub")
@@ -65,6 +73,9 @@ class GitHub:
                 "private": r.get("private"), "can_push": bool(perms.get("push"))}
 
     def open_pr(self, branch: str, base: str, title: str, body: str) -> dict:
+        if self.demo:
+            from .demomode import record_pr
+            return record_pr(self.s, "github", self.repo, branch, base, title, body)
         try:
             r = _call(f"{self.api}/repos/{self.repo}/pulls", "POST",
                       {"title": title, "head": branch, "base": base, "body": body}, self._h(), "GitHub")
@@ -77,6 +88,9 @@ class GitHub:
         return {"number": r["number"], "url": r["html_url"]}
 
     def merge(self, number: int):
+        if self.demo:
+            from .demomode import merge_pr
+            return merge_pr(self.s, number)
         _call(f"{self.api}/repos/{self.repo}/pulls/{number}/merge", "PUT", {"merge_method": "squash"}, self._h(), "GitHub")
 
     def remote(self) -> str:
@@ -87,13 +101,14 @@ class GitHub:
 # ---------------------------------------------------------------- GitLab
 class GitLab:
     def __init__(self, s):
+        self.s, self.demo = s, _demo(s)
         self.base = (s.get("gitlab_base_url") or "https://gitlab.com").rstrip("/")
-        self.project = (s.get("gitlab_project") or "").strip().strip("/")
+        self.project = (s.get("gitlab_project") or "").strip().strip("/") or ("acme/mobileheal-app" if self.demo else "")
         self.token = s.get("gitlab_token")
 
     @property
     def configured(self) -> bool:
-        return bool(self.project and self.token)
+        return self.demo or bool(self.project and self.token)
 
     @property
     def pid(self) -> str:
@@ -103,6 +118,8 @@ class GitLab:
         return {"PRIVATE-TOKEN": self.token}
 
     def test(self) -> dict:
+        if self.demo:
+            return {"ok": True, "repo": self.project + " (demo)", "default_branch": "main", "private": True}
         if not self.configured:
             raise ConnectorError("Enter the project path (group/project) and a token")
         r = _call(f"{self.base}/api/v4/projects/{self.pid}", headers=self._h(), name="GitLab")
@@ -114,6 +131,9 @@ class GitLab:
         return f"https://oauth2:{self.token}@{host}/{self.project}.git"
 
     def open_mr(self, branch: str, base: str, title: str, body: str) -> dict:
+        if self.demo:
+            from .demomode import record_pr
+            return record_pr(self.s, "gitlab", self.project, branch, base, title, body)
         try:
             r = _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests", "POST",
                       {"source_branch": branch, "target_branch": base, "title": title, "description": body,
@@ -126,11 +146,16 @@ class GitLab:
         return {"number": r["iid"], "url": r["web_url"]}
 
     def merge(self, iid: int):
+        if self.demo:
+            from .demomode import merge_pr
+            return merge_pr(self.s, iid)
         _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests/{iid}/merge", "PUT",
               {"squash": True}, self._h(), "GitLab")
 
 
-def push_branch(root, remote: str, branch: str):
+def push_branch(root, remote: str, branch: str, demo: bool = False):
+    if demo:
+        return
     r = subprocess.run(["git", "-c", "protocol.file.allow=never", "push", "-q", "--force", "--", remote,
                         f"refs/heads/{branch}:refs/heads/{branch}"], cwd=str(root), capture_output=True, text=True, timeout=120)
     if r.returncode:
@@ -180,16 +205,19 @@ def md_to_storage(md: str) -> str:
 
 class Confluence:
     def __init__(self, s):
+        self.s, self.demo = s, _demo(s)
         self.base = (s.get("confluence_base_url") or "").rstrip("/")
         self.email = s.get("confluence_email")
         self.token = s.get("confluence_api_token")
         self.space = (s.get("confluence_space_key") or "").strip()
         self.parent = (s.get("confluence_parent_id") or "").strip()
-        self.publish_on_merge = s.get("confluence_publish") == "on"
+        self.publish_on_merge = s.get("confluence_publish") == "on" or self.demo
+        if self.demo and not self.space:
+            self.space = "DEMO"
 
     @property
     def configured(self) -> bool:
-        return bool(self.base and self.email and self.token and self.space)
+        return self.demo or bool(self.base and self.email and self.token and self.space)
 
     @property
     def wiki(self) -> str:
@@ -200,12 +228,17 @@ class Confluence:
         return {"Authorization": f"Basic {tok}"}
 
     def test(self) -> dict:
+        if self.demo:
+            return {"ok": True, "space": f"{self.space} (demo)", "key": self.space}
         if not self.configured:
             raise ConnectorError("Enter the site URL, email, API token and space key")
         r = _call(f"{self.wiki}/rest/api/space/{urllib.parse.quote(self.space)}", headers=self._h(), name="Confluence")
         return {"ok": True, "space": r.get("name"), "key": r.get("key")}
 
     def publish(self, title: str, markdown: str) -> dict:
+        if self.demo:
+            from .demomode import publish_page
+            return publish_page(self.s, self.space, title, markdown)
         body = {"type": "page", "title": title[:250], "space": {"key": self.space},
                 "body": {"storage": {"value": md_to_storage(markdown), "representation": "storage"}}}
         if self.parent:
@@ -224,7 +257,7 @@ class Confluence:
 
 def status(s) -> dict:
     gh, gl, cf = GitHub(s), GitLab(s), Confluence(s)
-    return {"git_provider": s.get("git_provider") or "local",
+    return {"demo": _demo(s), "git_provider": s.get("git_provider") or ("github" if _demo(s) else "local"),
             "github": {"configured": gh.configured, "repo": gh.repo or None},
             "gitlab": {"configured": gl.configured, "repo": gl.project or None, "base": gl.base},
             "confluence": {"configured": cf.configured, "space": cf.space or None, "publish_on_merge": cf.publish_on_merge}}

@@ -44,6 +44,7 @@ web app at **http://localhost:8000**, and opens the `android/` project in Androi
 | `./start.command --server` | server + web app only |
 | `./start.command --android` | open Android Studio only |
 | `./start.command --test` | run the backend test suite |
+| `./start.command --demo` | demo mode — isolated workspace, every integration simulated |
 
 Port in use? `MOBILEHEAL_PORT=8010 ./start.command`.
 If macOS blocks the double-click ("unidentified developer"): right-click → **Open** once, or run it from Terminal.
@@ -115,6 +116,31 @@ mobileheal/
 
 Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, default 60), `MOBILEHEAL_SPEC`,
 `MOBILEHEAL_DB`, `MOBILEHEAL_ENV` (development/staging/production).
+
+## Demo mode
+
+Show the whole product with no accounts, keys or network:
+
+```bash
+./start.command --demo        # isolated demo workspace + demo database; your project is untouched
+```
+
+Then **Home → Load sample data** (or Settings → General → Demo mode). You get profiles with data problems,
+change requests at every stage (one already merged), and two crash incidents waiting for approval.
+
+| In demo mode | Behaves like |
+|---|---|
+| GitHub / GitLab | pull/merge requests opened and merged on a simulated remote, viewable in MobileHeal |
+| Jira | built-in tracker with the full defect workflow |
+| Confluence | change records / postmortems published to a built-in space on merge |
+| Figma | a sample “Profile” frame for any Figma link |
+| Zephyr Scale | sample test cases to import |
+| Android repo | stored analysis of Google's Now in Android app |
+| Agent model | parser mode (built-in parser, templates and fix playbooks) |
+
+`./start.command --demo-reset` deletes the demo workspace and database to start over.
+The demo toggle in Settings simulates integrations in your real workspace too, but sample data is only
+loaded in the isolated `--demo` workspace.
 
 ## Security
 

@@ -698,7 +698,8 @@ function renderCR(){
     ["checks","Checks", cr.checks?cr.checks.length:null],["test","Tests", state.tests?state.tests.cases.length:null],["pr","Pull request"]];
   const prLine = cr.pr ? `<span>PR <b>#${cr.pr.number}</b></span><span class="branch">${esc(cr.pr.branch)}</span><span>→</span><span class="branch">${esc(cr.pr.base)}</span>
      ${cr.stats?`<span><span class="plus">+${cr.stats.additions}</span> <span class="minus">−${cr.stats.deletions}</span></span>`:""}
-     ${cr.pr.github_url?`<a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">View on GitHub ↗</a>`:""}` : "";
+     ${cr.pr.github_url?`<a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">View on ${cr.pr.provider==="gitlab"?"GitLab":"GitHub"}${cr.pr.github_url.startsWith("/demo/")?" (demo)":""} ↗</a>`:""}
+     ${cr.confluence&&cr.confluence.url?`<a href="${esc(cr.confluence.url)}" target="_blank" rel="noopener">Confluence page ↗</a>`:""}` : "";
   $("#view").innerHTML = `
     <div class="hdr"><div style="min-width:0">
       <div class="meta" style="margin-bottom:6px">${chip(cr)}${isInc(cr)&&cr.jira&&cr.jira.key?jiraLink(cr.jira):""}<span>${esc(cr.author)} opened ${ago(cr.created_at)}</span>${cr.revision>1?`<span>· rev ${cr.revision}</span>`:""}</div>
@@ -1084,6 +1085,24 @@ async function loadSettings(){
   let el = document.getElementById("aipill");
   if (!el){ el = document.createElement("a"); el.id="aipill"; el.href="#settings"; el.style.textDecoration="none"; $("#repo").prepend(el); }
   el.innerHTML = `<span class="pill" title="${ai.available?'The agent runs on '+esc(ai.provider_name)+' — requirements, test generation, Android code and crash fixes':'Parser mode: no model API key — the agent uses its built-in parser, templates and playbooks. Add a key in Settings.'}"><span class="d" style="background:${ai.available?'var(--accent)':'var(--amber)'}"></span>${ai.available?'Agent · '+esc(ai.model):'Agent · Parser mode'}</span>`;
+  let dm = document.getElementById("demopill");
+  if (state.settings.demo_mode === "on") {
+    if (!dm){ dm = document.createElement("a"); dm.id="demopill"; dm.href="#settings/general"; dm.style.textDecoration="none"; $("#repo").prepend(dm); }
+    dm.innerHTML = `<span class="pill" style="background:#6941c6;color:#fff;border-color:#6941c6;font-weight:700" title="Demo mode: integrations are simulated — nothing leaves this computer">DEMO</span>`;
+  } else if (dm) dm.remove();
+}
+async function setDemo(on){
+  await act(async()=>{ await api("/api/demo-mode",{method:"POST",body:{on}}); await loadSettings(); await renderSettings("settings/"+(state.setSec||"general")); refreshInfo(); },
+    on ? "Demo mode on — every integration is simulated" : "Demo mode off");
+}
+async function seedDemo(){
+  const b = $("#demo-seed"); if (b){ b.disabled = true; b.innerHTML = `<span class="spinner"></span> Loading sample data…`; }
+  await act(async()=>{ const r = await api("/api/demo-mode/seed",{method:"POST"}); await refreshList(); go("home"); }, "Sample data loaded — agents are working on it in the background");
+  if (b){ b.disabled = false; b.textContent = "Load sample data"; }
+}
+async function resetDemo(){
+  if (!confirm("Delete all profiles, change requests, incidents and notifications in this demo workspace? Settings are kept.")) return;
+  await act(async()=>{ await api("/api/demo-mode/reset",{method:"POST"}); await refreshList(); go("home"); }, "Demo workspace cleared");
 }
 
 /* ---------- modal ---------- */
@@ -1526,15 +1545,20 @@ async function renderSettings(h){
     ["model","Agent model", ai.available, ai.available ? esc(ai.model) : "Parser mode"],
     ["source","GitHub", cx.github.configured, cx.github.configured ? esc(cx.github.repo) : "Not connected"],
     ["source","GitLab", cx.gitlab.configured, cx.gitlab.configured ? esc(cx.gitlab.repo) : "Not connected"],
-    ["jira","Jira", s.jira_mode==="live", s.jira_mode==="live" ? "Project "+esc(s.jira_project_key) : "Mock tracker"],
+    ["jira","Jira", s.jira_mode==="live"||s.demo_mode==="on", s.jira_mode==="live" ? "Project "+esc(s.jira_project_key) : s.demo_mode==="on" ? "Built-in tracker (demo)" : "Mock tracker"],
     ["confluence","Confluence", cx.confluence.configured, cx.confluence.configured ? "Space "+esc(cx.confluence.space) : "Not connected"],
-    ["design","Figma", !!(s.figma_token||{}).set, (s.figma_token||{}).set ? "Token saved" : "Embed only"],
-    ["design","Zephyr Scale", !!s.zephyr_configured, s.zephyr_configured ? "Project "+esc(s.zephyr_project_key) : "Not connected"],
+    ["design","Figma", !!(s.figma_token||{}).set||s.demo_mode==="on", (s.figma_token||{}).set ? "Token saved" : s.demo_mode==="on" ? "Sample frame (demo)" : "Embed only"],
+    ["design","Zephyr Scale", !!s.zephyr_configured, s.demo_mode==="on"&&!s.zephyr_token.set ? "Sample cases (demo)" : s.zephyr_configured ? "Project "+esc(s.zephyr_project_key) : "Not connected"],
     ["android","Android repo", null, "…"],
   ];
   const P = {
   general: `<h2>General</h2><p class="sdesc">Your workspace and how every connected system is doing.</p>
     <div class="ctiles">${tiles.map(([sec,n,ok,t])=>`<a class="ctile" href="#settings/${sec}"><span class="dot8 ${ok===null?"":ok?"ok":"warn"}" ${n==="Android repo"?'id="tile-repo-dot"':""}></span><div><b>${n}</b><span ${n==="Android repo"?'id="tile-repo"':""}>${t}</span></div><span class="chev">›</span></a>`).join("")}</div>
+    ${sGroup("🎬 Demo mode", sChip(s.demo_mode==="on","On","Off"),
+      sRow("Demo mode","Every integration is simulated — GitHub/GitLab pull requests, Jira, Confluence, Figma, Zephyr and the Android repo work with no accounts, keys or network. Start with <code>./start.command --demo</code> to use a separate demo database.",
+        `<label class="switch"><input type="checkbox" ${s.demo_mode==="on"?"checked":""} onchange="setDemo(this.checked)" aria-label="Demo mode"><span></span></label>`),
+      s.demo_mode==="on" && !s.demo_isolated ? `<span class="hint" style="margin:0">Integrations are simulated in this workspace. To load sample data safely, restart with <code>./start.command --demo</code> (separate database and project copy).</span>` :
+      s.demo_mode==="on" ? `<button class="btn sm primary" id="demo-seed" onclick="seedDemo()">Load sample data</button><button class="btn sm" onclick="resetDemo()">Reset demo data</button><span class="hint" style="margin:0">Profiles with data problems, change requests at every stage and two crash incidents.</span>` : "")}
     ${sGroup("Workspace","",
       sRow("Your name","Shown in activity, pull requests, Jira comments and the audit log.", sInput("user_name","Jane Appleseed")) +
       sRow("Environment","Tags crashes from this backend as development, staging or production.", sSelect("runtime_environment",[["development","Development"],["staging","Staging"],["production","Production"]])))}
@@ -2016,10 +2040,12 @@ async function renderHome(){
     ["Android repository", repo.status==="synced", repo.status==="synced" ? `${esc((repo.url||"").split("/").pop())} @ ${esc((repo.sha||"").slice(0,7))}` : "not synced", "#settings"],
     ["Source control", !!(state.info&&state.info.git), state.info&&state.info.github ? esc(state.info.github) : state.info&&state.info.git ? "local git" : "git not found", "#settings"],
   ];
+  const demoCta = s.demo_mode==="on" && s.demo_isolated && !list.length ? `<div class="banner-ok" style="margin:-8px 0 18px;background:#f2edff;color:#3e1c96"><span style="font-size:18px">🎬</span><div style="flex:1"><b>Demo mode is on.</b> Load a realistic workspace — profiles with data problems, change requests at every stage and crash incidents.</div><button class="btn primary" id="demo-seed" onclick="seedDemo()">Load sample data</button></div>` : "";
   const summary = att.length ? `${att.length} item${att.length>1?"s":""} need${att.length>1?"":"s"} your attention.` : "Everything is running smoothly — nothing needs you right now.";
   $("#view").innerHTML = `
     <div class="hero"><div><h1>${greet()}${name?", "+esc(name):""}</h1><p>${summary}</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#demo">Simulate a crash</a><a class="btn primary" href="#new">＋ New requirement</a></div></div>
+    ${demoCta}
     <div class="kpis">
       <a class="kpi" href="#delivery"><div class="l">Changes in flight</div><div class="v">${ch.filter(c=>!["merged","closed"].includes(c.status)).length}</div><div class="s">${ch.filter(c=>c.status==="merged").length} shipped</div></a>
       <a class="kpi" href="#incidents"><div class="l">Open incidents</div><div class="v" style="color:${incOpen?"var(--red)":"inherit"}">${incOpen}</div><div class="s">${fixed} crash${fixed===1?"":"es"} fixed by the agent</div></a>

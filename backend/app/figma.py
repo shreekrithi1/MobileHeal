@@ -170,6 +170,14 @@ def fetch(url: str, token: str, ai=None) -> dict:
            "fetched": bool(token)}
     if not token:
         return out
+    if token == "__demo__":
+        from .demomode import FIGMA_FRAME, FIGMA_IMAGE
+        doc = FIGMA_FRAME
+        out.update(name="MobileHeal designs (demo)", frame=doc["name"], image=FIGMA_IMAGE, fetched=True)
+        layers = summarise(doc)
+        out["layer_count"] = len(layers)
+        out["suggestions"], out["engine"] = heuristic_suggestions(doc), "layers"
+        return out
     key, node = info["key"], info["node"]
     if node:
         data = _get(f"/files/{key}/nodes?ids={urllib.parse.quote(node)}&geometry=omit", token)

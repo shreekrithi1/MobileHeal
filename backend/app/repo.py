@@ -74,6 +74,12 @@ class AndroidRepo:
 
     def sync_async(self) -> dict:
         self.validate_url(self.url)
+        from .demomode import NIA_SNAPSHOT, is_on
+        if is_on(self.settings):     # demo: no download — use a stored analysis of Now in Android
+            return {**self._save(status="synced", url=self.url, sha="a49ed25c0de", branch_checked_out="main",
+                                 commit_msg="Enable parallel IDE sync (#2140) · demo snapshot", commit_date="",
+                                 commit_author="", synced_at=time.strftime("%Y-%m-%dT%H:%M:%S"), analysis=NIA_SNAPSHOT,
+                                 error=None), "url": self.url, "cloned": False}
         if self.branch and (not self.BRANCH_RE.match(self.branch) or ".." in self.branch):
             raise RepoError("Invalid branch name")
         if self._state().get("status") == "syncing" and time.time() - self._state().get("started", 0) < 600:

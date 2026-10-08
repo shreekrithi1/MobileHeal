@@ -368,7 +368,8 @@ class Zephyr:
 
     @property
     def configured(self) -> bool:
-        return bool(self.s.get("zephyr_token") and self.s.get("zephyr_project_key"))
+        from .demomode import is_on
+        return is_on(self.s) or bool(self.s.get("zephyr_token") and self.s.get("zephyr_project_key"))
 
     def _req(self, method: str, path: str, body: Optional[dict] = None):
         url = self.s.get("zephyr_base_url").rstrip("/") + path
@@ -385,6 +386,18 @@ class Zephyr:
             raise RuntimeError(f"Cannot reach Zephyr: {e.reason}")
 
     def fetch_cases(self, max_results: int = 50, folder_id: Optional[str] = None) -> List[dict]:
+        from .demomode import is_on
+        if is_on(self.s):
+            demo = {"values": [
+                {"key": "MH-T101", "name": "Profile saves with valid data", "priority": {"name": "High"},
+                 "steps": [{"inline": {"description": "Open the profile screen", "expectedResult": "Name, email and phone are shown"}},
+                           {"inline": {"description": "Enter valid details and tap Save", "expectedResult": "Success message is shown"}}]},
+                {"key": "MH-T102", "name": "Email is required", "priority": {"name": "High"},
+                 "steps": [{"inline": {"description": "Clear the email field and tap Save", "expectedResult": "Banner asks for the email"}}]},
+                {"key": "MH-T103", "name": "Phone number format is validated", "priority": {"name": "Normal"},
+                 "steps": [{"inline": {"description": "Enter 12 as the phone number and tap Save", "expectedResult": "Phone number is flagged"}}]},
+            ][:max_results]}
+            return parse_zephyr_json(json.dumps(demo))
         q = f"/testcases?projectKey={self.s.get('zephyr_project_key')}&maxResults={max_results}"
         if folder_id:
             q += f"&folderId={folder_id}"
@@ -400,6 +413,9 @@ class Zephyr:
         return parse_zephyr_json(json.dumps({"values": out}))
 
     def export_run(self, case_key: str, run: dict) -> dict:
+        from .demomode import is_on
+        if is_on(self.s):
+            return {"id": 1, "key": f"{case_key}-E1 (demo)"}
         body = {"projectKey": self.s.get("zephyr_project_key"), "testCaseKey": case_key,
                 "testCycleKey": self.s.get("zephyr_cycle_key") or None,
                 "statusName": {"passed": "Pass", "failed": "Fail"}.get(run["status"], "Blocked"),

@@ -437,7 +437,8 @@ class Workflow:
             self._event(cr, self.user, "design", "removed the Figma design")
             return self._save(cr)
         try:
-            f = fg.fetch(url, self.settings.get("figma_token"), self.ai)
+            from .demomode import is_on
+            f = fg.fetch(url, self.settings.get("figma_token") or ("__demo__" if is_on(self.settings) else ""), self.ai)
         except fg.FigmaError as e:
             try:
                 f = {**fg.parse_url(url), "error": str(e), "suggestions": [], "fetched": False}
@@ -582,7 +583,7 @@ class Workflow:
         if pr["git"] and prov:
             from . import connectors as cx
             try:
-                cx.push_branch(self.root, prov.remote(), branch)
+                cx.push_branch(self.root, prov.remote(), branch, demo=prov.demo)
                 r = prov.open_pr(branch, pr["base"], f"{cr['key']}: {cr['title']}", cr["pr_body"]) if isinstance(prov, cx.GitHub) \
                     else prov.open_mr(branch, pr["base"], f"{cr['key']}: {cr['title']}", cr["pr_body"])
                 pr["provider"] = "github" if isinstance(prov, cx.GitHub) else "gitlab"
@@ -600,7 +601,10 @@ class Workflow:
     def remote_provider(self):
         """Configured remote (GitHub or GitLab) that PRs are mirrored to, or None for local-only."""
         from . import connectors as cx
+        from .demomode import is_on
         kind = self.settings.get("git_provider") or "local"
+        if is_on(self.settings) and kind == "local":
+            kind = "github"          # demo: show the full PR flow on a simulated GitHub
         p = cx.GitHub(self.settings) if kind == "github" else cx.GitLab(self.settings) if kind == "gitlab" else None
         return p if p is not None and p.configured else None
 

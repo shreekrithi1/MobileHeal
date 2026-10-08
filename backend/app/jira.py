@@ -76,6 +76,9 @@ class Jira:
 
     @property
     def live(self) -> bool:
+        from .demomode import is_on
+        if is_on(self.settings):
+            return False
         return bool(self.base and self.settings.get("jira_email") and self.settings.get("jira_api_token") and self.project)
 
     def status(self) -> dict:
@@ -170,6 +173,9 @@ class Jira:
         return to
 
     def ping(self) -> dict:
+        from .demomode import is_on
+        if is_on(self.settings):
+            return {"ok": True, "user": "Demo user", "project": f"{self.project} (built-in tracker)"}
         if not self.live:
             raise JiraError("Jira isn't configured — defects are kept in mock mode")
         me = self._req("GET", "/rest/api/3/myself")

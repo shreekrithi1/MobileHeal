@@ -4,6 +4,7 @@
 #   ./start.command --server   server + web app only
 #   ./start.command --android  open Android Studio only
 #   ./start.command --test     run the backend test suite
+#   ./start.command --demo     demo mode: isolated demo workspace, every integration simulated (no keys needed)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PORT="${MOBILEHEAL_PORT:-8000}"
@@ -53,7 +54,22 @@ setup_python() {
   ok "Python environment ready"
 }
 
+prepare_demo() {
+  DEMO="$ROOT/.mobileheal/demo-workspace"
+  if [ ! -d "$DEMO/.git" ]; then
+    say "Creating an isolated demo workspace (your project is not touched)…"
+    mkdir -p "$DEMO"
+    tar -C "$ROOT" --exclude=.git --exclude=.mobileheal --exclude=backend/.venv --exclude='*.db*' \
+        --exclude='android/*/build' --exclude=android/build --exclude=android/.gradle -cf - . | tar -C "$DEMO" -xf -
+    (cd "$DEMO" && git init -q -b main 2>/dev/null || git init -q; git add -A && git -c user.name=MobileHeal -c user.email=demo@mobileheal.local commit -qm "Demo workspace")
+  fi
+  export MOBILEHEAL_DEMO=1 MOBILEHEAL_ROOT="$DEMO" MOBILEHEAL_SPEC="$DEMO/backend/requirements.txt" MOBILEHEAL_DB="$ROOT/backend/mobileheal-demo.db"
+  ok "Demo mode — workspace $DEMO"
+}
+
 case "$MODE" in
+  --demo) prepare_demo; MODE="--server" ;;
+  --demo-reset) rm -rf "$ROOT/.mobileheal/demo-workspace" "$ROOT"/backend/mobileheal-demo.db*; ok "Demo workspace removed"; exit 0 ;;
   --android) open_android_studio; exit 0 ;;
   --test)    setup_python; exec pytest -q ;;
 esac

@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict
 
 from .agent import AutoHealAgent
@@ -314,7 +315,8 @@ def profile_completion(pid: int, fields: Optional[str] = None):
 @app.post("/api/figma/preview")
 def figma_preview(body: FigmaIn):
     try:
-        f = fg.fetch(body.url, app.state.wf.settings.get("figma_token"), app.state.wf.ai)
+        from .demomode import is_on
+        f = fg.fetch(body.url, app.state.wf.settings.get("figma_token") or ("__demo__" if is_on(app.state.wf.settings) else ""), app.state.wf.ai)
     except fg.FigmaError as e:
         raise HTTPException(400, str(e))
     f["suggestions"] = fg.compare(f["suggestions"], app.state.agent.read_text())
@@ -426,6 +428,88 @@ def settings_test_jira():
         raise HTTPException(400, str(e))
 
 
+# ---------------- Demo mode ----------------
+class DemoModeIn(BaseModel):
+    on: bool
+
+
+@app.get("/api/demo-mode")
+def demo_mode_status():
+    from .demomode import is_on
+    return {"on": is_on(_settings()), "forced": os.getenv("MOBILEHEAL_DEMO") == "1"}
+
+
+@app.post("/api/demo-mode")
+def demo_mode_set(body: DemoModeIn):
+    if os.getenv("MOBILEHEAL_DEMO") == "1" and not body.on:
+        raise HTTPException(409, "Started with --demo — restart without it to leave demo mode")
+    _settings().set("demo_mode", "on" if body.on else "off")
+    _settings().audit(app.state.wf.user, "demo_mode", "on" if body.on else "off")
+    return demo_mode_status()
+
+
+@app.post("/api/demo-mode/seed")
+async def demo_mode_seed():
+    from .demomode import is_on, seed
+    if not is_on(_settings()):
+        raise HTTPException(409, "Turn on demo mode first")
+    if os.getenv("MOBILEHEAL_DEMO") != "1":
+        raise HTTPException(409, "Sample data is loaded only in the isolated demo workspace — start with ./start.command --demo")
+    agent = app.state.agent
+    live = agent.read_text()
+    if not re.search(r"^phone_number\s*:", live, re.M):
+        await agent.apply_text(live.rstrip("\n") + "\nphone_number: required\n")
+    out = seed(app.state)
+    for p in app.state.db.list_profiles():
+        await agent.evaluate_profile(p)
+    return out
+
+
+@app.post("/api/demo-mode/reset")
+def demo_mode_reset():
+    from .demomode import is_on, reset
+    if os.getenv("MOBILEHEAL_DEMO") != "1":
+        raise HTTPException(409, "Reset is only available in the isolated demo workspace (./start.command --demo)")
+    return reset(app.state)
+
+
+def _demo_page(title: str, sub: str, body_html: str) -> HTMLResponse:
+    import html as _h
+    return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{_h.escape(title)}</title><style>body{{font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:860px;margin:40px auto;padding:0 20px;color:#151a21}}
+.tag{{display:inline-block;background:#f2edff;color:#6941c6;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600}}
+.meta{{color:#5f6b7a;font-size:13px}}pre,code{{background:#f0f2f5;border-radius:6px;padding:2px 5px}}h1{{letter-spacing:-.02em}}
+.box{{border:1px solid #e2e6eb;border-radius:12px;padding:6px 20px;margin-top:16px}}</style></head>
+<body><span class="tag">MobileHeal demo · simulated</span><h1>{_h.escape(title)}</h1><div class="meta">{sub}</div><div class="box">{body_html}</div>
+<p class="meta"><a href="/">← Back to MobileHeal</a></p></body></html>""")
+
+
+@app.get("/demo/{provider}/{number}")
+def demo_pr_view(provider: str, number: int):
+    import html as _h
+    from .demomode import get_pr
+    if provider == "confluence":
+        return demo_page_view(str(number))
+    pr = get_pr(_settings(), number)
+    if not pr or provider not in ("github", "gitlab"):
+        raise HTTPException(404, "Not found")
+    name = "Pull request" if provider == "github" else "Merge request"
+    sub = (f"{'GitHub' if provider == 'github' else 'GitLab'} · {_h.escape(pr['repo'])} · {name} #{pr['number']} · "
+           f"<b>{_h.escape(pr['state'])}</b> · <code>{_h.escape(pr['branch'])}</code> → <code>{_h.escape(pr['base'])}</code>")
+    return _demo_page(pr["title"], sub, connectors.md_to_storage(pr.get("body") or ""))
+
+
+@app.get("/demo/confluence/{pid}")
+def demo_page_view(pid: str):
+    import html as _h
+    from .demomode import get_page
+    p = get_page(_settings(), pid)
+    if not p:
+        raise HTTPException(404, "Not found")
+    return _demo_page(p["title"], f"Confluence · space {_h.escape(p['space'])} · version {p['version']} · updated {_h.escape(p['updated'])}",
+                      connectors.md_to_storage(p["markdown"]))
+
+
 # ---------------- DataWatchdog + notifications ----------------
 @app.get("/api/data-health")
 def data_health(status: str = "open"):
@@ -483,7 +567,8 @@ def _settings():
 def settings_get():
     wf = app.state.wf
     return {**_settings().public(), "ai": wf.ai.status(), "zephyr_configured": tc.Zephyr(_settings()).configured,
-            "github": wf.info()["github"], "connectors": connectors.status(_settings())}
+            "github": wf.info()["github"], "connectors": connectors.status(_settings()),
+            "demo_isolated": os.getenv("MOBILEHEAL_DEMO") == "1"}
 
 
 @app.put("/api/settings")

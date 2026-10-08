@@ -62,6 +62,7 @@ DEFAULTS = {
     "gitlab_base_url": "https://gitlab.com", "gitlab_project": "",
     "confluence_base_url": "", "confluence_email": "", "confluence_space_key": "", "confluence_parent_id": "",
     "confluence_publish": "off",
+    "demo_mode": "off",
     "watchdog_enabled": "on", "watchdog_autofix": "on", "notify_webhook_url": "",
     "android_repo_url": "https://github.com/android/nowinandroid", "android_repo_branch": "",
     "zephyr_base_url": "https://api.zephyrscale.smartbear.com/v2", "zephyr_project_key": "", "zephyr_cycle_key": "",
@@ -86,6 +87,8 @@ class Settings:
             return os.getenv("FIGMA_TOKEN", "")
         if not v and key == "github_token":
             return os.getenv("GITHUB_TOKEN", "")
+        if not v and key == "demo_mode" and os.getenv("MOBILEHEAL_DEMO") == "1":
+            return "on"
         if not v and key == "github_repo":
             return os.getenv("GITHUB_REPO", "")
         if not v and key == "gitlab_token":

@@ -198,7 +198,7 @@ class DataWatchdog:
         with self.db._lock:
             self.db._conn.execute("INSERT INTO notifications(ts, level, source, title, body, link) VALUES (?,?,?,?,?,?)",
                                   (_now(), level, source, title, body, link))
-        url = self.get("notify_webhook_url")
+        url = "" if self.get("demo_mode") == "on" else self.get("notify_webhook_url")
         if url and url.startswith("https://"):
             threading.Thread(target=self._webhook, args=(url, f"*{title}*\n{body}"), daemon=True).start()
 
