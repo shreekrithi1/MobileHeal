@@ -109,6 +109,9 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(fields = it.fields + (key to value)) }
 
     fun save() = viewModelScope.launch {
+        // Normalise the phone number for the support dialler before sending
+        val phone = _state.value.fields["phone_number"].orEmpty().trim()  // MH-DEMO-BUG
+        onFieldChange("phone_number", phone)
         _state.update { it.copy(saving = true, message = null) }
         try {
             val r = client.saveProfile(_state.value.profileId, _state.value.fields)
