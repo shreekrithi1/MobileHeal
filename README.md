@@ -69,6 +69,7 @@ web app at **http://localhost:8000**, and opens the `android/` project in Androi
 | `./start.command` | server + web app + Android Studio |
 | `./start.command --server` | server + web app only |
 | `./start.command --android` | open Android Studio only |
+| `./start.command --ios` | open the iOS app in Xcode (generates the project with XcodeGen) |
 | `./start.command --demo` | demo mode — isolated workspace, every integration simulated |
 | `./start.command --demo-reset` | delete the demo workspace and database |
 | `./start.command --test` | run the backend test suite |
@@ -92,6 +93,23 @@ cd mobileheal && chmod +x start.command && ./start.command --demo
    emulator). Allow notifications when asked.
    - Physical device: set `BASE_URL` in `android/app/build.gradle.kts` to your computer's LAN IP and add
      it to `res/xml/network_security_config.xml`.
+
+## 3b. Run the iOS app
+
+1. Install Xcode 15+ (Mac App Store) and XcodeGen: `brew install xcodegen`.
+2. `./start.command --ios` — generates `ios/MobileHeal.xcodeproj` and opens it in Xcode.
+3. Choose an iPhone simulator and press **⌘R**. The simulator reaches the server at `http://localhost:8000`.
+4. Unit tests: **⌘U** in Xcode, or `cd ios/MobileHealKit && swift test` (no simulator needed).
+
+The iOS app is SwiftUI (iOS 17+, MVVM with unidirectional data flow) and behaves like the Android app: fields,
+colours, labels and after-save screens come live from the business rules; DataWatchdog alerts arrive as
+notifications; crashes are uploaded to MobileHeal. Every approved change regenerates
+`ios/MobileHeal/Generated/RulesDefaults.swift`, and the **iOS developer agent** writes SwiftUI screens (with previews)
+when a requirement adds a new screen. Crashes from iOS are analysed, fixed (e.g. force unwraps) and opened as PRs
+just like Android ones.
+
+In the web app, use the **Android | iOS** tabs at the top to switch the design previews (Material vs. iOS look),
+the Code tab (Android or iOS files + shared ones) and the crash demo.
 
 ## 4. Agent model: LLM or parser mode
 
@@ -146,7 +164,8 @@ mobileheal/
 │   ├── app/repo.py               # connected Android repository
 │   ├── app/static/workflow.html  # the web app (Home, Requirements, Incidents, Data health, …)
 │   └── tests/                    # pytest suite (`./start.command --test`)
-└── android/                      # Kotlin, Clean Architecture (:app / :data / :domain), Hilt, Compose
+├── android/                      # Kotlin, Clean Architecture (:app / :data / :domain), Hilt, Compose
+└── ios/                          # SwiftUI app + MobileHealKit Swift package (XcodeGen project.yml)
 ```
 
 Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, default 60), `MOBILEHEAL_SPEC`,

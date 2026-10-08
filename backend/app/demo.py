@@ -49,7 +49,37 @@ SCENARIOS = [
      "fingerprint_func": "save", "endpoint": "POST /api/crashes",
      "expect": "The fix agent locates the `!!` in ProfileViewModel.kt from the stack trace and makes it null-safe. "
                "It can't run Android code, so the PR asks for device/CI verification."},
+    {"id": "ios", "title": "iPhone app crashes on Save",
+     "story": "The iOS Save action force-unwraps the phone number (`!`). Customers without a phone number crash the "
+              "app; the CrashReporter uploads the Swift stack trace to MobileHeal.",
+     "kind": "ios", "file": "ios/MobileHeal/Features/Profile/ProfileViewModel.swift",
+     "fingerprint_func": "save", "endpoint": "POST /api/crashes (platform: ios)",
+     "expect": "The fix agent finds the force unwrap in ProfileViewModel.swift and nil-coalesces it. "
+               "It can't run Xcode here, so the PR asks for simulator/CI verification."},
 ]
+
+IOS_FILE = "ios/MobileHeal/Features/Profile/ProfileViewModel.swift"
+IOS_BUG_LINE = '        let phone = c.values["phone_number"]!.trimmingCharacters(in: .whitespaces)  // MH-DEMO-BUG'
+IOS_REPORT = {
+    "platform": "ios", "exception": "Fatal error",
+    "message": "Unexpectedly found nil while unwrapping an Optional value",
+    "stack": ("Fatal error: Unexpectedly found nil while unwrapping an Optional value\n"
+              "0  MobileHeal  ProfileViewModel.save() (ProfileViewModel.swift:{line})\n"
+              "1  MobileHeal  closure #1 in ProfileForm.body.getter (ProfileView.swift:96)\n"
+              "2  SwiftUI     ButtonAction.callAsFunction()\n3  UIKitCore   -[UIApplication sendAction:to:from:forEvent:]"),
+    "device": "iPhone 15 Pro (iOS 17.5)", "app_version": "1.0", "screen": "Profile", "demo": True,
+}
+
+
+def ios_report(root: Path) -> dict:
+    line = 80
+    p = Path(root) / IOS_FILE
+    if p.exists():
+        for i, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            if "MH-DEMO-BUG" in l:
+                line = i
+                break
+    return {**IOS_REPORT, "stack": IOS_REPORT["stack"].replace("{line}", str(line))}
 
 ANDROID_BUG_LINE = '        val phone = content.fields["phone_number"]!!.trim()  // MH-DEMO-BUG'
 ANDROID_FILE = "android/app/src/main/java/com/mobileheal/app/ui/profile/ProfileViewModel.kt"
@@ -97,6 +127,10 @@ class Demo:
                        for c in incs if ((c.get("incident") or {}).get("fingerprint") or "").endswith(fp_tail)]
             if sc["kind"] == "backend":
                 fixed = self._read(sc["file"]).strip() != ORIGINALS[sc["file"]].strip()
+            elif sc["kind"] == "ios":
+                if not (self.root / IOS_FILE).exists():
+                    continue
+                fixed = IOS_BUG_LINE not in self._read(sc["file"])
             else:
                 fixed = ANDROID_BUG_LINE not in self._read(sc["file"])
             out.append({**sc, "fixed": fixed, "incidents": related[:5]})
@@ -107,16 +141,17 @@ class Demo:
         if not sc:
             raise KeyError("unknown scenario")
         changed = []
-        if sc["kind"] == "android":
-            p = self.root / ANDROID_FILE
+        if sc["kind"] in ("android", "ios"):
+            fpath, bug = (ANDROID_FILE, ANDROID_BUG_LINE) if sc["kind"] == "android" else (IOS_FILE, IOS_BUG_LINE)
+            p = self.root / fpath
             src = p.read_text(encoding="utf-8")
-            new = re.sub(r"^.*MH-DEMO-BUG.*$", lambda m: ANDROID_BUG_LINE, src, count=1, flags=re.M)
+            new = re.sub(r"^.*MH-DEMO-BUG.*$", lambda m: bug, src, count=1, flags=re.M)
             if new != src:
                 p.write_text(new, encoding="utf-8")
-                changed.append(ANDROID_FILE)
+                changed.append(fpath)
                 if self.wf.git.is_repo():
                     try:
-                        self.wf.git.commit_paths(changed, "Demo reset: re-introduce android bug")
+                        self.wf.git.commit_paths(changed, f"Demo reset: re-introduce {sc['kind']} bug")
                     except Exception:
                         pass
             self.wf.settings.audit(actor, "demo.reset", sc["id"], f"restored {len(changed)} file(s)")

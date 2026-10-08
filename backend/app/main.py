@@ -336,7 +336,9 @@ def cr_figma_apply(cid: int, body: FigmaApplyIn):
 # ---------------- Crash demo ----------------
 @app.get("/api/demo")
 def demo_state():
+    from .demo import ios_report
     return {"scenarios": app.state.demo.state(), "android_report": android_report(PROJECT_ROOT),
+            "ios_report": ios_report(PROJECT_ROOT),
             "healer": app.state.healer.info()}
 
 
@@ -351,7 +353,12 @@ def demo_reset(sid: str):
 @app.post("/api/crashes", status_code=201)
 def report_crash(body: CrashIn):
     """Crash reports from the Android app's CrashReporter."""
-    inc = app.state.healer.record(android_capture(body.model_dump()))
+    data = body.model_dump()
+    if str(data.get("platform", "")).lower() == "ios":
+        from .healer import ios_capture
+        inc = app.state.healer.record(ios_capture(data, PROJECT_ROOT))
+    else:
+        inc = app.state.healer.record(android_capture(data))
     return {"incident": inc["key"], "status": inc["status"]}
 
 
@@ -568,7 +575,7 @@ def settings_get():
     wf = app.state.wf
     return {**_settings().public(), "ai": wf.ai.status(), "zephyr_configured": tc.Zephyr(_settings()).configured,
             "github": wf.info()["github"], "connectors": connectors.status(_settings()),
-            "demo_isolated": os.getenv("MOBILEHEAL_DEMO") == "1"}
+            "demo_isolated": os.getenv("MOBILEHEAL_DEMO") == "1", "ios_present": (PROJECT_ROOT / "ios" / "MobileHeal").is_dir()}
 
 
 @app.put("/api/settings")
@@ -680,6 +687,25 @@ def android_open():
         subprocess.Popen(["studio", str(path)])
         return {"opened": True, "path": str(path)}
     raise HTTPException(404, f"Android Studio not found — open {path} manually")
+
+
+@app.post("/api/ios/open")
+def ios_open():
+    """Open the iOS project in Xcode (generating it with XcodeGen when needed) on the machine running the server."""
+    import platform
+    import subprocess
+    ios = PROJECT_ROOT / "ios"
+    if not ios.is_dir():
+        raise HTTPException(404, "No iOS app in this project")
+    if platform.system() != "Darwin":
+        raise HTTPException(400, f"Xcode runs on macOS — open {ios} on a Mac")
+    proj = ios / "MobileHeal.xcodeproj"
+    if not proj.exists() and shutil.which("xcodegen"):
+        subprocess.run(["xcodegen", "--quiet"], cwd=str(ios), timeout=120)
+    target = proj if proj.exists() else ios / "MobileHealKit" / "Package.swift"
+    subprocess.Popen(["open", "-a", "Xcode", str(target)])
+    return {"opened": True, "path": str(target),
+            "note": None if proj.exists() else "Install XcodeGen (brew install xcodegen) to generate the app project; opened the Swift package instead."}
 
 
 @app.get("/api/android")

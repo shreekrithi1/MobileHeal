@@ -225,6 +225,24 @@ def propose_kotlin(line: str, exc_type: str, msg: str) -> Optional[Patch]:
     return None
 
 
+def propose_swift(line: str, exc_type: str, msg: str) -> Optional[Patch]:
+    """Swift playbook: a force unwrap (`x!`) that found nil → nil-coalesce to a safe default."""
+    if not re.search(r"nil|unwrap|EXC_BREAKPOINT|SIGTRAP|Fatal error", f"{exc_type} {msg}", re.I):
+        return None
+    m = re.search(r"((?:[A-Za-z_][\w.]*)(?:\[[^\]]+\])?)!(?=\s*[.)\s,]|$)", line)
+    if not m:
+        return None
+    expr = m.group(1)
+    default = '""' if re.search(r"\[\s*\"", expr) or "String" in line or "trimming" in line else None
+    if default is None:
+        new = line[:m.start()] + expr + "?" + line[m.end():]
+        why = f"`{expr}` was nil, so the force unwrap crashed. Use optional chaining instead of `!`."
+    else:
+        new = line[:m.start()] + f"({expr} ?? {default})" + line[m.end():]
+        why = f"`{expr}` was nil, so the force unwrap crashed. Fall back to an empty string with `?? \"\"`."
+    return (new, why)
+
+
 def patch_source_lang(source: str, lineno: int, exc_type: str, msg: str, lang: str):
     if lang == "python":
         return patch_source(source, lineno, exc_type, msg)
@@ -233,7 +251,7 @@ def patch_source_lang(source: str, lineno: int, exc_type: str, msg: str, lang: s
         return None
     raw = lines[lineno - 1]
     body = raw.rstrip("\r\n")
-    r = propose_kotlin(body, exc_type, msg)
+    r = propose_swift(body, exc_type, msg) if lang == "swift" else propose_kotlin(body, exc_type, msg)
     if not r:
         return None
     lines[lineno - 1] = r[0] + raw[len(body):]

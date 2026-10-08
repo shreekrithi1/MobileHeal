@@ -15,3 +15,7 @@ android/*/build/
 android/.kotlin/
 .DS_Store
 *.tgz
+ios/MobileHeal.xcodeproj/
+ios/MobileHeal/Info.plist
+ios/**/.build/
+ios/**/xcuserdata/

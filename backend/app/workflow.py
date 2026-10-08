@@ -201,7 +201,7 @@ class Workflow:
         return p.read_text(encoding="utf-8") if p.exists() else None
 
     def _base_files(self) -> dict:
-        paths = [codegen.SPEC_PATH, codegen.KOTLIN_PATH, codegen.TEST_PATH]
+        paths = [codegen.SPEC_PATH, codegen.KOTLIN_PATH, codegen.TEST_PATH, codegen.SWIFT_PATH]
         return {p: self._read(p) for p in paths}
 
     def _design(self, base_text: str, new_text: str) -> dict:
@@ -350,6 +350,25 @@ class Workflow:
             self._log(cr, "Android developer agent", "fail" if agent.get("error") else "done",
                       f"{agent.get('engine')}: {len(agent['files'])} Kotlin file(s)" + (f" · build {agent['build']['status']}" if agent.get("build") else ""))
 
+            # iOS developer agent: requirement → SwiftUI (template engine)
+            from .ios_agent import IOSAgent
+            ios = IOSAgent(self)
+            if ios.present:
+                self._log(cr, "iOS developer agent", "running", "planning…")
+                ia = ios.run(cr)
+                for path, content in ia["files"].items():
+                    old = self._read(path)
+                    if old == content:
+                        continue
+                    d = codegen.unified_diff(path, old, content)
+                    files[:] = [f for f in files if f["path"] != path]
+                    files.append({"path": path, "status": "added" if old is None else "modified", "content": content,
+                                  "diff": d, **codegen.diff_stats(d), "by": "ios-agent"})
+                cr["ios_agent"] = {k: ia.get(k) for k in ("engine", "plan", "lint")} | {"files": sorted(ia["files"])}
+                cr["stats"] = {"files": len(files), "additions": sum(f["additions"] for f in files),
+                               "deletions": sum(f["deletions"] for f in files)}
+                self._log(cr, "iOS developer agent", "done", f"templates: {len(ia['files'])} Swift file(s)")
+
             self._log(cr, "Run checks", "running")
             cr["checks"] = self._run_checks(cr, files) + self._agent_checks(cr)
             fails = sum(1 for c in cr["checks"] if c["status"] == "fail")
@@ -392,6 +411,15 @@ class Workflow:
             pre.append({"name": "Android developer agent", "status": "warn", "ms": 0,
                         "detail": f"Model failed ({a['llm_error'][:120]}); the template engine implemented what it could — "
                                   "review that the requirement is fully covered."})
+        ia = cr.get("ios_agent")
+        if ia:
+            ilint = ia.get("lint") or []
+            ierr = [i for i in ilint if i["severity"] == "error"]
+            pre.append({"name": "iOS lint (SwiftUI)", "status": "fail" if ierr else "warn" if ilint else "pass", "ms": 1,
+                        "detail": "; ".join(f"{i['path'].split('/')[-1]}: {i['message']}" for i in ilint[:4]) or
+                                  "Previews present, no force unwraps, balanced structure"})
+            pre.append({"name": "iOS build & tests (Xcode)", "status": "warn", "ms": 0,
+                        "detail": "Not run here — build with ⌘B / test with ⌘U in Xcode, or `xcodebuild test` in CI."})
         out = pre + [{"name": "Android architecture lint (skill)", "status": "fail" if errs else "warn" if lint else "pass",
                 "detail": ("; ".join(f"{i['path'].split('/')[-1]}: {i['message']}" for i in lint[:4]) if lint
                            else "Clean Architecture, UDF, previews and test coverage rules satisfied"), "ms": 1}]

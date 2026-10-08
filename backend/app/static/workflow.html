@@ -182,6 +182,25 @@ textarea.code.bad{border-color:var(--red)}
 .pbtn{border:0;border-radius:20px;padding:10px;font-weight:650;font-size:13px;cursor:pointer;margin-top:4px}
 .ptoast{position:absolute;left:14px;right:14px;bottom:14px;background:#1b1f24;color:#fff;font-size:11.5px;border-radius:8px;padding:8px 10px;opacity:0;transform:translateY(8px);transition:.25s}
 .ptoast.show{opacity:1;transform:none}
+/* platform tabs (top bar) */
+.plat{display:inline-flex;background:var(--sunk);border-radius:9px;padding:2px;gap:2px}
+.plat button{border:0;background:none;border-radius:7px;padding:4px 12px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.plat button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+/* iOS look for phone previews */
+.plat-ios .phone{border-radius:46px;background:#1c1c1e;box-shadow:0 18px 40px -18px rgba(0,0,0,.45),inset 0 0 0 2px #3a3a3c}
+.plat-ios .screen{border-radius:36px;background:#f2f2f7!important;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}
+.plat-ios .sb{position:relative;padding:0 22px}.plat-ios .sb::after{content:"";position:absolute;left:50%;top:5px;transform:translateX(-50%);width:76px;height:20px;border-radius:12px;background:#000}
+.plat-ios .appbar{flex-direction:column;align-items:flex-start;gap:0;font-size:24px;font-weight:800;letter-spacing:-.02em;padding:14px 16px 6px}
+.plat-ios .appbar .live{font-size:10px;font-weight:600;order:-1}
+.plat-ios .pbody{gap:0;padding:4px 14px 10px}
+.plat-ios .ptitle{text-transform:uppercase;font-size:10.5px;font-weight:500;color:#6d6d72;margin:10px 4px 5px}
+.plat-ios .pf{background:#fff!important;border:0;border-radius:0;border-bottom:.5px solid #d1d1d6;padding:16px 12px 6px}
+.plat-ios .ptitle + .pf{border-radius:10px 10px 0 0}.plat-ios .pf:has(+ .pbtn){border-radius:0 0 10px 10px;border-bottom:0}
+.plat-ios .pf span{top:4px;left:12px;background:none;font-size:9.5px;color:#8e8e93}
+.plat-ios .pf.miss{box-shadow:inset 3px 0 0 #ff3b30}.plat-ios .pf.miss span{color:#ff3b30}
+.plat-ios .pbtn{border-radius:12px;padding:12px;margin-top:18px;font-size:14px}
+.plat-ios .banner{border-radius:10px;margin-bottom:6px}
+.plat-ios .screen::after{content:"Profile          Alerts          About";position:absolute;left:0;right:0;bottom:0;height:40px;background:rgba(249,249,249,.94);border-top:.5px solid #c6c6c8;font-size:9.5px;color:#8e8e93;display:flex;align-items:center;justify-content:center;white-space:pre}
 .seg{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:3px}
 .seg button{border:0;background:none;padding:5px 14px;border-radius:7px;cursor:pointer;font-weight:600;color:var(--muted)}
 .seg button.on{background:var(--panel);color:var(--fg);box-shadow:var(--shadow)}
@@ -385,6 +404,10 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
 <header class="top">
   <button class="rail-toggle" aria-label="Open navigation" onclick="$('#shell').classList.toggle('rail-open')">☰</button>
   <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+  <div class="plat" role="tablist" aria-label="Platform" id="plat">
+    <button role="tab" data-p="android" onclick="setPlatform('android')"><span aria-hidden="true">🤖</span>Android</button>
+    <button role="tab" data-p="ios" onclick="setPlatform('ios')"><span aria-hidden="true">📱</span>iOS</button>
+  </div>
   <button class="btn sm mobile-list" onclick="document.querySelector('.app').classList.toggle('list-open')">List</button>
   <div class="repo" id="repo"></div>
   <button class="bell" id="bell" aria-label="Notifications" onclick="toggleNotifs()">🔔</button>
@@ -412,7 +435,7 @@ const STATUS = {design_review:"Design review", coding:"Coding", pr_open:"PR open
 const isInc = cr => cr && cr.kind === "incident";
 const UI_DEF = {after_save:"stay", success_title:"Profile saved", success_message:"Thanks — your details are up to date.", app_title:"MobileHeal", button_label:"Save", button_color:"#6750A4", button_text_color:"#FFFFFF",
   banner_color:"#FFF4E5", banner_text_color:"#B54708", background_color:"#FFFFFF"};
-let state = {filter:"change", healer:null, seen:null, list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
+let state = {platform:(()=>{ try { return localStorage.getItem("mh.platform")||"android"; } catch(e){ return "android"; } })(), filter:"change", healer:null, seen:null, list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
 async function api(path, opts={}) {
@@ -422,6 +445,13 @@ async function api(path, opts={}) {
   return data;
 }
 function ago(ts){ const s=(Date.now()-new Date(ts))/1000; if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+"m ago"; if(s<86400) return Math.floor(s/3600)+"h ago"; return new Date(ts).toLocaleDateString(); }
+function setPlatform(p){
+  state.platform = p; try { localStorage.setItem("mh.platform", p); } catch(e){}
+  document.body.classList.toggle("plat-ios", p === "ios");
+  document.querySelectorAll("#plat button").forEach(b => { const on = b.dataset.p === p; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  if (state.cr && state.route === "cr") renderCR(); else if (state.route === "settings") renderSettings("settings/"+(state.setSec||"general"));
+}
+const platOf = path => path.startsWith("ios/") ? "ios" : path.startsWith("android/") ? "android" : "shared";
 function jiraLink(j){ return j.url ? `<a class="jira" href="${esc(j.url)}" target="_blank" rel="noopener" title="Open in Jira"><i></i>${esc(j.key)} · ${esc(j.status||"")}</a>`
   : `<a class="jira" href="javascript:void 0" onclick="showJira('${esc(j.key)}')" title="Mock Jira — configure Jira in Settings"><i></i>${esc(j.key)} · ${esc(j.status||"")}</a>`; }
 async function showJira(key){
@@ -716,17 +746,18 @@ function renderCR(){
   renderList();
 }
 function mergedBanner(cr){
-  const andr = (cr.files||[]).filter(f=>f.path.startsWith("android/"));
+  const andr = (cr.files||[]).filter(f=>f.path.startsWith("android/")||f.path.startsWith("ios/"));
   const root = (state.info&&state.info.root)||"your project folder";
   const live = isInc(cr) ? (cr.deployed==="hot-reloaded" ? "the fix is live in the running server" : "restart the backend to load the fix") : "rules are live and were pushed to connected phones";
   return `<div class="banner-ok" style="margin-top:16px;align-items:flex-start"><span style="font-size:20px">⇡</span><div style="flex:1">
     <div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} into <code>main</code> — ${live}.</div>
-    ${andr.length?`<div style="margin-top:6px">Android code updated in <code>${esc(root)}/android</code>:</div><ul class="notes" style="margin:4px 0 6px">${andr.map(f=>`<li><code>${esc(f.path.replace(/^android\//,""))}</code></li>`).join("")}</ul>
-      <div class="hint" style="margin:0 0 8px">Android Studio picks up the files automatically — press <b>▶ Run</b> to rebuild the app on the emulator.</div>
-      <button class="btn sm" onclick="openStudio()">Open in Android Studio</button>`
+    ${andr.length?`<div style="margin-top:6px">App code updated in <code>${esc(root)}</code>:</div><ul class="notes" style="margin:4px 0 6px">${andr.map(f=>`<li><span class="chip s-closed">${f.path.startsWith("ios/")?"iOS":"Android"}</span> <code>${esc(f.path.replace(/^(android|ios)\//,""))}</code></li>`).join("")}</ul>
+      <div class="hint" style="margin:0 0 8px">Android Studio and Xcode pick up the files automatically — press <b>▶ Run</b> / <b>⌘R</b> to rebuild on the emulator or simulator.</div>
+      <span style="display:flex;gap:8px;flex-wrap:wrap">${andr.some(f=>f.path.startsWith("android/"))?`<button class="btn sm" onclick="openStudio()">Open in Android Studio</button>`:""}${andr.some(f=>f.path.startsWith("ios/"))?`<button class="btn sm" onclick="openXcode()">Open in Xcode</button>`:""}</span>`
      :`<div class="hint" style="margin:6px 0 0">No Android source changed — this change is data-driven (rules), so a running app updates live without a rebuild.</div>`}
   </div></div>`;
 }
+async function openXcode(){ await act(async()=>{ await api("/api/ios/open",{method:"POST"}); }, "Opening the iOS project in Xcode…"); }
 async function openStudio(){ await act(async()=>{ const r = await api("/api/android/open",{method:"POST"}); }, "Opening the project in Android Studio…"); }
 function headerActions(cr){
   if (isInc(cr)) {
@@ -813,12 +844,21 @@ function bar5(a,r){ const t=a+r||1, na=Math.round(5*a/t); return `<span class="b
 function codingLog(cr){
   const log = cr.coding_log||[];
   const steps = isInc(cr) ? ["Diagnose","Reproduce","Approval","Fix","Run checks","Open pull request"]
-    : ["Generate code","Generate test cases","Android developer agent", ...[...new Set(log.map(e=>e.step).filter(x=>x.startsWith("Agent · ")))], "Run checks","Open pull request"];
+    : ["Generate code","Generate test cases","Android developer agent", ...[...new Set(log.map(e=>e.step).filter(x=>x.startsWith("Agent · ")))], ...(log.some(e=>e.step==="iOS developer agent")?["iOS developer agent"]:[]), "Run checks","Open pull request"];
   return `<div class="card" style="margin-bottom:16px"><div class="card-h">Build pipeline ${cr.status==="coding"?'<span class="chip s-coding">running</span>':""}</div>
     ${steps.map(s=>{ const ev=[...log].reverse().find(e=>e.step===s); let st=ev?ev.status:"pending"; if(st==="warn") st="warn";
       return `<div class="chk ${s.startsWith("Agent · ")?"sub":""}"><div class="dot d-${st==='pending'?'info':st}" style="${st==='pending'?'opacity:.35':''}">${st==='done'?'✓':st==='fail'?'✕':st==='warn'?'!':''}</div>
         <div><div class="nm">${s.replace("Agent · ","")}</div><div class="dt">${esc(ev&&ev.detail||(st==='pending'?'waiting':''))}</div></div></div>`; }).join("")}
     ${log.filter(e=>e.step==="Error").map(e=>`<div class="chk"><div class="dot d-fail">✕</div><div><div class="nm">Error</div><div class="dt">${esc(e.detail)}</div></div></div>`).join("")}</div>`;
+}
+function iosAgentCard(cr){
+  const a = cr.ios_agent; if (!a) return `<div class="card" style="margin-bottom:16px"><div class="card-b hint" style="margin:0">No iOS app in this project — add one under <code>ios/</code> to get SwiftUI changes.</div></div>`;
+  const p = a.plan || {}, lint = a.lint || [];
+  return `<div class="card" style="margin-bottom:16px"><div class="card-h"><span>📱 iOS Developer Agent <span class="chip s-closed">${esc(a.engine||"templates")}</span></span></div><div class="card-b">
+    <div style="font-weight:600;margin-bottom:6px">${esc(p.summary||"")}</div>
+    ${(p.changes||[]).length?`<ul class="notes">${p.changes.map(c=>`<li><code>${esc(c.path.replace("ios/MobileHeal/",""))}</code> — ${esc(c.purpose)}</li>`).join("")}</ul>`:""}
+    ${(p.notes||[]).length?`<ul class="notes">${p.notes.map(n=>`<li class="hint" style="margin:0">${esc(n)}</li>`).join("")}</ul>`:""}
+    <div class="hint" style="margin:6px 0 0">${lint.length?lint.map(i=>`${esc(i.severity)}: ${esc(i.path.split("/").pop())} — ${esc(i.message)}`).join(" · "):"✓ SwiftUI lint clean · build & test in Xcode (⌘B / ⌘U)"}</div></div></div>`;
 }
 function agentCard(cr){
   const a = cr.android_agent; if (!a) return "";
@@ -844,10 +884,12 @@ function agentCard(cr){
 function tCode(cr){
   if (!cr.files && isInc(cr)) return codingLog(cr) + (["diagnosing","fixing"].includes(cr.status)?`<div class="skel"></div><div class="skel" style="width:70%"></div>`:"");
   if (!cr.files) return cr.status==="design_review" ? `<div class="empty">Code is generated after the design is approved.</div>` : codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:70%"></div>`;
-  return `${["coding","failed","diagnosing"].includes(cr.status)?codingLog(cr):""}${agentCard(cr)}
-    <div class="meta" style="margin-bottom:12px">Showing <b>${cr.files.length} changed files</b> with <span class="plus">${cr.stats.additions} additions</span> and <span class="minus">${cr.stats.deletions} deletions</span>${cr.pr&&cr.pr.commit?` · commit <code>${esc(cr.pr.commit)}</code>`:""}</div>
-    ${cr.files.map((f,i)=>`<div class="file"><div class="file-h" onclick="this.nextElementSibling.classList.toggle('hide')">
-        <span class="p">${esc(f.path)}</span>${f.by==="android-agent"?'<span class="chip s-coding">🤖 agent</span>':""}${f.status==="added"?'<span class="chip s-pr_open">new</span>':""}
+  const P = state.platform, shown = cr.files.filter(f => platOf(f.path) !== (P === "ios" ? "android" : "ios"));
+  const hidden = cr.files.length - shown.length, other = P === "ios" ? "Android" : "iOS";
+  return `${["coding","failed","diagnosing"].includes(cr.status)?codingLog(cr):""}${P==="ios"?iosAgentCard(cr):agentCard(cr)}
+    <div class="meta" style="margin-bottom:12px">Showing <b>${shown.length} ${P==="ios"?"iOS":"Android"} + shared files</b> · <span class="plus">${shown.reduce((a,f)=>a+f.additions,0)} additions</span> · <span class="minus">${shown.reduce((a,f)=>a+f.deletions,0)} deletions</span>${hidden?` · <a href="javascript:void 0" onclick="setPlatform('${P==="ios"?"android":"ios"}')">${hidden} ${other} file${hidden>1?"s":""} →</a>`:""}${cr.pr&&cr.pr.commit?` · commit <code>${esc(cr.pr.commit)}</code>`:""}</div>
+    ${shown.map((f,i)=>`<div class="file"><div class="file-h" onclick="this.nextElementSibling.classList.toggle('hide')">
+        <span class="p">${esc(f.path)}</span>${f.by==="android-agent"?'<span class="chip s-coding">🤖 Android agent</span>':f.by==="ios-agent"?'<span class="chip s-coding">📱 iOS agent</span>':""}<span class="chip s-closed">${{android:"Android",ios:"iOS",shared:"Shared"}[platOf(f.path)]}</span>${f.status==="added"?'<span class="chip s-pr_open">new</span>':""}
         <span class="plus">+${f.additions}</span><span class="minus">−${f.deletions}</span>${bar5(f.additions,f.deletions)}</div>
       <div class="${i>1&&f.additions>60?'hide':''}">${diffTable(f.diff)}</div></div>`).join("")}`;
 }
@@ -1071,7 +1113,7 @@ async function saveRevision(){
   await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/revise`,{method:"POST",body:{title:$("#e-title").value, description:state.cr.description,
     spec_text:$("#e-spec").value, requirement_text: eng, translation: state.editTr}}); state.tab="design"; await refreshList(); renderCR(); }, "Design regenerated"); }
 
-window.__init = async () => { state.filter = state.filter || "change"; await refreshInfo(); await refreshHealer(); await loadSettings(); await refreshList(); state.seen = state.list.filter(c=>c.kind==="incident").map(c=>c.id+":"+c.status+":"+c.occurrences).join("|");
+window.__init = async () => { state.filter = state.filter || "change"; setPlatform(state.platform); await refreshInfo(); await refreshHealer(); await loadSettings(); await refreshList(); state.seen = state.list.filter(c=>c.kind==="incident").map(c=>c.id+":"+c.status+":"+c.occurrences).join("|");
   await route(); refreshShell(); setInterval(refreshShell, 6000); setInterval(refreshInfo, 15000); setInterval(watchIncidents, 4000); setInterval(refreshHealer, 15000); };
 </script>
 <script>
@@ -1525,7 +1567,7 @@ async function dsDelete(id){ await act(async()=>{ await api(`/api/datasets/${id}
    ===================================================================== */
 const SET_SECTIONS = [
   ["general","General","⚙︎"], ["model","Agent model","✦"], ["source","Source control","⎇"], ["jira","Jira","◆"],
-  ["confluence","Confluence","▤"], ["design","Design & testing","◐"], ["android","Android","▣"],
+  ["confluence","Confluence","▤"], ["design","Design & testing","◐"], ["android","Mobile apps","▣"],
   ["data","Data & notifications","🔔"], ["delivery","Delivery & approvals","✓"],
 ];
 function sChip(ok, okText, offText, warn){ return `<span class="chip ${ok?'s-pr_open':warn?'s-diagnosing':'s-closed'}">${ok?okText:offText}</span>`; }
@@ -1607,12 +1649,16 @@ async function renderSettings(h){
       sRow("Project key","", sInput("zephyr_project_key","MH")) +
       sRow("Test cycle key","Results are exported to this cycle.", sInput("zephyr_cycle_key","MH-R1")), sTest("zephyr"))}`,
 
-  android: `<h2>Android</h2><p class="sdesc">The codebase the Android developer agent learns conventions from, and the skill it follows when writing Kotlin.</p>
+  android: `<h2>Mobile apps</h2><p class="sdesc">The Android and iOS apps the developer agents write code for, the reference repository and the Android coding skill.</p>
     ${sGroup("Reference repository", `<span id="repo-chip"></span>`,
       sRow("Git URL","https only. Public repositories need no token.", sInput("android_repo_url","https://github.com/org/app")) +
       sRow("Branch","Blank = default branch.", sInput("android_repo_branch","main")) +
       `<div id="repo-out" class="sgroup-b"></div>`,
       `<button class="btn sm primary" onclick="syncRepo()">Save &amp; sync</button><button class="btn sm" onclick="$('#s-android_repo_url').value='https://github.com/android/nowinandroid';$('#s-android_repo_branch').value='';markDirty()">Use sample</button><button class="btn sm" id="repo-browse" onclick="browseRepo('')" disabled>Browse files</button>`)}
+    ${sGroup("📱 iOS app", sChip(!!s.ios_present,"In project","Not found"),
+      sRow("Project","SwiftUI app (iOS 17+) in <code>ios/</code> with the MobileHealKit Swift package. Generated with XcodeGen.", `<span class="hint" style="margin:0">${s.ios_present?"ios/project.yml · MobileHealKit":"Add an iOS app under ios/"}</span>`) +
+      sRow("iOS developer agent","Writes SwiftUI screens and regenerates RulesDefaults.swift for every change.", `<span class="hint" style="margin:0">Template engine · lint + previews</span>`),
+      s.ios_present?`<button class="btn sm" onclick="openXcode()">Open in Xcode</button><span class="hint" style="margin:0">Or run <code>./start.command --ios</code></span>`:"")}
     ${sGroup("Developer agent skill", `<span id="ag-status" class="hint" style="margin:0"></span>`,
       `<div class="sgroup-b"><textarea id="ag-skill" class="input code" style="min-height:260px" aria-label="Agent skill"></textarea></div>`,
       `<button class="btn sm" onclick="saveSkill()">Save skill</button><span id="ag-tc" class="hint" style="margin:0"></span>`)}`,
@@ -1861,7 +1907,7 @@ async function renderDemo(){
 }
 function demoRunHtml(){
   const D = state.demo, a = D.active; if (!a) return `<div class="empty">Pick a scenario to start. Tip: put this page and the Android emulator side by side.</div>`;
-  const steps = DEMO_STEPS.filter(s => a.kind!=="android" || ANDROID_STEPS.includes(s[0]));
+  const steps = DEMO_STEPS.filter(s => (a.kind!=="android" && a.kind!=="ios") || ANDROID_STEPS.includes(s[0]));
   const t0 = a.t0, fmt = t => t==null ? "" : `+${((t-t0)/1000).toFixed(1)}s`;
   const m = a.marks;
   const metric = (lbl, from, to) => m[from]!=null && m[to]!=null ? `<div><b>${((m[to]-m[from])/1000).toFixed(1)}s</b><span>${lbl}</span></div>` : `<div><b>—</b><span>${lbl}</span></div>`;
@@ -1905,7 +1951,14 @@ async function runDemo(id){
   try {
     let incKey;
     dmMark("traffic","running");
-    if (sc.kind === "android") {
+    if (sc.kind === "ios") {
+      dmLog("📱 iPhone 15 Pro · user taps Save on the Profile screen…");
+      dmMark("traffic","done","User taps Save in the iOS app");
+      dmLog("💥 Fatal error: Unexpectedly found nil while unwrapping an Optional value", "err");
+      dmMark("crash","done","App crashed — CrashReporter uploads the Swift stack trace", D.data.ios_report.stack.split("\n").slice(0,3).join("\n"));
+      const r = await api("/api/crashes",{method:"POST",body:D.data.ios_report}); incKey = r.incident;
+      dmLog(`POST /api/crashes (platform: ios) → 201 ${incKey}`);
+    } else if (sc.kind === "android") {
       dmLog("📱 Pixel 8 · user taps Save on the Profile screen…");
       dmMark("traffic","done","User taps Save in the Android app");
       dmLog("💥 java.lang.NullPointerException in ProfileViewModel.save", "err");
@@ -1953,7 +2006,7 @@ async function runDemo(id){
     if (inc.attempts) dmMark("fix","done", `${inc.attempts.filter(x=>x.patched).length} patch(es) · ${inc.attempts.map(x=>x.why).filter(Boolean).map(w=>w.split(". ")[0]).join(" → ")}`,
        inc.attempts.filter(x=>x.patched).map(x=>`- ${x.line}\n+ ${x.patched}`).join("\n"));
     if (inc.status === "needs_engineer") {
-      if (sc.kind==="android") dmMark("diagnose","done", inc.diagnosis ? inc.diagnosis.summary : "Stack trace recorded");
+      if (sc.kind==="android"||sc.kind==="ios") dmMark("diagnose","done", inc.diagnosis ? inc.diagnosis.summary : "Stack trace recorded");
       dmMark("pr","fail","No verified automatic fix — routed to an engineer" + (state.settings.ai.available?"":" (parser mode — add a model API key so the agent's LLM can propose one)"));
       D.active.done = true; D.active.outcome = "engineer"; D.active.outcomeText = "Needs engineer"; D.running=false; await renderDemo(); return;
     }

@@ -3,6 +3,7 @@
 #   ./start.command            start the server, open the web app and Android Studio
 #   ./start.command --server   server + web app only
 #   ./start.command --android  open Android Studio only
+#   ./start.command --ios      open the iOS app in Xcode (generates the project with XcodeGen)
 #   ./start.command --test     run the backend test suite
 #   ./start.command --demo     demo mode: isolated demo workspace, every integration simulated (no keys needed)
 set -euo pipefail
@@ -25,6 +26,19 @@ open_android_studio() {
   else
     warn "Android Studio not found. Install it from https://developer.android.com/studio, then open: $ROOT/android"
   fi
+}
+
+open_xcode() {
+  [ "$(uname)" = "Darwin" ] || { warn "Xcode needs macOS"; return; }
+  [ -d "/Applications/Xcode.app" ] || { warn "Xcode not found — install it from the Mac App Store"; return; }
+  cd "$ROOT/ios"
+  if [ ! -d MobileHeal.xcodeproj ]; then
+    if command -v xcodegen >/dev/null 2>&1; then say "Generating the Xcode project (XcodeGen)…"; xcodegen --quiet
+    elif command -v brew >/dev/null 2>&1; then say "Installing XcodeGen with Homebrew…"; brew install xcodegen >/dev/null && xcodegen --quiet
+    else warn "Install XcodeGen (https://github.com/yonaskolb/XcodeGen) to create the app project; opening the Swift package instead."; open -a Xcode MobileHealKit/Package.swift; cd "$ROOT"; return; fi
+  fi
+  open -a Xcode MobileHeal.xcodeproj && ok "Xcode launched — choose an iPhone simulator and press ⌘R"
+  cd "$ROOT"
 }
 
 setup_python() {
@@ -71,6 +85,7 @@ case "$MODE" in
   --demo) prepare_demo; MODE="--server" ;;
   --demo-reset) rm -rf "$ROOT/.mobileheal/demo-workspace" "$ROOT"/backend/mobileheal-demo.db*; ok "Demo workspace removed"; exit 0 ;;
   --android) open_android_studio; exit 0 ;;
+  --ios) open_xcode; exit 0 ;;
   --test)    setup_python; exec pytest -q ;;
 esac
 

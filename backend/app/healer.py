@@ -106,6 +106,28 @@ def _rel(p: str) -> str:
         return p
 
 
+def ios_capture(report: dict, root: Path) -> dict:
+    """Normalise a crash report posted by the iOS CrashReporter (or a symbolicated crash log)."""
+    stack = report.get("stack", "")
+    file = func = None
+    line = None
+    m = re.search(r"([A-Za-z0-9_]+\.swift):(\d+)", stack)
+    if m:
+        fname, line = m.group(1), int(m.group(2))
+        hits = sorted((root / "ios").rglob(fname)) if (root / "ios").is_dir() else []
+        hits = [h for h in hits if "/.build/" not in h.as_posix() and "/DerivedData/" not in h.as_posix()]
+        if hits:
+            file = hits[0].relative_to(root).as_posix()
+        f = re.search(r"(?:at |\.)(\w+)\(\)", stack)
+        func = f.group(1) if f else None
+    exc_type = (report.get("exception") or "Fatal error").split(".")[-1]
+    return {"source": "ios", "exc_type": exc_type, "message": (report.get("message") or "")[:500],
+            "traceback": stack[-6000:], "frames": [], "file": file, "line": line, "function": func,
+            "environment": (report.get("environment") or "production").lower(),
+            "request": {"device": report.get("device"), "app_version": report.get("app_version"), "screen": report.get("screen")},
+            "fingerprint": f"ios:{exc_type}:{file}:{func}"}
+
+
 def android_capture(report: dict) -> dict:
     """Normalise a crash report posted by the Android CrashReporter."""
     stack = report.get("stack", "")
@@ -278,8 +300,8 @@ class Healer:
             if not d.get("file") or not d.get("line") or not (self.root / d["file"]).exists():
                 return self._run_ai_only(inc, "the stack trace doesn't point at a file in this project")
             if d["source"] != "backend" or not d["file"].endswith(".py"):
-                return self._run_static(inc, "kotlin" if d["file"].endswith(".kt") else "other",
-                                        "Android code can't be executed on the server")
+                lang = "kotlin" if d["file"].endswith(".kt") else "swift" if d["file"].endswith(".swift") else "other"
+                return self._run_static(inc, lang, ("iOS" if lang == "swift" else "Android") + " code can't be executed on the server")
             if d.get("repro_kwargs") is None or not d.get("module"):
                 return self._run_static(inc, "python", "the captured input can't be serialised for a replay")
             src_path = self.root / d["file"]
@@ -404,6 +426,7 @@ class Healer:
         self._log(inc, "Diagnose", "running")
         line_text = original.splitlines()[d["line"] - 1].strip() if d["line"] <= len(original.splitlines()) else ""
         hint = patcher.propose_kotlin(line_text, d["exc_type"], d["message"]) if lang == "kotlin" else \
+            patcher.propose_swift(line_text, d["exc_type"], d["message"]) if lang == "swift" else \
             patcher.propose(line_text, d["exc_type"], d["message"]) if lang == "python" else None
         inc["diagnosis"] = {"summary": hint[1] if hint else f"Unhandled {d['exc_type']} in {d.get('function')}().",
                             "details": [f"`{d['exc_type']}{': ' + d['message'] if d['message'] else ''}` in `{d.get('function')}()` "
@@ -472,6 +495,9 @@ class Healer:
                                "detail": self.wf._summ(r.stdout), "ms": round((time.perf_counter() - t0) * 1000), "output": r.stdout[-3000:]})
             finally:
                 shutil.rmtree(td, ignore_errors=True)
+        if lang == "swift":
+            checks.append({"name": "iOS build & tests", "status": "warn",
+                           "detail": "Not run here (no Xcode). Build with ⌘B and test with ⌘U, or `xcodebuild test` in CI, before merging.", "ms": 0})
         if lang == "kotlin":
             checks.append({"name": "Android build & tests", "status": "warn",
                            "detail": "Not run here (no Android SDK). Run ./gradlew testDebugUnitTest in CI or try it on a device before merging.", "ms": 0})
