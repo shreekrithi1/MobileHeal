@@ -383,7 +383,16 @@ class Workflow:
             return []
         lint = a.get("lint") or []
         errs = [i for i in lint if i["severity"] == "error"]
-        out = [{"name": "Android architecture lint (skill)", "status": "fail" if errs else "warn" if lint else "pass",
+        pre = []
+        if a.get("error"):
+            pre.append({"name": "Android developer agent", "status": "fail", "ms": 0,
+                        "detail": f"The agent couldn't implement this requirement in Android code: {a['error']}. "
+                                  "Revise the requirement or retry (Update branch)."})
+        elif a.get("llm_error"):
+            pre.append({"name": "Android developer agent", "status": "warn", "ms": 0,
+                        "detail": f"Model failed ({a['llm_error'][:120]}); the template engine implemented what it could — "
+                                  "review that the requirement is fully covered."})
+        out = pre + [{"name": "Android architecture lint (skill)", "status": "fail" if errs else "warn" if lint else "pass",
                 "detail": ("; ".join(f"{i['path'].split('/')[-1]}: {i['message']}" for i in lint[:4]) if lint
                            else "Clean Architecture, UDF, previews and test coverage rules satisfied"), "ms": 1}]
         b = a.get("build") or {}
@@ -690,6 +699,6 @@ class Workflow:
         return self._save(cr)
 
     def info(self) -> dict:
-        return {"stages": STAGES, "git": self.git.available, "repo": self.git.is_repo(),
+        return {"stages": STAGES, "git": self.git.available, "repo": self.git.is_repo(), "root": str(self.root),
                 "github": self.git.github_repo if self.git.github_enabled else None,
                 "log": self.git.log(6), "live_spec": self._read(codegen.SPEC_PATH) or ""}

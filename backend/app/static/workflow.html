@@ -680,13 +680,27 @@ function renderCR(){
       <div class="meta">${prLine}</div></div>
       <div style="display:flex;gap:8px">${headerActions(cr)}</div></div>
     ${stepper(st, cr)}
-    ${cr.status==="merged"?`<div class="banner-ok" style="margin-top:16px"><span style="font-size:20px">⇡</span><div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} — ${isInc(cr) ? (cr.deployed==="hot-reloaded" ? "fix is live in the running server." : "restart the backend to load the fix.") : "rules are live and were pushed to connected phones."}</div></div>`:""}
+    ${cr.status==="merged"?mergedBanner(cr):""}
+    ${cr.status==="pr_open"&&cr.tested?`<div class="banner-err" style="margin-top:16px;background:var(--blue-soft);color:var(--fg)"><span style="font-size:18px">ⓘ</span><div><b>Tested, not merged yet.</b> Changes stay on branch <code>${esc(cr.pr.branch)}</code> until you merge — they are not in your Android Studio project yet. <a href="javascript:void 0" onclick="setTab('pr')">Review &amp; merge →</a></div></div>`:""}
     ${cr.status==="needs_engineer"?`<div class="banner-err" style="margin-top:16px"><b>Auto-heal couldn't produce a verified fix.</b> ${esc(cr.error||"See Diagnosis for what was tried.")}</div>`:""}
     ${cr.status==="failed"?`<div class="banner-err" style="margin-top:16px"><b>Coding failed:</b> ${esc(cr.error)}</div>`:""}
     <div class="tabs">${tabs.map(([k,n,c])=>`<button class="tab ${state.tab===k?'on':''}" onclick="setTab('${k}')">${n}${c!=null?`<span class="count">${c}</span>`:""}</button>`).join("")}</div>
     <div id="tabbody">${(isInc(cr) ? {overview:iOverview, diagnosis:iDiagnosis, code:tCode, checks:tChecks, test:iReview, pr:tPR} : {overview:tOverview, design:tDesign, code:tCode, checks:tChecks, test:tTests, pr:tPR})[state.tab](cr)}</div>`;
   renderList();
 }
+function mergedBanner(cr){
+  const andr = (cr.files||[]).filter(f=>f.path.startsWith("android/"));
+  const root = (state.info&&state.info.root)||"your project folder";
+  const live = isInc(cr) ? (cr.deployed==="hot-reloaded" ? "the fix is live in the running server" : "restart the backend to load the fix") : "rules are live and were pushed to connected phones";
+  return `<div class="banner-ok" style="margin-top:16px;align-items:flex-start"><span style="font-size:20px">⇡</span><div style="flex:1">
+    <div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} into <code>main</code> — ${live}.</div>
+    ${andr.length?`<div style="margin-top:6px">Android code updated in <code>${esc(root)}/android</code>:</div><ul class="notes" style="margin:4px 0 6px">${andr.map(f=>`<li><code>${esc(f.path.replace(/^android\//,""))}</code></li>`).join("")}</ul>
+      <div class="hint" style="margin:0 0 8px">Android Studio picks up the files automatically — press <b>▶ Run</b> to rebuild the app on the emulator.</div>
+      <button class="btn sm" onclick="openStudio()">Open in Android Studio</button>`
+     :`<div class="hint" style="margin:6px 0 0">No Android source changed — this change is data-driven (rules), so a running app updates live without a rebuild.</div>`}
+  </div></div>`;
+}
+async function openStudio(){ await act(async()=>{ const r = await api("/api/android/open",{method:"POST"}); }, "Opening the project in Android Studio…"); }
 function headerActions(cr){
   if (isInc(cr)) {
     if (cr.status==="detected") return `<button class="btn primary" onclick="heal()">Analyze crash</button>`;

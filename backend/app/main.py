@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -549,6 +550,23 @@ def repo_file(path: str):
         return _repo().read(path)
     except RepoError as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/android/open")
+def android_open():
+    """Open the project's android/ folder in Android Studio on the machine running the server."""
+    import platform
+    import subprocess
+    path = PROJECT_ROOT / "android"
+    if platform.system() == "Darwin":
+        for app_path in ("/Applications/Android Studio.app", str(Path.home() / "Applications/Android Studio.app")):
+            if Path(app_path).exists():
+                subprocess.Popen(["open", "-a", app_path, str(path)])
+                return {"opened": True, "path": str(path)}
+    elif shutil.which("studio"):
+        subprocess.Popen(["studio", str(path)])
+        return {"opened": True, "path": str(path)}
+    raise HTTPException(404, f"Android Studio not found — open {path} manually")
 
 
 @app.get("/api/android")

@@ -269,5 +269,5 @@ def parse_json(raw: str) -> Any:
     except json.JSONDecodeError:
         m = re.search(r"(\{.*\}|\[.*\])", raw, re.S)
         if not m:
-            raise AIError("Claude returned no JSON")
+            raise AIError("The model returned no JSON")
         return json.loads(m.group(1))

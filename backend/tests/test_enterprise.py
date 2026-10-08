@@ -249,3 +249,13 @@ def test_finalize_skips_questions_and_reasoning_models(tmp_path, monkeypatch):
     # translate falls back to the parser instead of failing
     out = translate("Make the save button green", "name: required\nemail: required\n", ai)
     assert out["engine"] == "rules" and "ui.button_color = #079455" in out["spec_text"]
+
+
+def test_agent_failure_is_visible_in_checks(env):
+    c, m = env
+    wf = m.app.state.wf
+    fail = wf._agent_checks({"android_agent": {"error": "boom", "lint": []}})
+    assert fail[0]["name"] == "Android developer agent" and fail[0]["status"] == "fail"
+    warn = wf._agent_checks({"android_agent": {"llm_error": "empty answer", "engine": "templates", "lint": []}})
+    assert warn[0]["status"] == "warn" and "template engine" in warn[0]["detail"]
+    assert "root" in c.get("/api/workflow").json()

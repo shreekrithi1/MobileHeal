@@ -414,7 +414,15 @@ class AndroidAgent:
         result = {"engine": None, "plan": None, "files": {}, "lint": [], "build": None, "iterations": 0, "log": []}
         try:
             if self.wf.ai.available:
-                self._run_claude(cr, result, say)
+                try:
+                    self._run_claude(cr, result, say)
+                except Exception as e:
+                    # the model failed (empty/invalid answer, network…) — don't ship a rules-only change silently
+                    log.warning("LLM android agent failed, using templates: %s", e)
+                    say("Plan", "warn", f"model failed ({str(e)[:80]}) — falling back to the template engine")
+                    result.update({"files": {}, "lint": [], "build": None, "iterations": 0,
+                                   "llm_error": str(e)[:300]})
+                    self._run_templates(cr, result, say)
             else:
                 self._run_templates(cr, result, say)
         except Exception as e:
