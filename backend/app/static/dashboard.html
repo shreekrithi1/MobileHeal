@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MobileHeal Control</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#667085; --line:#e4e7ec;
+          --ok:#12b76a; --off:#98a2b3; --warn:#f79009; --err:#d92d20; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b21; --fg:#e7e9ee;
+          --muted:#98a2b3; --line:#2a2f38; } }
+  * { box-sizing:border-box } body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;
+          background:var(--bg); color:var(--fg); }
+  main { max-width:880px; margin:0 auto; padding:24px 16px; }
+  h1 { font-size:22px; margin:0 0 4px } .sub { color:var(--muted); margin:0 0 20px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap }
+  .state { font-size:28px; font-weight:700; letter-spacing:.5px }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; vertical-align:middle }
+  .switch { position:relative; width:64px; height:34px; } .switch input { opacity:0; width:0; height:0 }
+  .slider { position:absolute; inset:0; background:var(--off); border-radius:34px; cursor:pointer; transition:.2s }
+  .slider:before { content:""; position:absolute; width:26px; height:26px; left:4px; top:4px; background:#fff;
+          border-radius:50%; transition:.2s } input:checked + .slider { background:var(--ok) }
+  input:checked + .slider:before { transform:translateX(30px) }
+  dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; margin:12px 0 0 } dt { color:var(--muted) }
+  table { width:100%; border-collapse:collapse; font-size:14px } th,td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line) }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; background:var(--line); margin:1px }
+  .tag.req { background:color-mix(in srgb, var(--warn) 22%, transparent) }
+  .err { color:var(--err) } .muted { color:var(--muted) }
+  button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer }
+  .scroll { overflow-x:auto }
+  textarea { width:100%; min-height:260px; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; padding:12px;
+          border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--fg); resize:vertical }
+  textarea.bad { border-color:var(--err) }
+  .btn-primary { background:#1570ef; color:#fff; border-color:#1570ef } .btn-primary:disabled { opacity:.5; cursor:default }
+  .ok { color:var(--ok) } .grid2 { display:grid; grid-template-columns:1fr 280px; gap:16px }
+  @media (max-width:720px) { .grid2 { grid-template-columns:1fr } }
+  .phone { border:1px solid var(--line); border-radius:22px; padding:14px; min-height:260px; }
+  .phone .bar { font-weight:600; padding:6px 0 10px } .phone .banner { border-radius:8px; padding:10px; font-size:13px; margin-bottom:10px }
+  .phone .fld { border:1px solid #c8ccd2; border-radius:6px; padding:8px; font-size:13px; margin-bottom:8px; color:#667085; background:#fff }
+  .phone .pbtn { border-radius:20px; padding:10px; text-align:center; font-weight:600 }
+  .help code { background:var(--line); padding:1px 5px; border-radius:4px; font-size:12px } .help li { margin:2px 0 }
+</style>
+</head>
+<body>
+<main>
+  <h1>MobileHeal Control Dashboard</h1>
+  <p class="sub">Auto-Heal agent status and schema enforcement · <a href="/workflow">Open Delivery workflow →</a> <span class="muted">(change requests → design → PR → test → merge)</span></p>
+
+  <section class="card">
+    <div class="row">
+      <div><div class="muted">Watcher agent</div>
+        <div class="state"><span class="dot" id="dot"></span><span id="state">…</span></div></div>
+      <label class="switch" title="Start / stop agent"><input type="checkbox" id="toggle"><span class="slider"></span></label>
+    </div>
+    <dl>
+      <dt>Interval</dt><dd id="interval">–</dd>
+      <dt>Last tick</dt><dd id="tick">–</dd>
+      <dt>Tick duration</dt><dd id="dur">–</dd>
+      <dt>Mobile clients</dt><dd id="clients">–</dd>
+      <dt>Spec file</dt><dd id="specPath" style="word-break:break-all">–</dd>
+    </dl>
+    <p id="error" class="err"></p>
+    <button id="runNow">Run check now</button>
+  </section>
+
+  <section class="card">
+    <div class="row"><h3 style="margin:0">Business rules editor</h3>
+      <span><button id="reload">Revert</button> <button id="save" class="btn-primary">Save &amp; apply</button></span></div>
+    <p class="muted" style="margin:6px 0 12px">Edits are validated, written to <code>requirements.txt</code>, and pushed to connected phones instantly.</p>
+    <div class="grid2">
+      <div>
+        <textarea id="spec" spellcheck="false"></textarea>
+        <p id="specMsg" class="muted" style="margin:6px 0 0">&nbsp;</p>
+      </div>
+      <div>
+        <div class="muted" style="font-size:13px;margin-bottom:6px">App preview</div>
+        <div class="phone" id="phone"></div>
+      </div>
+    </div>
+    <details class="help" style="margin-top:12px"><summary>Rule syntax</summary>
+      <ul>
+        <li><code>phone_number: required</code> — profile field users must fill in (<code>optional</code> to relax)</li>
+        <li><code>ui.button_color = #E53935</code> — app look &amp; behaviour, any key below</li>
+        <li><code># comment</code> — ignored</li>
+      </ul>
+      <div id="uiKeys"></div>
+    </details>
+    <h4 style="margin:14px 0 6px">Active rules</h4><div id="rules" class="muted">–</div>
+  </section>
+
+  <section class="card scroll">
+    <h3 style="margin-top:0">Profiles</h3>
+    <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Missing</th></tr></thead>
+      <tbody id="profiles"></tbody></table>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function refresh() {
+  try {
+    const [a, p] = await Promise.all([fetch("/api/agent").then(r=>r.json()), fetch("/api/profiles").then(r=>r.json())]);
+    const on = a.state === "START";
+    $("state").textContent = on ? "RUNNING" : "STOPPED";
+    $("dot").style.background = on ? "var(--ok)" : "var(--off)";
+    $("toggle").checked = on;
+    $("interval").textContent = a.interval_seconds + " s";
+    $("tick").textContent = a.last_tick ? new Date(a.last_tick).toLocaleString() : "–";
+    $("dur").textContent = a.last_duration_ms != null ? a.last_duration_ms + " ms" : "–";
+    $("clients").textContent = a.ws_clients;
+    $("specPath").textContent = a.spec_path;
+    $("error").textContent = a.last_error || "";
+    $("rules").innerHTML = (a.rules.map(r =>
+      `<span class="tag ${r.constraint==='required'?'req':''}">${esc(r.field)}: ${esc(r.constraint)}</span>`).concat(
+      Object.entries(a.ui || {}).map(([k, v]) => `<span class="tag">ui.${esc(k)} = ${k.endsWith("_color") ?
+        `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;background:${esc(v)}"></span> ` : ""}${esc(v)}</span>`))
+      .join(" ")) || "No rules";
+    $("profiles").innerHTML = p.length ? p.map(x => {
+      const miss = a.active_alerts[x.id] || [];
+      return `<tr><td>${x.id}</td><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.phone_number)}</td>
+        <td>${miss.length ? miss.map(m=>`<span class="tag req">${esc(m)}</span>`).join(" ") : '<span class="muted">✓ healthy</span>'}</td></tr>`;
+    }).join("") : `<tr><td colspan="5" class="muted">No profiles yet</td></tr>`;
+  } catch (e) { $("error").textContent = "Backend unreachable"; }
+}
+$("toggle").addEventListener("change", async e => {
+  await fetch("/api/agent/toggle", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({state: e.target.checked ? "START" : "STOP"})});
+  refresh();
+});
+$("runNow").addEventListener("click", async () => { await fetch("/api/agent/run-now", {method:"POST"}); refresh(); });
+let dirty = false, lastSaved = "";
+const label = k => k.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+function preview(rules, ui) {
+  const req = rules.filter(r => r.constraint === "required").map(r => r.field);
+  const fields = ["name", "email", ...req.filter(f => f !== "name" && f !== "email")];
+  const extra = req.filter(f => f !== "name" && f !== "email");
+  $("phone").style.background = ui.background_color || "#ffffff";
+  $("phone").innerHTML = `<div class="bar" style="color:#1b1f24">${esc(ui.app_title || "MobileHeal")}</div>` +
+    (extra.length ? `<div class="banner" style="background:${esc(ui.banner_color || "#FFF4E5")};color:${esc(ui.banner_text_color || "#B54708")}">
+      <b>Action needed</b><br>${esc(ui.banner_message || "Your profile is missing: " + extra.map(label).join(", "))}</div>` : "") +
+    fields.map(f => `<div class="fld">${esc(label(f))}</div>`).join("") +
+    `<div class="pbtn" style="background:${esc(ui.button_color || "#6750A4")};color:${esc(ui.button_text_color || "#FFFFFF")}">${esc(ui.button_label || "Save")}</div>`;
+}
+let vTimer;
+$("spec").addEventListener("input", () => {
+  dirty = $("spec").value !== lastSaved;
+  clearTimeout(vTimer);
+  vTimer = setTimeout(async () => {
+    const r = await fetch("/api/requirements/validate", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({text: $("spec").value})}).then(r => r.json());
+    $("spec").classList.toggle("bad", !r.valid);
+    $("save").disabled = !r.valid;
+    $("specMsg").className = r.valid ? (dirty ? "muted" : "ok") : "err";
+    $("specMsg").textContent = r.valid ? (dirty ? "Valid — unsaved changes" : "Saved") : r.error;
+    if (r.valid) preview(r.rules, r.ui);
+  }, 250);
+});
+async function loadSpec() {
+  const r = await fetch("/api/requirements").then(r => r.json());
+  lastSaved = r.text; $("spec").value = r.text; dirty = false;
+  $("spec").classList.remove("bad"); $("save").disabled = false;
+  $("specMsg").className = r.last_error ? "err" : "muted"; $("specMsg").textContent = r.last_error || "\u00a0";
+  $("uiKeys").innerHTML = "<p class='muted' style='margin:6px 0 2px'>Supported <code>ui.</code> keys:</p><ul>" +
+    Object.entries(r.ui_keys).map(([k, d]) => `<li><code>ui.${k}</code> — ${esc(d)}</li>`).join("") + "</ul>";
+  preview(r.rules, r.ui);
+}
+$("save").addEventListener("click", async () => {
+  $("save").disabled = true;
+  const res = await fetch("/api/requirements", {method:"PUT", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({text: $("spec").value})});
+  const r = await res.json();
+  if (!res.ok) { $("specMsg").className = "err"; $("specMsg").textContent = r.detail; $("save").disabled = false; return; }
+  lastSaved = r.text; $("spec").value = r.text; dirty = false;
+  $("specMsg").className = "ok"; $("specMsg").textContent = "Saved and pushed to " + (await fetch("/api/agent").then(x=>x.json())).ws_clients + " connected app(s)";
+  $("save").disabled = false; refresh();
+});
+$("reload").addEventListener("click", loadSpec);
+loadSpec(); refresh(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>

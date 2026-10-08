@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MobileHeal Delivery</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --sunk:#f0f2f5; --fg:#151a21; --muted:#5f6b7a; --faint:#8a95a3; --line:#e2e6eb;
+  --accent:#4f46e5; --accent-fg:#fff; --accent-soft:#eef0ff;
+  --green:#14804a; --green-soft:#e7f6ee; --amber:#b25e09; --amber-soft:#fff4e2; --red:#c4320a; --red-soft:#fdecea;
+  --blue:#175cd3; --blue-soft:#eaf2ff; --purple:#6941c6; --purple-soft:#f2edff;
+  --add:#e6f6ec; --add-strong:#c5ecd3; --del:#fdeceb; --del-strong:#f8d0cd;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1014; --panel:#151a20; --sunk:#10151a; --fg:#e8ecf1; --muted:#9aa5b3; --faint:#6e7987; --line:#262d36;
+  --accent:#8b85ff; --accent-fg:#0d1014; --accent-soft:#232350;
+  --green:#4ade80; --green-soft:#12291c; --amber:#fbbf24; --amber-soft:#2d2210; --red:#f87171; --red-soft:#331616;
+  --blue:#7cb1ff; --blue-soft:#13233d; --purple:#b69cff; --purple-soft:#241a3d;
+  --add:#11291b; --add-strong:#1b4a2e; --del:#331617; --del-strong:#5a2224; --shadow:none;
+}}
+*{box-sizing:border-box} html,body{margin:0;height:100%}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px 5px;border-radius:4px}
+
+/* top bar */
+.top{height:52px;display:flex;align-items:center;gap:18px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em}
+.logo{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#22c55e);display:grid;place-items:center;color:#fff;font-size:13px}
+.nav a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:7px;font-weight:500}
+.nav a.on{color:var(--fg);background:var(--sunk)}
+.repo{margin-left:auto;display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12.5px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:2px 10px;background:var(--panel);white-space:nowrap}
+.pill .d{width:7px;height:7px;border-radius:50%;background:var(--green)}
+
+/* layout */
+.app{display:grid;grid-template-columns:300px 1fr;height:calc(100% - 52px)}
+.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.side-h{padding:14px;border-bottom:1px solid var(--line)}
+.list{overflow:auto;flex:1;padding:6px}
+.item{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 10px;border-radius:9px;cursor:pointer;margin-bottom:2px}
+.item:hover{background:var(--sunk)} .item.on{background:var(--accent-soft)}
+.item .t{font-weight:600;font-size:13.5px;line-height:1.35;margin:3px 0 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.item .m{display:flex;gap:8px;align-items:center;color:var(--faint);font-size:12px}
+.main{overflow:auto;min-width:0}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 24px 60px}
+.empty{color:var(--faint);text-align:center;padding:40px 10px;font-size:13px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:550;white-space:nowrap;box-shadow:var(--shadow)}
+.btn:hover{background:var(--sunk)} .btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)} .btn.primary:hover{filter:brightness(1.08)}
+.btn.green{background:#1a7f37;border-color:#1a7f37;color:#fff} .btn.green:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--red)} .btn.block{width:100%} .btn.sm{padding:4px 10px;font-size:12.5px}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-design_review{background:var(--purple-soft);color:var(--purple)} .s-coding{background:var(--blue-soft);color:var(--blue)}
+.s-pr_open{background:var(--green-soft);color:var(--green)} .s-merged{background:var(--purple-soft);color:var(--purple)}
+.s-closed{background:var(--sunk);color:var(--muted)} .s-failed{background:var(--red-soft);color:var(--red)}
+.s-tested{background:var(--green-soft);color:var(--green)}
+
+/* header */
+.hdr{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.hdr h1{font-size:22px;letter-spacing:-.015em;margin:0 0 6px;line-height:1.25}
+.hdr .key{color:var(--faint);font-weight:500}
+.meta{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px;flex-wrap:wrap}
+.branch{font-family:var(--mono);font-size:12px;background:var(--blue-soft);color:var(--blue);padding:1px 7px;border-radius:5px}
+
+/* stepper */
+.steps{display:grid;grid-template-columns:repeat(6,1fr);margin:20px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 10px;box-shadow:var(--shadow)}
+.step{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;font-size:12.5px;color:var(--faint);font-weight:550;text-align:center}
+.step:not(:last-child)::after{content:"";position:absolute;top:13px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:var(--line)}
+.step.done:not(:last-child)::after{background:var(--green)}
+.step .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line);background:var(--panel);font-size:12px;z-index:1}
+.step.done{color:var(--fg)} .step.done .n{background:var(--green);border-color:var(--green);color:#fff}
+.step.cur{color:var(--accent)} .step.cur .n{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.step.cur.spin .n{border-top-color:transparent;animation:spin 1s linear infinite}
+.step.err .n{border-color:var(--red);color:var(--red)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:18px 0 18px;overflow-x:auto}
+.tab{border:0;background:none;padding:9px 14px;cursor:pointer;color:var(--muted);font-weight:550;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;gap:7px;align-items:center;white-space:nowrap}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.count{background:var(--sunk);border-radius:99px;padding:0 7px;font-size:11.5px;color:var(--muted)}
+
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card-h{padding:12px 16px;border-bottom:1px solid var(--line);font-weight:650;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card-b{padding:16px}
+.grid{display:grid;gap:16px} .g2{grid-template-columns:1fr 1fr} .g-side{grid-template-columns:1fr 330px}
+@media (max-width:980px){.g2,.g-side{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}.app.list-open .side{display:flex}}
+.label{font-size:12px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
+.field{margin-bottom:14px} .field label{display:block;font-weight:600;margin-bottom:5px}
+.input{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 11px;outline:none}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea.code{font-family:var(--mono);font-size:13px;line-height:1.6;min-height:240px;resize:vertical;background:var(--sunk)}
+textarea.code.bad{border-color:var(--red)}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px} .err{color:var(--red)} .ok{color:var(--green)}
+.quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+.quick input[type=color]{width:30px;height:28px;border:1px solid var(--line);border-radius:6px;padding:2px;background:var(--panel);cursor:pointer}
+
+/* phone */
+.phones{display:flex;gap:22px;justify-content:center;flex-wrap:wrap}
+.pcol{display:flex;flex-direction:column;align-items:center;gap:10px}
+.pcap{font-size:12px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.phone{width:262px;height:520px;border-radius:38px;padding:11px;background:#0b0d10;box-shadow:0 18px 40px -18px rgba(0,0,0,.45),inset 0 0 0 2px #2a2f36}
+.screen{width:100%;height:100%;border-radius:28px;overflow:hidden;display:flex;flex-direction:column;color:#1b1f24;position:relative}
+.sb{height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 18px;font-size:11px;font-weight:600}
+.appbar{padding:8px 16px 10px;display:flex;justify-content:space-between;align-items:center;font-weight:650;font-size:16px}
+.live{font-size:10.5px;font-weight:600;color:#12b76a}
+.pbody{padding:6px 14px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:9px}
+.banner{border-radius:10px;padding:9px 11px;font-size:11.5px;line-height:1.4}
+.banner b{display:block;font-size:12px;margin-bottom:2px}
+.ptitle{font-weight:650;font-size:14px;margin-top:2px}
+.pf{position:relative;border:1px solid #9aa3ad;border-radius:6px;padding:12px 10px 6px;font-size:12.5px;background:transparent;min-height:38px}
+.pf span{position:absolute;top:-8px;left:8px;padding:0 4px;font-size:10px;color:#5f6b7a;background:inherit}
+.pf input{border:0;outline:0;width:100%;background:transparent;font-size:12.5px;color:#1b1f24;padding:0}
+.pf.miss{border-color:#d92d20;border-width:2px} .pf.miss span{color:#d92d20}
+.pf.new{box-shadow:0 0 0 3px rgba(79,70,229,.25)}
+.pbtn{border:0;border-radius:20px;padding:10px;font-weight:650;font-size:13px;cursor:pointer;margin-top:4px}
+.ptoast{position:absolute;left:14px;right:14px;bottom:14px;background:#1b1f24;color:#fff;font-size:11.5px;border-radius:8px;padding:8px 10px;opacity:0;transform:translateY(8px);transition:.25s}
+.ptoast.show{opacity:1;transform:none}
+.seg{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:3px}
+.seg button{border:0;background:none;padding:5px 14px;border-radius:7px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--panel);color:var(--fg);box-shadow:var(--shadow)}
+
+/* change list */
+.chg{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line)}
+.chg:last-child{border-bottom:0}
+.ico{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+.i-add{background:var(--green-soft);color:var(--green)} .i-rem{background:var(--red-soft);color:var(--red)} .i-mod{background:var(--blue-soft);color:var(--blue)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15);margin-right:3px}
+.notes li{margin:0 0 7px} .notes{padding-left:18px;margin:0}
+table.t{width:100%;border-collapse:collapse;font-size:13px} .t th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.t td{padding:8px;border-bottom:1px solid var(--line)} .t tr:last-child td{border-bottom:0}
+.lvl{font-weight:700;font-size:12px} .lvl.Fail{color:var(--red)} .lvl.AA\ Large{color:var(--amber)} .lvl.AA,.lvl.AAA{color:var(--green)}
+.stat{display:flex;gap:12px} .stat div{flex:1;background:var(--sunk);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:20px;letter-spacing:-.02em}
+.stat span{font-size:12px;color:var(--muted)}
+
+/* diff */
+.file{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px;background:var(--panel)}
+.file-h{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--sunk);border-bottom:1px solid var(--line);cursor:pointer;font-family:var(--mono);font-size:12.5px}
+.file-h .p{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plus{color:var(--green);font-weight:700} .minus{color:var(--red);font-weight:700}
+.bar5{display:inline-flex;gap:1px} .bar5 i{width:7px;height:7px;border-radius:1px;background:var(--line)} .bar5 i.a{background:var(--green)} .bar5 i.r{background:var(--red)}
+.diff{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;line-height:1.55}
+.diff td{padding:0 10px;white-space:pre;vertical-align:top}
+.diff .ln{width:1%;color:var(--faint);text-align:right;user-select:none;padding:0 8px;border-right:1px solid var(--line)}
+.diff tr.a{background:var(--add)} .diff tr.a .ln{background:var(--add-strong)}
+.diff tr.r{background:var(--del)} .diff tr.r .ln{background:var(--del-strong)}
+.diff tr.h td{background:var(--blue-soft);color:var(--blue);padding:3px 10px}
+.diffscroll{overflow-x:auto}
+
+/* checks / log */
+.chk{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);align-items:flex-start}
+.chk:last-child{border-bottom:0}
+.dot{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;flex:none;margin-top:1px;color:#fff}
+.d-pass,.d-done{background:#1a7f37} .d-warn{background:#d97706} .d-fail{background:#d92d20} .d-info{background:#64748b} .d-running{border:2px solid var(--accent);border-top-color:transparent;animation:spin .9s linear infinite;background:none}
+.chk .nm{font-weight:600} .chk .dt{color:var(--muted);font-size:13px} .chk .ms{margin-left:auto;color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+pre.out{background:var(--sunk);border-radius:8px;padding:10px;font-size:11.5px;overflow:auto;max-height:240px;margin:8px 0 0}
+
+/* timeline */
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:flex;gap:11px;padding:0 0 14px;position:relative}
+.tl li:not(:last-child)::before{content:"";position:absolute;left:11px;top:24px;bottom:0;width:2px;background:var(--line)}
+.tl .av{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none;background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.tl .av.bot{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.tl .when{color:var(--faint);font-size:12px}
+
+/* PR */
+.md h2{font-size:17px;margin:0 0 8px} .md h3{font-size:14px;margin:16px 0 6px} .md p{margin:0 0 8px} .md ul,.md ol{margin:0 0 8px;padding-left:20px} .md li{margin:2px 0}
+.mergebox{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.req{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+.req .dot{width:18px;height:18px;font-size:10px}
+.mergebox .act{padding:14px;display:flex;gap:8px;flex-wrap:wrap;background:var(--sunk)}
+.banner-ok{display:flex;gap:12px;align-items:center;background:var(--purple-soft);color:var(--purple);border-radius:12px;padding:14px 16px;font-weight:600;margin-bottom:16px}
+.banner-err{background:var(--red-soft);color:var(--red);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+.checklist label{display:flex;gap:9px;align-items:flex-start;padding:6px 0;cursor:pointer}
+.checklist input{margin-top:3px;accent-color:var(--accent)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:9px;font-weight:550;opacity:0;transition:.25s;z-index:20;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.skel{background:linear-gradient(90deg,var(--sunk),var(--line),var(--sunk));background-size:200% 100%;animation:sh 1.2s infinite;border-radius:6px;height:12px;margin:8px 0}
+@keyframes sh{to{background-position:-200% 0}}
+.hide{display:none!important}
+.mobile-list{display:none} @media (max-width:980px){.mobile-list{display:inline-flex}}
+@media (max-width:640px){.repo{display:none}.top{gap:10px;padding:0 12px}.wrap{padding:16px 16px 48px}.nav a{padding:6px 7px}.mobile-list{margin-left:auto}.hdr h1{font-size:19px}.step{font-size:11px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><div class="logo">✚</div>MobileHeal</div>
+  <nav class="nav"><a href="/">Dashboard</a><a href="/workflow" class="on">Delivery</a></nav>
+  <button class="btn sm mobile-list" onclick="document.querySelector('.app').classList.toggle('list-open')">Requests</button>
+  <div class="repo" id="repo"></div>
+</header>
+<div class="app">
+  <aside class="side">
+    <div class="side-h"><button class="btn primary block" onclick="go('new')">＋ New change request</button></div>
+    <div class="list" id="list"></div>
+  </aside>
+  <main class="main"><div class="wrap" id="view"></div></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const label = k => k.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+const STATUS = {design_review:"Design review", coding:"Coding", pr_open:"PR open", merged:"Merged", closed:"Closed", failed:"Failed"};
+const UI_DEF = {app_title:"MobileHeal", button_label:"Save", button_color:"#6750A4", button_text_color:"#FFFFFF",
+  banner_color:"#FFF4E5", banner_text_color:"#B54708", background_color:"#FFFFFF"};
+let state = {list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
+async function api(path, opts={}) {
+  const r = await fetch(path, {headers:{"Content-Type":"application/json"}, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined});
+  const data = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(data.detail || ("HTTP " + r.status));
+  return data;
+}
+function ago(ts){ const s=(Date.now()-new Date(ts))/1000; if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+"m ago"; if(s<86400) return Math.floor(s/3600)+"h ago"; return new Date(ts).toLocaleDateString(); }
+function chip(cr){ if(cr.status==="pr_open" && cr.tested) return `<span class="chip s-tested">✓ Tested</span>`;
+  return `<span class="chip s-${cr.status}">${STATUS[cr.status]||cr.status}</span>`; }
+
+/* ---------------- routing ---------------- */
+function go(r){ location.hash = r; }
+window.addEventListener("hashchange", route);
+async function route(){
+  const h = location.hash.slice(1) || "";
+  clearInterval(state.poll);
+  document.querySelector('.app').classList.remove('list-open');
+  if (h === "new" || (!h && !state.list.length)) { state.route="new"; renderNew(); }
+  else if (h.startsWith("cr/")) { const [, id, tab] = h.split("/"); state.route="cr"; await loadCR(+id, tab); }
+  else if (state.list.length) { go("cr/" + state.list[0].id); return; }
+  renderList();
+}
+async function refreshList(){ state.list = await api("/api/cr"); renderList(); }
+async function refreshInfo(){
+  state.info = await api("/api/workflow");
+  const i = state.info, head = i.log[0];
+  $("#repo").innerHTML = (i.git ? `<span class="pill"><span class="d"></span>${i.repo ? `main · <code style="padding:0;background:none">${esc(head?head.sha:"")}</code>` : "git ready"}</span>`
+     : `<span class="pill" title="Install git to create real branches"><span class="d" style="background:var(--amber)"></span>git not found</span>`) +
+    (i.github ? `<span class="pill">GitHub · ${esc(i.github)}</span>` : "");
+}
+function renderList(){
+  $("#list").innerHTML = state.list.length ? state.list.map(c => `
+    <button class="item ${state.cr && state.cr.id===c.id && state.route==='cr' ? 'on':''}" onclick="go('cr/${c.id}')">
+      <div class="m"><span>${esc(c.key)}</span>${chip(c)}</div>
+      <div class="t">${esc(c.title)}</div>
+      <div class="m">${c.pr ? `<span>PR #${c.pr.number}</span>` : ""}${c.stats ? `<span><span class="plus">+${c.stats.additions}</span> <span class="minus">−${c.stats.deletions}</span></span>`:""}<span style="margin-left:auto">${ago(c.updated_at)}</span></div>
+    </button>`).join("") : `<div class="empty">No change requests yet.<br>Create one to start the pipeline.</div>`;
+}
+
+/* ---------------- phone renderer ---------------- */
+function profileFields(rules){
+  const fs = ["name","email"];
+  rules.forEach(r => { if (!fs.includes(r.field)) fs.push(r.field); });
+  return fs;
+}
+function missingOf(rules, values){ return rules.filter(r => r.constraint==="required" && !(values[r.field]||"").trim()).map(r=>r.field); }
+function phone({rules, ui, values, interactive=false, highlight=[], id=""}){
+  ui = {...UI_DEF, ...ui};
+  const miss = missingOf(rules, values);
+  const fields = profileFields(rules);
+  const banner = miss.length ? `<div class="banner" style="background:${esc(ui.banner_color)};color:${esc(ui.banner_text_color)}">
+      <b>Action needed</b>${esc(ui.banner_message || "Your profile is missing: " + miss.map(label).join(", ") + ". Please fill in the highlighted fields and tap " + ui.button_label + ".")}</div>` : "";
+  const f = fields.map(k => `<div class="pf ${miss.includes(k)?'miss':''} ${highlight.includes(k)?'new':''}" style="background:${esc(ui.background_color)}">
+      <span>${esc(label(k))}${rules.find(r=>r.field===k&&r.constraint==='required')?' *':''}</span>
+      ${interactive ? `<input data-k="${k}" value="${esc(values[k]||"")}" oninput="pvInput(this)" inputmode="${k.includes('phone')?'tel':k.includes('email')?'email':'text'}">`
+                    : `<div style="color:${values[k]?'#1b1f24':'#9aa3ad'}">${esc(values[k]||" ")}</div>`}</div>`).join("");
+  return `<div class="phone"><div class="screen" style="background:${esc(ui.background_color)}" id="${id}">
+    <div class="sb"><span>9:41</span><span>●●● ▮</span></div>
+    <div class="appbar"><span>${esc(ui.app_title)}</span><span class="live">● Live</span></div>
+    <div class="pbody">${banner}<div class="ptitle">Your profile</div>${f}
+      <button class="pbtn" style="background:${esc(ui.button_color)};color:${esc(ui.button_text_color)}" ${interactive?'onclick="pvSave()"':''}>${esc(ui.button_label)}</button>
+    </div><div class="ptoast" id="${id}-toast"></div></div></div>`;
+}
+
+/* ---------------- new CR (Requirements) ---------------- */
+async function renderNew(prefill){
+  state.cr = null;
+  const live = (state.info && state.info.live_spec) || "";
+  $("#view").innerHTML = `
+    <div class="hdr"><div><div class="meta" style="margin-bottom:6px"><span class="chip s-design_review">Step 1 · Requirements</span></div>
+      <h1>New change request</h1><div class="meta">Describe the business need and edit the rules. MobileHeal will design, code, test and open a PR.</div></div></div>
+    ${stepper(0)}
+    <div class="grid g-side" style="margin-top:18px">
+      <div class="card"><div class="card-b">
+        <div class="field"><label for="f-title">Title</label><input id="f-title" class="input" placeholder="e.g. Collect phone numbers and rebrand the save button" value="${esc(prefill?.title||"")}"></div>
+        <div class="field"><label for="f-desc">Business requirement</label>
+          <textarea id="f-desc" class="input" rows="3" placeholder="Why is this needed? Who asked for it? What does success look like?">${esc(prefill?.description||"")}</textarea></div>
+        <div class="field" style="margin-bottom:0"><label for="f-spec">Rules <span style="color:var(--faint);font-weight:400">— edits to <code>requirements.txt</code></span></label>
+          <textarea id="f-spec" class="input code" spellcheck="false">${esc(prefill?.spec_text ?? live)}</textarea>
+          <div class="hint" id="f-msg">&nbsp;</div>
+          <div class="quick">
+            <span class="hint" style="margin:0">Quick add:</span>
+            <input id="q-field" class="input" style="width:150px;padding:4px 9px" placeholder="field_name">
+            <button class="btn sm" onclick="qField('required')">+ Required</button>
+            <button class="btn sm" onclick="qField('optional')">+ Optional</button>
+            <span style="width:1px;height:20px;background:var(--line)"></span>
+            <label class="hint" style="margin:0;display:flex;gap:6px;align-items:center">Button <input type="color" value="#6750a4" onchange="qUi('button_color', this.value.toUpperCase())"></label>
+            <label class="hint" style="margin:0;display:flex;gap:6px;align-items:center">Banner <input type="color" value="#fff4e5" onchange="qUi('banner_color', this.value.toUpperCase())"></label>
+            <button class="btn sm" onclick="qLabel()">Button label…</button>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--sunk);border-radius:0 0 12px 12px">
+        <button class="btn" onclick="$('#f-spec').value=state.info.live_spec;validateNew()">Reset rules</button>
+        <button class="btn primary" id="f-submit" onclick="submitNew()">Generate UX design →</button>
+      </div></div>
+      <div><div class="label" style="text-align:center">Live preview</div><div id="f-phone" class="phones"></div></div>
+    </div>`;
+  $("#f-spec").addEventListener("input", validateNew);
+  validateNew();
+}
+let vT;
+function validateNew(){
+  clearTimeout(vT);
+  vT = setTimeout(async () => {
+    const text = $("#f-spec").value;
+    const r = await api("/api/requirements/validate", {method:"POST", body:{text}});
+    $("#f-spec").classList.toggle("bad", !r.valid);
+    $("#f-submit").disabled = !r.valid;
+    const changed = text.trim() !== (state.info.live_spec||"").trim();
+    $("#f-msg").innerHTML = r.valid ? (changed ? `<span class="ok">✓ Valid</span> — ${r.rules.length} field rules, ${Object.keys(r.ui).length} UI rules` : "No changes from the live rules yet") : `<span class="err">✕ ${esc(r.error)}</span>`;
+    if (r.valid) $("#f-phone").innerHTML = phone({rules:r.rules, ui:r.ui, values:{name:"Jane Doe", email:"jane@example.com"}});
+  }, 200);
+}
+function setLine(re, line){ const ta=$("#f-spec"); let t=ta.value; if (re.test(t)) t=t.replace(re, line); else t=t.replace(/\n*$/,"\n")+line+"\n"; ta.value=t; validateNew(); }
+function qField(c){ const f=$("#q-field").value.trim().toLowerCase().replace(/[^a-z0-9_]+/g,"_"); if(!f) return toast("Type a field name first");
+  setLine(new RegExp("^"+f+"\\s*:.*$","m"), `${f}: ${c}`); $("#q-field").value=""; }
+function qUi(k,v){ setLine(new RegExp("^ui\\."+k+"\\s*=.*$","m"), `ui.${k} = ${v}`); }
+function qLabel(){ const v=prompt("Button label", "Save"); if(v) qUi("button_label", v.trim()); }
+async function submitNew(){
+  const b=$("#f-submit"); b.disabled=true; b.textContent="Generating design…";
+  try {
+    const cr = await api("/api/cr", {method:"POST", body:{title:$("#f-title").value, description:$("#f-desc").value, spec_text:$("#f-spec").value}});
+    await refreshList(); go(`cr/${cr.id}/design`); toast(`${cr.key} created — review the design`);
+  } catch(e){ toast(e.message); b.disabled=false; b.textContent="Generate UX design →"; }
+}
+
+/* ---------------- CR detail ---------------- */
+function stageOf(cr){ return cr.status==="merged" ? 6 : cr.status==="coding" ? 2 : cr.status==="design_review" ? 1 :
+  cr.status==="pr_open" ? (cr.tested ? 5 : 4) : cr.status==="failed" ? 2 : cr.stage||1; }
+function stepper(cur, cr){
+  const names = ["Requirements","UX Design","Coding","Pull Request","Test","Merge"];
+  return `<div class="steps">${names.map((n,i)=>{
+    let cls = i<cur ? "done" : i===cur ? "cur" : "";
+    if (cr && cr.status==="coding" && i===2) cls += " spin";
+    if (cr && cr.status==="failed" && i===2) cls = "err";
+    if (cr && cr.status==="closed") cls = i<cur ? "done" : "";
+    return `<div class="step ${cls}"><div class="n">${i<cur?"✓":i+1}</div>${n}</div>`; }).join("")}</div>`;
+}
+const defaultTab = cr => ({design_review:"design", coding:"code", failed:"code", pr_open: cr.tested ? "pr" : "test", merged:"pr", closed:"overview"})[cr.status] || "overview";
+
+async function loadCR(id, tab){
+  try { state.cr = await api(`/api/cr/${id}`); } catch(e){ $("#view").innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+  if (state.preview.crId !== id) {
+    const profs = await api("/api/profiles");
+    state.preview = {crId:id, mode:"after", profile: profs[0]||null, values: {...(profs[0]||{name:"Jane Doe",email:"jane@example.com"})}, profiles: profs};
+    state.testChecks = {};
+  }
+  state.tab = tab || defaultTab(state.cr);
+  renderCR();
+  if (state.cr.status === "coding") state.poll = setInterval(async () => {
+    const cr = await api(`/api/cr/${id}`);
+    if (JSON.stringify(cr.coding_log) !== JSON.stringify(state.cr.coding_log) || cr.status !== state.cr.status) {
+      const done = cr.status !== "coding"; state.cr = cr;
+      if (done) { clearInterval(state.poll); state.tab = defaultTab(cr); await refreshList(); await refreshInfo();
+        toast(cr.status==="pr_open" ? `PR #${cr.pr.number} opened — try it in the Test tab` : "Coding failed"); }
+      renderCR();
+    }
+  }, 700);
+}
+function setTab(t){ state.tab=t; history.replaceState(null,"",`#cr/${state.cr.id}/${t}`); renderCR(); }
+
+function renderCR(){
+  const cr = state.cr, st = stageOf(cr);
+  const tabs = [["overview","Overview"],["design","UX Design"],["code","Code", cr.stats?cr.stats.files:null],
+    ["checks","Checks", cr.checks?cr.checks.length:null],["test","Test"],["pr","Pull request"]];
+  const prLine = cr.pr ? `<span>PR <b>#${cr.pr.number}</b></span><span class="branch">${esc(cr.pr.branch)}</span><span>→</span><span class="branch">${esc(cr.pr.base)}</span>
+     ${cr.stats?`<span><span class="plus">+${cr.stats.additions}</span> <span class="minus">−${cr.stats.deletions}</span></span>`:""}
+     ${cr.pr.github_url?`<a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">View on GitHub ↗</a>`:""}` : "";
+  $("#view").innerHTML = `
+    <div class="hdr"><div style="min-width:0">
+      <div class="meta" style="margin-bottom:6px">${chip(cr)}<span>${esc(cr.author)} opened ${ago(cr.created_at)}</span>${cr.revision>1?`<span>· rev ${cr.revision}</span>`:""}</div>
+      <h1>${esc(cr.title)} <span class="key">${esc(cr.key)}</span></h1>
+      <div class="meta">${prLine}</div></div>
+      <div style="display:flex;gap:8px">${headerActions(cr)}</div></div>
+    ${stepper(st, cr)}
+    ${cr.status==="merged"?`<div class="banner-ok" style="margin-top:16px"><span style="font-size:20px">⇡</span><div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} — rules are live and were pushed to connected phones.</div></div>`:""}
+    ${cr.status==="failed"?`<div class="banner-err" style="margin-top:16px"><b>Coding failed:</b> ${esc(cr.error)}</div>`:""}
+    <div class="tabs">${tabs.map(([k,n,c])=>`<button class="tab ${state.tab===k?'on':''}" onclick="setTab('${k}')">${n}${c!=null?`<span class="count">${c}</span>`:""}</button>`).join("")}</div>
+    <div id="tabbody">${({overview:tOverview, design:tDesign, code:tCode, checks:tChecks, test:tTest, pr:tPR})[state.tab](cr)}</div>`;
+  renderList();
+}
+function headerActions(cr){
+  if (cr.status==="design_review") return `<button class="btn" onclick="editCR()">Edit requirements</button><button class="btn primary" onclick="approve()">Approve design & start coding</button>`;
+  if (cr.status==="pr_open" && !cr.tested) return `<button class="btn primary" onclick="setTab('test')">Test in preview →</button>`;
+  if (cr.status==="pr_open" && cr.tested) return `<button class="btn green" onclick="setTab('pr')">Review & merge →</button>`;
+  if (cr.status==="failed") return `<button class="btn" onclick="editCR()">Edit requirements</button>`;
+  return "";
+}
+
+/* overview */
+function tOverview(cr){
+  const icon = {requirements:"✎", design:"◧", approve:"✓", pr:"⇄", checks:"✔", test:"▶", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
+  return `<div class="grid g-side">
+    <div class="grid">
+      <div class="card"><div class="card-h">Business requirement</div><div class="card-b">${cr.description?esc(cr.description).replace(/\n/g,"<br>"):'<span style="color:var(--faint)">No description</span>'}</div></div>
+      <div class="card"><div class="card-h">Requested rules <span class="hint" style="margin:0">backend/requirements.txt</span></div>
+        <div class="card-b" style="padding:0"><pre class="out" style="margin:0;border-radius:0 0 12px 12px;max-height:none">${esc(cr.spec_text)}</pre></div></div>
+    </div>
+    <div class="card"><div class="card-h">Activity</div><div class="card-b"><ul class="tl">${(cr.timeline||[]).map(e=>`
+      <li><div class="av ${e.actor==='MobileHeal'?'bot':''}">${icon[e.kind]||"•"}</div><div><b>${esc(e.actor)}</b> ${esc(e.text)}<div class="when">${ago(e.ts)}</div></div></li>`).join("")}</ul></div></div>
+  </div>`;
+}
+
+/* design */
+function changeRow(c){
+  if (c.kind==="field_added") return `<div class="chg"><div class="ico i-add">＋</div><div><b>${esc(c.label)}</b> field added <span class="chip s-${c.constraint==='required'?'design_review':'closed'}">${c.constraint}</span><div class="hint" style="margin:2px 0 0"><code>${esc(c.field)}</code></div></div></div>`;
+  if (c.kind==="field_removed") return `<div class="chg"><div class="ico i-rem">−</div><div><b>${esc(c.label)}</b> rule removed<div class="hint" style="margin:2px 0 0">was ${esc(c.constraint)}</div></div></div>`;
+  if (c.kind==="constraint_changed") return `<div class="chg"><div class="ico i-mod">⇄</div><div><b>${esc(c.label)}</b>: ${esc(c.from)} → <b>${esc(c.to)}</b></div></div>`;
+  const v = x => x==null ? `<span style="color:var(--faint)">default${c.default?` (${esc(c.default)})`:""}</span>` :
+    (c.key.endsWith("_color") ? `<span class="sw" style="background:${esc(x)}"></span><code>${esc(x)}</code>` : `“${esc(x)}”`);
+  return `<div class="chg"><div class="ico i-mod">✎</div><div><b>${esc(c.label)}</b>${c.known?"":' <span class="chip s-failed">unsupported</span>'}<div style="margin-top:3px">${v(c.from)} → ${v(c.to)}</div></div></div>`;
+}
+function tDesign(cr){
+  const d = cr.design, sample = {name:"Jane Doe", email:"jane@example.com"};
+  const added = d.changes.filter(c=>c.kind==="field_added").map(c=>c.field);
+  return `<div class="grid g-side">
+    <div class="card"><div class="card-h">Screen design <span class="hint" style="margin:0">Profile screen · sample user Jane Doe</span></div>
+      <div class="card-b"><div class="phones">
+        <div class="pcol"><div class="pcap">Live today</div>${phone({...d.before, values:sample})}</div>
+        <div class="pcol"><div class="pcap" style="color:var(--accent)">Proposed</div>${phone({...d.after, values:sample, highlight:added})}</div>
+      </div></div></div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">UX changes <span class="count">${d.changes.length}</span></div><div class="card-b" style="padding-top:6px;padding-bottom:6px">${d.changes.map(changeRow).join("")||'<div class="hint">No visible changes</div>'}</div></div>
+      <div class="card"><div class="card-h">User impact</div><div class="card-b"><div class="stat">
+        <div><b>${d.impact.newly_flagged}</b><span>newly prompted</span></div><div><b>${d.impact.healed}</b><span>alerts cleared</span></div><div><b>${d.impact.total_profiles}</b><span>profiles</span></div></div></div></div>
+    </div>
+    <div class="card"><div class="card-h">Design notes</div><div class="card-b"><ul class="notes">${d.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div></div>
+    <div class="card"><div class="card-h">Accessibility</div><div class="card-b" style="padding:6px 8px"><table class="t"><tr><th>Element</th><th>Colours</th><th>Ratio</th><th>WCAG</th></tr>
+      ${d.contrast.map(r=>`<tr><td>${esc(r.element)}</td><td><span class="sw" style="background:${esc(r.fg)}"></span><span class="sw" style="background:${esc(r.bg)}"></span></td><td>${r.ratio}:1</td><td class="lvl ${esc(r.level)}">${esc(r.level)}</td></tr>`).join("")}</table></div></div>
+  </div>
+  ${cr.status==="design_review"?`<div class="card" style="margin-top:16px"><div class="card-b" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div><b>Happy with the design?</b><div class="hint" style="margin:2px 0 0">Approving generates the code, runs the checks and opens a pull request.</div></div>
+    <div style="display:flex;gap:8px"><button class="btn" onclick="editCR()">Edit requirements</button><button class="btn primary" onclick="approve()">Approve & start coding</button></div></div></div>`:""}`;
+}
+
+/* code */
+function diffTable(diff){
+  let o=0,n=0; const rows=[];
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("---")||line.startsWith("+++")||line==="") continue;
+    if (line.startsWith("@@")) { const m=/@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(line); o=+m[1]; n=+m[2]; rows.push(`<tr class="h"><td colspan="3">${esc(line)}</td></tr>`); continue; }
+    const c=line[0], body=esc(line.slice(1));
+    if (c==="+") rows.push(`<tr class="a"><td class="ln"></td><td class="ln">${n++}</td><td>+${body}</td></tr>`);
+    else if (c==="-") rows.push(`<tr class="r"><td class="ln">${o++}</td><td class="ln"></td><td>-${body}</td></tr>`);
+    else rows.push(`<tr><td class="ln">${o++}</td><td class="ln">${n++}</td><td> ${body}</td></tr>`);
+  }
+  return `<div class="diffscroll"><table class="diff">${rows.join("")}</table></div>`;
+}
+function bar5(a,r){ const t=a+r||1, na=Math.round(5*a/t); return `<span class="bar5">${[0,1,2,3,4].map(i=>`<i class="${i<na?'a':i<5&&r?'r':''}"></i>`).join("")}</span>`; }
+function codingLog(cr){
+  const log = cr.coding_log||[];
+  const steps = ["Generate code","Run checks","Open pull request"];
+  return `<div class="card" style="margin-bottom:16px"><div class="card-h">Build pipeline ${cr.status==="coding"?'<span class="chip s-coding">running</span>':""}</div>
+    ${steps.map(s=>{ const ev=[...log].reverse().find(e=>e.step===s); const st=ev?ev.status:"pending";
+      return `<div class="chk"><div class="dot d-${st==='pending'?'info':st}" style="${st==='pending'?'opacity:.35':''}">${st==='done'?'✓':st==='fail'?'✕':''}</div>
+        <div><div class="nm">${s}</div><div class="dt">${esc(ev&&ev.detail||(st==='pending'?'waiting':''))}</div></div></div>`; }).join("")}
+    ${log.filter(e=>e.step==="Error").map(e=>`<div class="chk"><div class="dot d-fail">✕</div><div><div class="nm">Error</div><div class="dt">${esc(e.detail)}</div></div></div>`).join("")}</div>`;
+}
+function tCode(cr){
+  if (!cr.files) return cr.status==="design_review" ? `<div class="empty">Code is generated after the design is approved.</div>` : codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:70%"></div>`;
+  return `${cr.status==="coding"||cr.status==="failed"?codingLog(cr):""}
+    <div class="meta" style="margin-bottom:12px">Showing <b>${cr.files.length} changed files</b> with <span class="plus">${cr.stats.additions} additions</span> and <span class="minus">${cr.stats.deletions} deletions</span>${cr.pr&&cr.pr.commit?` · commit <code>${esc(cr.pr.commit)}</code>`:""}</div>
+    ${cr.files.map((f,i)=>`<div class="file"><div class="file-h" onclick="this.nextElementSibling.classList.toggle('hide')">
+        <span class="p">${esc(f.path)}</span>${f.status==="added"?'<span class="chip s-pr_open">new</span>':""}
+        <span class="plus">+${f.additions}</span><span class="minus">−${f.deletions}</span>${bar5(f.additions,f.deletions)}</div>
+      <div class="${i>1&&f.additions>60?'hide':''}">${diffTable(f.diff)}</div></div>`).join("")}`;
+}
+
+/* checks */
+function tChecks(cr){
+  if (!cr.checks) return `<div class="empty">Checks run after coding.</div>`;
+  const s = cr.checks_summary;
+  return `<div class="card"><div class="card-h"><span>${s.fail?`<span class="err">✕ ${s.fail} failing</span>`:`<span class="ok">✓ All checks passed</span>`}</span>
+      <span class="hint" style="margin:0">${s.pass} passed · ${s.warn} warnings</span></div>
+    ${cr.checks.map((c,i)=>`<div class="chk"><div class="dot d-${c.status}">${{pass:"✓",fail:"✕",warn:"!",info:"i"}[c.status]}</div>
+      <div style="min-width:0;flex:1"><div class="nm">${esc(c.name)}</div><div class="dt">${esc(c.detail)}</div>
+        ${c.output?`<details><summary class="hint" style="cursor:pointer">Show output</summary><pre class="out">${esc(c.output)}</pre></details>`:""}</div>
+      <div class="ms">${c.ms!=null?c.ms+" ms":""}</div></div>`).join("")}</div>`;
+}
+
+/* test */
+function testChecklist(cr){
+  const items = [];
+  (cr.design.changes||[]).forEach(c=>{
+    if (c.kind==="field_added" && c.constraint==="required") items.push(`Leave “${c.label}” empty → alert banner appears and the field is highlighted`, `Fill in “${c.label}” and tap the button → alert clears`);
+    else if (c.kind==="field_added") items.push(`“${c.label}” appears and can be left empty without an alert`);
+    else if (c.kind==="field_removed") items.push(`“${c.label}” is no longer required`);
+    else if (c.kind==="constraint_changed") items.push(`“${c.label}” behaves as ${c.to}`);
+    else if (c.kind==="ui_changed") items.push(`${c.label} shows ${c.to ?? "the default"}`);
+  });
+  items.push("Compare Before / After — nothing else changed unexpectedly");
+  return items;
+}
+function tTest(cr){
+  if (!cr.pr) return `<div class="empty">The preview is available once the pull request is open.</div>`;
+  const p = state.preview, side = p.mode==="after" ? cr.design.after : cr.design.before;
+  const items = testChecklist(cr);
+  const added = cr.design.changes.filter(c=>c.kind==="field_added").map(c=>c.field);
+  return `<div class="grid g-side">
+    <div class="card"><div class="card-h"><span>Preview environment <span class="hint" style="margin:0;font-weight:400">· branch <span class="branch">${esc(cr.pr.branch)}</span></span></span>
+      <div class="seg"><button class="${p.mode==='before'?'on':''}" onclick="pvMode('before')">Before</button><button class="${p.mode==='after'?'on':''}" onclick="pvMode('after')">After (PR)</button></div></div>
+      <div class="card-b"><div class="phones"><div class="pcol">${phone({...side, values:p.values, interactive:true, highlight:p.mode==='after'?added:[], id:"pv"})}
+        <div class="hint">Interactive — type and tap the button. Nothing is written to the live database.</div></div></div></div></div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Test data</div><div class="card-b">
+        <label class="hint" style="margin:0 0 6px;display:block">Start from profile</label>
+        <select class="input" onchange="pvProfile(this.value)">${(p.profiles||[]).map(x=>`<option value="${x.id}" ${p.profile&&p.profile.id===x.id?'selected':''}>#${x.id} ${esc(x.name||"(no name)")}</option>`).join("")}<option value="blank">Blank profile</option></select>
+        <button class="btn sm" style="margin-top:8px" onclick="pvProfile(p_id())">Reset values</button></div></div>
+      <div class="card"><div class="card-h">Test plan <span class="count">${items.filter((_,i)=>state.testChecks[i]).length}/${items.length}</span></div><div class="card-b checklist">
+        ${items.map((t,i)=>`<label><input type="checkbox" ${state.testChecks[i]?'checked':''} onchange="state.testChecks[${i}]=this.checked;renderCR()"><span>${esc(t)}</span></label>`).join("")}
+        ${cr.status==="pr_open" ? `<textarea id="t-notes" class="input" rows="2" placeholder="Notes (optional)" style="margin-top:10px">${esc(cr.test_notes||"")}</textarea>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn" onclick="markTested(false)">Report problem</button>
+            <button class="btn primary" style="flex:1" onclick="markTested(true)">${cr.tested?"✓ Tested — update":"Mark as tested ✓"}</button></div>` :
+          `<div class="hint">${cr.tested?"✓ Verified"+(cr.test_notes?`: “${esc(cr.test_notes)}”`:""):""}</div>`}
+      </div></div>
+    </div></div>`;
+}
+const p_id = () => state.preview.profile ? state.preview.profile.id : "blank";
+function pvMode(m){ state.preview.mode=m; renderCR(); }
+function pvProfile(v){ const p=state.preview; if (v==="blank"){ p.profile=null; p.values={}; } else { p.profile=p.profiles.find(x=>x.id==v); p.values={...p.profile}; } renderCR(); }
+function pvInput(el){ state.preview.values[el.dataset.k]=el.value; }
+function pvSave(){
+  const cr=state.cr, side = state.preview.mode==="after"?cr.design.after:cr.design.before;
+  const miss = missingOf(side.rules, state.preview.values);
+  renderCR();
+  const t=document.getElementById("pv-toast");
+  if (t){ t.textContent = miss.length ? `Still missing: ${miss.map(label).join(", ")}` : "✓ Saved — profile complete (preview only)"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+}
+
+/* PR */
+function md(src){
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`(.+?)`/g,"<code>$1</code>").replace(/(^|\s)_([^_]+?)_(?=\s|$|[.,])/g,"$1<i>$2</i>");
+  let html="", list=null;
+  for (const l of src.split("\n")) {
+    const m = /^(\d+\.|-) (.*)$/.exec(l);
+    if (m) { const t = m[1]==="-"?"ul":"ol"; if (list!==t){ if(list) html+=`</${list}>`; html+=`<${t}>`; list=t; } html+=`<li>${inline(m[2])}</li>`; continue; }
+    if (list){ html+=`</${list}>`; list=null; }
+    if (l.startsWith("### ")) html+=`<h3>${inline(l.slice(4))}</h3>`; else if (l.startsWith("## ")) html+=`<h2>${inline(l.slice(3))}</h2>`; else if (l.trim()) html+=`<p>${inline(l)}</p>`;
+  }
+  return html + (list?`</${list}>`:"");
+}
+function tPR(cr){
+  if (!cr.pr) return `<div class="empty">The pull request is opened automatically after coding.</div>`;
+  const live = (state.info&&state.info.live_spec)||"";
+  const upToDate = live === cr.base_spec, checksOk = !(cr.checks_summary&&cr.checks_summary.fail);
+  const reqs = [[checksOk, checksOk?"All checks have passed":"Some checks are failing", "checks"],
+    [cr.tested, cr.tested?"Tested in the preview environment":"Not yet tested in the preview", "test"],
+    [upToDate, upToDate?"Branch is up to date with live rules":"Live rules changed since this PR was created", null]];
+  const can = cr.status==="pr_open" && reqs.every(r=>r[0]);
+  return `<div class="grid g-side">
+    <div class="card"><div class="card-h"><span>Description</span><button class="btn sm" onclick="navigator.clipboard.writeText(state.cr.pr_body);toast('Copied as Markdown')">Copy Markdown</button></div>
+      <div class="card-b md">${md(cr.pr_body||"")}</div></div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><div class="card-h">Pull request #${cr.pr.number}</div><div class="card-b" style="font-size:13px;display:grid;gap:8px">
+        <div><span class="hint" style="margin:0">Branch</span><br><span class="branch">${esc(cr.pr.branch)}</span> → <span class="branch">${esc(cr.pr.base)}</span></div>
+        ${cr.pr.commit?`<div><span class="hint" style="margin:0">Head commit</span><br><code>${esc(cr.pr.commit)}</code></div>`:""}
+        <div><span class="hint" style="margin:0">Changes</span><br>${cr.stats.files} files · <span class="plus">+${cr.stats.additions}</span> <span class="minus">−${cr.stats.deletions}</span> · <a href="#cr/${cr.id}/code">view diff</a></div>
+        ${cr.pr.github_url?`<div><a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">Open on GitHub ↗</a></div>`:""}
+        ${cr.pr.git?"":`<div class="hint">git isn't available, so this PR exists only in MobileHeal${cr.pr.git_error?`: ${esc(cr.pr.git_error)}`:""}.</div>`}
+        ${cr.pr.github_error?`<div class="hint err">GitHub: ${esc(cr.pr.github_error)}</div>`:""}
+      </div></div>
+      ${cr.status==="pr_open"?`<div class="mergebox">${reqs.map(([ok,t,tab])=>`<div class="req"><div class="dot d-${ok?'pass':'warn'}">${ok?"✓":"!"}</div><span style="flex:1">${esc(t)}</span>${!ok&&tab?`<a href="#cr/${cr.id}/${tab}">Fix</a>`:""}</div>`).join("")}
+        <div class="act"><button class="btn green" style="flex:1" ${can?"":"disabled"} onclick="merge()">Merge pull request</button>
+          ${upToDate?"":`<button class="btn" onclick="updateBranch()">Update branch</button>`}
+          <button class="btn danger" onclick="closeCR()">Close</button></div></div>`:""}
+    </div></div>`;
+}
+
+/* ---------------- actions ---------------- */
+async function act(fn, ok){ try { await fn(); if (ok) toast(ok); } catch(e){ toast(e.message); } }
+async function approve(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/approve`,{method:"POST"}); await refreshList(); await loadCR(state.cr.id,"code"); }, "Coding started"); }
+async function markTested(passed){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/test`,{method:"POST",body:{notes:($("#t-notes")||{}).value||"",passed}}); await refreshList(); state.tab=passed?"pr":"test"; renderCR(); }, passed?"Marked as tested — ready to merge":"Problem recorded"); }
+async function merge(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/merge`,{method:"POST"}); await refreshList(); await refreshInfo(); renderCR(); }, "Merged — change is live on phones"); }
+async function updateBranch(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/update-branch`,{method:"POST"}); await loadCR(state.cr.id,"code"); }, "Regenerating against latest rules"); }
+async function closeCR(){ if(!confirm("Close this change request?")) return; await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/close`,{method:"POST"}); await refreshList(); renderCR(); }, "Closed"); }
+function editCR(){
+  const cr = state.cr;
+  $("#tabbody").innerHTML = `<div class="card"><div class="card-b">
+    <div class="field"><label>Title</label><input id="e-title" class="input" value="${esc(cr.title)}"></div>
+    <div class="field"><label>Business requirement</label><textarea id="e-desc" class="input" rows="3">${esc(cr.description)}</textarea></div>
+    <div class="field"><label>Rules</label><textarea id="e-spec" class="input code" spellcheck="false">${esc(cr.spec_text)}</textarea></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" onclick="renderCR()">Cancel</button>
+    <button class="btn primary" onclick="saveRevision()">Regenerate design</button></div></div></div>`;
+}
+async function saveRevision(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/revise`,{method:"POST",body:{title:$("#e-title").value,description:$("#e-desc").value,spec_text:$("#e-spec").value}}); state.tab="design"; await refreshList(); renderCR(); }, "Design regenerated"); }
+
+(async () => { await refreshInfo(); await refreshList(); await route(); setInterval(refreshInfo, 15000); })();
+</script>
+</body>
+</html>

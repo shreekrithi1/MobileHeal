@@ -1,0 +1,8 @@
+# MobileHeal profile requirements spec (FR-2)
+# Format:  field_name: required | optional
+# Edits are picked up by the Auto-Heal agent within 60 seconds — no restart needed.
+# Try appending:  phone_number: required
+name: required
+email: required
+
+
