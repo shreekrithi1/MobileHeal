@@ -4,6 +4,4 @@
 # Try appending:  phone_number: required
 name: required
 email: required
-
-
-
+zip: required

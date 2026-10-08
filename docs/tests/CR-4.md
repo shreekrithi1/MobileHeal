@@ -1,0 +1,31 @@
+# Test cases for CR-4
+
+_Plain-English test cases. Steps marked 🤖 can run automatically in the preview._
+
+## 1. Zip is required before a profile is complete
+
+**Priority:** High  
+**Objective:** Users who haven't provided Zip are prompted and can resolve it.  
+**Preconditions:** Signed-in user on the Profile screen.  
+**Test data:** Email = `jane@example.com`, Zip = `94105`, Name = `Jane Doe`
+
+| # | Step | Expected result |
+|---|---|---|
+| 1 | 🤖 Fill in the other required fields and leave Zip empty | The alert banner asks for Zip |
+| 2 | 🤖 Look at the Zip field | Zip is highlighted as missing |
+| 3 | 🤖 Tap the save button | The profile is not complete; the banner stays |
+| 4 | 🤖 Enter a valid Zip | Zip is no longer highlighted |
+| 5 | 🤖 Tap the save button | The banner disappears and the profile is saved |
+
+## 2. Happy path: complete profile with your own data
+
+**Priority:** High  
+**Objective:** A user can complete their profile end to end. You'll be asked to type realistic values.  
+**Test data:** Email = `jane@example.com`, Zip = `94105`, Name = `Jane Doe`
+
+| # | Step | Expected result |
+|---|---|---|
+| 1 | 🤖 Enter Name | — |
+| 2 | 🤖 Enter Email | — |
+| 3 | 🤖 Enter Zip | — |
+| 4 | 🤖 Tap the save button | The profile is saved with no alert |
