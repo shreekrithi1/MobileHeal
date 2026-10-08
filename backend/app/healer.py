@@ -207,9 +207,54 @@ class Healer:
         if w is not None:
             w.notify("error", f"{inc['key']}: {data['environment']} crash detected", f"{data['exc_type']}: {data['message'][:200]}",
                      f"#cr/{inc['id']}", source="Auto-heal")
-        if self.autoheal:
+        if data.get("awaiting_client"):
+            self.wf._event(inc, "MobileHeal", "detect",
+                           f"HTTP 500 returned to the {data['client_app'].capitalize()} app — waiting for the app's failure report")
+            self.wf._save(inc)
+        elif self.autoheal:
             self.start(inc["id"])
         return inc
+
+    # ------------------------------------------------------------ mobile-initiated API failures
+    def client_report(self, rep: dict) -> dict:
+        """A mobile app got an HTTP 5xx from the API and reported it. Link it to the server-side incident
+        (by the incident key in the 500 body, else by endpoint) and start the heal from the app's report."""
+        platform = (rep.get("platform") or "android").lower()
+        app_name = {"ios": "iOS", "android": "Android"}.get(platform, platform)
+        path = (rep.get("endpoint") or "").split("?")[0]
+        incs = [i for i in self._incidents() if i["status"] not in ("closed",)]
+        inc = None
+        if rep.get("incident"):
+            inc = next((i for i in incs if i["key"] == rep["incident"]), None)
+        if inc is None and path:
+            cands = [i for i in incs if ((i.get("incident") or {}).get("request") or {}).get("path") == path
+                     and i["status"] != "merged"]
+            inc = cands[-1] if cands else None
+        now = self.wf_now()
+        report = {"ts": now, "platform": platform, "method": rep.get("method"), "endpoint": rep.get("endpoint"),
+                  "status": rep.get("status"), "device": rep.get("device"), "app_version": rep.get("app_version"),
+                  "screen": rep.get("screen")}
+        if inc is None:
+            return {"linked": False, "incident": None, "status": "unmatched",
+                    "message": "No server-side failure matches this report; it was logged for the team."}
+        inc.setdefault("client_reports", []).append(report)
+        inc["client_reports"] = inc["client_reports"][-10:]
+        inc["detected_by"] = f"{app_name} app"
+        inc.setdefault("incident", {})["initiator"] = f"{app_name} app"
+        self.wf._event(inc, f"{app_name} app", "detect",
+                       f"reported HTTP {rep.get('status')} on {rep.get('method')} {path}"
+                       + (f" from {rep['device']}" if rep.get("device") else ""))
+        started = False
+        if inc["status"] == "detected":
+            inc["incident"].pop("awaiting_client", None)
+            self.wf._save(inc)
+            if self.autoheal:
+                self.start(inc["id"], actor=f"{app_name} app")
+                started = True
+        else:
+            self.wf._save(inc)
+        return {"linked": True, "incident": inc["key"], "id": inc["id"], "status": self.wf.get(inc["id"])["status"],
+                "healing": started}
 
     def _incidents(self) -> List[dict]:
         out = []

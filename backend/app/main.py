@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .agent import AutoHealAgent
 from .rules import UI_KEYS, RuleParseError, parse_spec
@@ -19,6 +19,7 @@ from .workflow import Workflow, WorkflowError
 from .healer import Healer, android_capture, capture
 from .features import greeting
 from .features import completion as completion_mod
+from .features import contact as contact_mod
 from .demo import Demo, android_report
 from . import figma as fg
 from . import english, testcases as tc
@@ -123,6 +124,18 @@ class CrashIn(BaseModel):
     exception: str = "Exception"
     message: str = ""
     stack: str = ""
+
+
+class ClientErrorIn(BaseModel):
+    platform: str = Field("android", max_length=20)
+    method: str = Field("GET", max_length=10)
+    endpoint: str = Field(..., max_length=500)
+    status: int = Field(..., ge=100, le=599)
+    incident: Optional[str] = Field(None, max_length=40)
+    body: str = Field("", max_length=2000)
+    device: str = Field("", max_length=200)
+    app_version: str = Field("", max_length=40)
+    screen: str = Field("", max_length=80)
 
 
 class AutoHealIn(BaseModel):
@@ -280,8 +293,16 @@ async def on_crash(request: Request, exc: Exception):
     except Exception:
         body = ""
     req = {"method": request.method, "path": request.url.path, "query": str(request.url.query), "body": body}
+    client_app = (request.headers.get("x-mobileheal-client") or "").lower()[:20]
+    if client_app in ("android", "ios"):
+        req["client_app"] = client_app
     try:
-        inc = app.state.healer.record(capture(exc, req))
+        data = capture(exc, req)
+        if client_app in ("android", "ios"):
+            # the request came from a mobile app: wait for the app to report the failure (it initiates the heal)
+            data["client_app"] = client_app
+            data["awaiting_client"] = True
+        inc = app.state.healer.record(data)
         ref = inc["key"]
     except Exception:
         logging.getLogger("mobileheal").exception("failed to record incident")
@@ -296,6 +317,21 @@ def profile_greeting(pid: int):
     if not prof:
         raise HTTPException(404, "profile not found")
     return greeting.make_greeting(prof)
+
+
+@app.get("/api/profiles/{pid}/contact")
+def profile_contact(pid: int):
+    """Contact card for the mobile apps' Profile screen."""
+    prof = app.state.db.get_profile(pid)
+    if not prof:
+        raise HTTPException(404, "profile not found")
+    return contact_mod.contact_card(prof)
+
+
+@app.post("/api/client-errors", status_code=201)
+def client_error(body: ClientErrorIn):
+    """API failures seen by the mobile apps (HTTP 5xx). The app's report starts the auto-heal."""
+    return app.state.healer.client_report(body.model_dump())
 
 
 @app.get("/api/profiles/{pid}/completion")

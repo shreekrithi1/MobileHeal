@@ -48,3 +48,15 @@ final class ValidatorTests: XCTestCase {
         XCTAssertTrue(v.formatIssues(["email": "a@b.co", "phone_number": "+1 415 555 0100"]).isEmpty)
     }
 }
+
+final class ApiFailureReporterTests: XCTestCase {
+    func testPayloadCarriesIncidentKeyFromThe500Body() throws {
+        let req = URLRequest(url: URL(string: "http://localhost:8000/api/profiles/3/contact")!)
+        let p = ApiFailureReporter.payload(request: req, status: 500,
+                                           body: #"{"detail":"Internal error","incident":"INC-7"}"#, device: "iPhone")
+        XCTAssertEqual(p["platform"] as? String, "ios")
+        XCTAssertEqual(p["endpoint"] as? String, "/api/profiles/3/contact")
+        XCTAssertEqual(p["status"] as? Int, 500)
+        XCTAssertEqual(p["incident"] as? String, "INC-7")
+    }
+}

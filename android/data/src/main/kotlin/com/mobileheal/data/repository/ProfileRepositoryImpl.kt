@@ -18,7 +18,10 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override suspend fun load(id: Int): Profile = mapErrors {
         try {
-            api.get(id).toDomain()
+            api.get(id).toDomain().also {
+                // Contact card is non-critical: a 5xx is reported to MobileHeal by the interceptor and healed server-side.
+                runCatching { api.contact(id) }
+            }
         } catch (e: HttpStatusException) {
             if (e.code != 404) throw e
             api.create(mapOf("name" to "Jane Doe", "email" to "jane@example.com")).toDomain()

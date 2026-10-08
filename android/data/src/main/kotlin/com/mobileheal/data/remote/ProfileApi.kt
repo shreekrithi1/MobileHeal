@@ -25,6 +25,15 @@ class ProfileApi @Inject constructor(
     suspend fun update(id: Int, fields: Map<String, String>): ProfileDto =
         call(Request.Builder().url("$baseUrl/api/profiles/$id").put(JSONObject(fields).toString().toRequestBody(json)).build())
 
+    /** Contact card for the Profile screen. A 5xx here is reported to MobileHeal by [ApiFailureInterceptor]. */
+    suspend fun contact(id: Int): JSONObject = withContext(Dispatchers.IO) {
+        client.newCall(Request.Builder().url("$baseUrl/api/profiles/$id/contact").build()).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw HttpStatusException(response.code, body)
+            JSONObject(body)
+        }
+    }
+
     private suspend fun call(request: Request): ProfileDto = withContext(Dispatchers.IO) {
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()

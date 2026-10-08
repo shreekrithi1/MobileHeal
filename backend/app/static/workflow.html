@@ -1871,6 +1871,7 @@ function exportAudit(){ const rows=state.auditRows||[]; const q=v=>`"${String(v?
 const DEMO_STEPS = [
   ["traffic","Production traffic","A real user request hits the live backend"],
   ["crash","Crash","Unhandled exception → HTTP 500 for the user"],
+  ["report","App reports the failure","The mobile app's API-failure reporter posts the 500 to MobileHeal"],
   ["detect","Incident detected","Grouped by fingerprint, input captured"],
   ["jira","Jira defect","Bug filed automatically and kept in sync"],
   ["diagnose","Diagnosis","Failing line, values and root cause"],
@@ -1892,7 +1893,7 @@ async function renderDemo(){
      <div class="demo-ctl"><label class="ah"><span>Auto-play review & merge</span><span class="switch"><input type="checkbox" id="dm-auto" ${D.autoplay?"checked":""} onchange="state.demo.autoplay=this.checked"><span></span></span></label></div></div>
    ${h.autoheal?"":`<div class="banner-err" style="margin-top:14px">Auto-heal is off, so crashes will only be recorded. <button class="btn sm" onclick="toggleAutoheal(true).then(renderDemo)">Turn it on</button></div>`}
    <div class="scen">${d.scenarios.map(sc=>`<div class="card scard ${D.active&&D.active.id===sc.id?'on':''}"><div class="card-b">
-      <div class="meta" style="margin-bottom:6px"><span class="chip ${sc.kind==='android'?'s-coding':'s-detected'}">${sc.kind==='android'?'Android app':'Backend'}</span>
+      <div class="meta" style="margin-bottom:6px"><span class="chip ${sc.kind==='android'||sc.kind==='mobile_api'?'s-coding':'s-detected'}">${sc.kind==='android'?'Android app':sc.kind==='mobile_api'?'Android → API':sc.kind==='ios'?'iOS app':'Backend'}</span>
         ${sc.fixed?'<span class="chip s-pr_open">✓ bug fixed</span>':'<span class="chip s-failed">bug present</span>'}</div>
       <div style="font-weight:650;font-size:15px">${esc(sc.title)}</div>
       <div class="hint" style="margin:4px 0 8px">${esc(sc.story)}</div>
@@ -1907,7 +1908,7 @@ async function renderDemo(){
 }
 function demoRunHtml(){
   const D = state.demo, a = D.active; if (!a) return `<div class="empty">Pick a scenario to start. Tip: put this page and the Android emulator side by side.</div>`;
-  const steps = DEMO_STEPS.filter(s => (a.kind!=="android" && a.kind!=="ios") || ANDROID_STEPS.includes(s[0]));
+  const steps = DEMO_STEPS.filter(s => (a.kind==="mobile_api") || (s[0]!=="report" && ((a.kind!=="android" && a.kind!=="ios") || ANDROID_STEPS.includes(s[0]))));
   const t0 = a.t0, fmt = t => t==null ? "" : `+${((t-t0)/1000).toFixed(1)}s`;
   const m = a.marks;
   const metric = (lbl, from, to) => m[from]!=null && m[to]!=null ? `<div><b>${((m[to]-m[from])/1000).toFixed(1)}s</b><span>${lbl}</span></div>` : `<div><b>—</b><span>${lbl}</span></div>`;
@@ -1965,6 +1966,21 @@ async function runDemo(id){
       dmMark("crash","done","App crashed — CrashReporter uploads the report on next launch", D.data.android_report.stack.split("\n").slice(0,3).join("\n"));
       const r = await api("/api/crashes",{method:"POST",body:D.data.android_report}); incKey = r.incident;
       dmLog(`POST /api/crashes → 201 ${incKey}`);
+    } else if (sc.kind === "mobile_api") {
+      const body = {name:"Sam Rivera", email:`sam-${Date.now()%100000}@example.com`};
+      const prof = await api("/api/profiles",{method:"POST",body}); dmLog(`POST /api/profiles → 201 #${prof.id} (no city on file)`);
+      const url = `/api/profiles/${prof.id}/contact`, hdr = {"X-MobileHeal-Client":"android"};
+      dmLog("📱 Pixel 8 · user opens the Profile screen → the app loads the contact card…");
+      dmMark("traffic","done", `Android app → GET ${url}`);
+      const res = await fetch(url,{headers:hdr}); const j = await res.json();
+      dmLog(`GET ${url} → ${res.status} ${JSON.stringify(j)}`, res.status>=500?"err":"");
+      if (res.status < 500) { dmMark("crash","fail","No failure — the API is already fixed. Reset it and run again."); throw new Error("no crash"); }
+      dmMark("crash","done",`HTTP ${res.status} returned to the app: ${j.detail}`);
+      const rep = await api("/api/client-errors",{method:"POST",body:{platform:"android",method:"GET",endpoint:url,status:res.status,incident:j.incident,
+                                                               body:JSON.stringify(j),device:"Google Pixel 8 (API 34)",app_version:"1.0",screen:"Profile"}});
+      dmLog(`📲 ApiFailureInterceptor → POST /api/client-errors → ${rep.linked?"linked to "+rep.incident:"unmatched"}${rep.healing?" · heal started by the app":""}`);
+      dmMark("report", rep.linked?"done":"fail", rep.linked?`Android app reported HTTP ${res.status} on GET ${url} → ${rep.incident}${rep.healing?" · heal started":""}`:rep.message);
+      incKey = j.incident; D.active.url = url; D.active.hdr = hdr;
     } else {
       const body = id==="greeting" ? {email:`demo-${Date.now()%100000}@example.com`} : {name:"Partner Demo", email:`partner-${Date.now()%100000}@example.com`};
       const prof = await api("/api/profiles",{method:"POST",body}); dmLog(`POST /api/profiles → 201 #${prof.id} ${JSON.stringify(body)}`);
@@ -1980,7 +1996,7 @@ async function runDemo(id){
     D.active.incKey = incKey; D.active.incId = inc0.id;
     let inc = await api(`/api/cr/${inc0.id}`);
     D.active.regression = inc.incident.regression_of;
-    dmMark("detect","done", `${incKey}: ${inc.incident.exc_type}${inc.incident.message?": "+inc.incident.message:""}` + (inc.occurrences>1?` (×${inc.occurrences})`:""));
+    dmMark("detect","done", (inc.detected_by?`Detected by the ${inc.detected_by} · `:"") + `${incKey}: ${inc.incident.exc_type}${inc.incident.message?": "+inc.incident.message:""}` + (inc.occurrences>1?` (×${inc.occurrences})`:""));
     // follow the healer
     const seen = new Set();
     while (true) {
@@ -2038,7 +2054,7 @@ async function demoAfterMerge(inc){
   dmMark("deploy","done", `Merged${inc.merged_commit?" as "+inc.merged_commit:""} · ${inc.deployed==="hot-reloaded"?"hot-reloaded, no restart":"restart the backend to load it"}`);
   dmLog(`⇡ merged ${inc.key}${inc.merged_commit?" "+inc.merged_commit:""}`);
   if (a.kind!=="android" && a.url) {
-    const res = await fetch(a.url); const j = await res.json();
+    const res = await fetch(a.url,{headers:a.hdr||{}}); const j = await res.json();
     dmLog(`GET ${a.url} → ${res.status} ${JSON.stringify(j)}`, res.status>=500?"err":"");
     dmMark("verify", res.status<500?"done":"fail", res.status<500?`HTTP ${res.status} — the same request now succeeds`:`Still HTTP ${res.status} — restart the backend`, JSON.stringify(j));
     a.outcome = res.status<500?"fixed":"error"; a.outcomeText = res.status<500?"Healed":"Restart needed";

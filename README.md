@@ -26,65 +26,27 @@ auto-fixed and shipped. A DataWatchdog agent keeps backend data valid and notifi
 
 No API keys are required. Everything runs out of the box in **parser mode**.
 
-## 2. Get the code and start everything
-
-### 2a. Clone the repository
-
-Pick a folder for your projects (any location works — `~/Projects` is used here) and clone:
+## 2. Start everything (one command)
 
 ```bash
-mkdir -p ~/Projects && cd ~/Projects
-git clone https://github.com/shreekrithi1/MobileHeal.git mobileheal
-cd mobileheal
-```
-
-> Private repo? GitHub will ask for your username and a **personal access token** as the password
-> (github.com → Settings → Developer settings → Personal access tokens), or clone over SSH:
-> `git clone git@github.com:shreekrithi1/MobileHeal.git mobileheal`
-
-**No git?** Download instead: open https://github.com/shreekrithi1/MobileHeal → **Code** → **Download ZIP**,
-then unzip it into your folder and `cd` into it:
-
-```bash
-cd ~/Projects && unzip ~/Downloads/MobileHeal-main.zip && mv MobileHeal-main mobileheal && cd mobileheal
-```
-
-Already have it? Get the latest version with `git pull`.
-
-### 2b. Start everything (one command)
-
-From the `mobileheal` folder:
-
-```bash
+cd ~/Downloads/mobileheal
 chmod +x start.command          # first time only
 ./start.command                 # or double-click start.command in Finder
 ```
 
-**One command launches everything:** it creates the Python environment, installs dependencies, starts the
-server, opens the web app at **http://localhost:8000**, opens the Android app in **Android Studio** and the
-iOS app in **Xcode** (generating the Xcode project with XcodeGen when needed). Tools that aren't installed are
-skipped with a hint. Press **Ctrl+C** (or close the window) to stop.
+The script creates a Python virtual environment, installs dependencies, starts the server, opens the
+web app at **http://localhost:8000**, and opens the `android/` project in Android Studio. Press **Ctrl+C**
+(or close the window) to stop.
 
 | Command | Does |
 |---|---|
-| `./start.command` | **everything** — server + web app + Android Studio + Xcode |
-| `./start.command --demo` | everything, in demo mode (isolated workspace, integrations simulated) |
+| `./start.command` | server + web app + Android Studio |
 | `./start.command --server` | server + web app only |
 | `./start.command --android` | open Android Studio only |
-| `./start.command --ios` | open the iOS app in Xcode (generates the project with XcodeGen) |
-| `./start.command --demo-reset` | delete the demo workspace and database |
 | `./start.command --test` | run the backend test suite |
 
 Port in use? `MOBILEHEAL_PORT=8010 ./start.command`.
 If macOS blocks the double-click ("unidentified developer"): right-click → **Open** once, or run it from Terminal.
-
-**Quick start (copy & paste):**
-
-```bash
-mkdir -p ~/Projects && cd ~/Projects && \
-git clone https://github.com/shreekrithi1/MobileHeal.git mobileheal && \
-cd mobileheal && chmod +x start.command && ./start.command --demo
-```
 
 ## 3. Run the Android app
 
@@ -94,23 +56,6 @@ cd mobileheal && chmod +x start.command && ./start.command --demo
    emulator). Allow notifications when asked.
    - Physical device: set `BASE_URL` in `android/app/build.gradle.kts` to your computer's LAN IP and add
      it to `res/xml/network_security_config.xml`.
-
-## 3b. Run the iOS app
-
-1. Install Xcode 15+ (Mac App Store) and XcodeGen: `brew install xcodegen`.
-2. `./start.command --ios` — generates `ios/MobileHeal.xcodeproj` and opens it in Xcode.
-3. Choose an iPhone simulator and press **⌘R**. The simulator reaches the server at `http://localhost:8000`.
-4. Unit tests: **⌘U** in Xcode, or `cd ios/MobileHealKit && swift test` (no simulator needed).
-
-The iOS app is SwiftUI (iOS 17+, MVVM with unidirectional data flow) and behaves like the Android app: fields,
-colours, labels and after-save screens come live from the business rules; DataWatchdog alerts arrive as
-notifications; crashes are uploaded to MobileHeal. Every approved change regenerates
-`ios/MobileHeal/Generated/RulesDefaults.swift`, and the **iOS developer agent** writes SwiftUI screens (with previews)
-when a requirement adds a new screen. Crashes from iOS are analysed, fixed (e.g. force unwraps) and opened as PRs
-just like Android ones.
-
-In the web app, use the **Android | iOS** tabs at the top to switch the design previews (Material vs. iOS look),
-the Code tab (Android or iOS files + shared ones) and the crash demo.
 
 ## 4. Agent model: LLM or parser mode
 
@@ -134,9 +79,7 @@ database `backend/mobileheal.db`, which is git-ignored, and are never sent back 
 | **Zephyr Scale** token | import CSV/JSON exports | import/export via API |
 | **Figma** token | Figma links are embedded | colours, labels and fields extracted from frames |
 | **Team webhook** (Slack/Teams/Chat) | notifications in the 🔔 bell | also posted to the channel |
-| **GitHub** (repo + token, Enterprise API URL optional) | local git branches | PRs mirrored to GitHub and merged there |
-| **GitLab** (instance URL, project, token) | local git branches | merge requests mirrored to GitLab and merged there |
-| **Confluence** (site, email, API token, space) | docs stay in `docs/` | change records / postmortems published as pages on merge |
+| **GitHub** — start with `GITHUB_TOKEN` + `GITHUB_REPO` env vars | local git branches | PRs mirrored to GitHub |
 
 ## 6. A 5-minute tour
 
@@ -165,54 +108,11 @@ mobileheal/
 │   ├── app/repo.py               # connected Android repository
 │   ├── app/static/workflow.html  # the web app (Home, Requirements, Incidents, Data health, …)
 │   └── tests/                    # pytest suite (`./start.command --test`)
-├── android/                      # Kotlin, Clean Architecture (:app / :data / :domain), Hilt, Compose
-└── ios/                          # SwiftUI app + MobileHealKit Swift package (XcodeGen project.yml)
+└── android/                      # Kotlin, Clean Architecture (:app / :data / :domain), Hilt, Compose
 ```
 
 Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, default 60), `MOBILEHEAL_SPEC`,
 `MOBILEHEAL_DB`, `MOBILEHEAL_ENV` (development/staging/production).
-
-## Demo mode
-
-Show the whole product with no accounts, keys or network:
-
-```bash
-./start.command --demo        # isolated demo workspace + demo database; your project is untouched
-```
-
-Then **Home → Load sample data** (or Settings → General → Demo mode). You get profiles with data problems,
-change requests at every stage (one already merged), and two crash incidents waiting for approval.
-
-| In demo mode | Behaves like |
-|---|---|
-| GitHub / GitLab | pull/merge requests opened and merged on a simulated remote, viewable in MobileHeal |
-| Jira | built-in tracker with the full defect workflow |
-| Confluence | change records / postmortems published to a built-in space on merge |
-| Figma | a sample “Profile” frame for any Figma link |
-| Zephyr Scale | sample test cases to import |
-| Android repo | stored analysis of Google's Now in Android app |
-| Agent model | parser mode (built-in parser, templates and fix playbooks) |
-
-`./start.command --demo-reset` deletes the demo workspace and database to start over.
-The demo toggle in Settings simulates integrations in your real workspace too, but sample data is only
-loaded in the isolated `--demo` workspace.
-
-## Security
-
-MobileHeal can write code, run tests and hold API keys, so it is locked down by default:
-
-- **Listens on localhost only** (`127.0.0.1`). The Android emulator still reaches it via `10.0.2.2`.
-  To use a physical phone: `MOBILEHEAL_HOST=0.0.0.0 MOBILEHEAL_ALLOWED_HOSTS=192.168.1.20 MOBILEHEAL_API_TOKEN=<long-random> ./start.command`,
-  then open the web app once with `http://<ip>:8000/?token=<long-random>`.
-- **Blocks DNS-rebinding and cross-site requests** (Host allow-list, Origin check, JSON-only writes) and sends
-  security headers (CSP, no framing, nosniff, no-referrer).
-- **Secrets** stay in the git-ignored local database, are never returned to the browser, and are **cleared automatically
-  when the URL they are sent to changes** (so a changed Jira/endpoint URL can't capture an existing token).
-  Endpoint URLs must be `https://` (Ollama may use `http://localhost`).
-- **Repository sync** accepts https git URLs only; branch names are validated and file browsing can't leave the clone.
-- **Dependencies**: use Python **3.10+** to get the patched web stack (Starlette ≥ 1.3.1). On Python 3.9 the launcher
-  warns you; upgrade with `brew install python@3.12`, delete `backend/.venv`, run again.
-- **Agent-written code is never merged automatically** — every change needs a human test/approval and passing checks.
 
 ## Troubleshooting
 
@@ -300,18 +200,31 @@ First build: open `android/` in Android Studio (it creates the Gradle wrapper, A
 
 ## Guided crash demo
 
-Open **Crash demo** (http://localhost:8000/workflow#demo). There are three real bugs, each triggered through the real code path:
+Open **Crash demo** (http://localhost:8000/workflow#demo). There are five real bugs, each triggered through the real code path:
 
 | Scenario | Crash | What the agent does |
 |---|---|---|
 | Customer without a name | `AttributeError` in `greeting.py` (HTTP 500) | Replays the captured input, applies two chained fixes, adds a regression test |
 | Partner report, no fields | `ZeroDivisionError` in `completion.py` | Replays, fixes the division, adds a regression test |
+| Android app gets HTTP 500 from the API | `KeyError: 'city'` in `contact.py`, hit by the Android app's `GET /api/profiles/{id}/contact` | The app reports the 500 and that report starts the heal (see below) |
 | Android app crashes on Save | `NullPointerException` in `ui/profile/ProfileViewModel.save()` (a `!!`) | Static fix agent: locates the line from the stack trace and makes it null-safe. The PR asks for device/CI verification |
 
 The page narrates each step live (traffic → crash → incident → diagnosis → reproduction → fix → checks → PR → review →
 deploy → verified) with timings for time to detect, time to fix PR and crash-to-verified-fix. Turn on **Auto-play** for
 hands-free presentations, or leave it off to approve the fix yourself. **Reset bug** puts the bug back (and removes its
 regression test) so you can run the demo again. Running it again after a reset is flagged as a *regression*.
+
+### API failures detected by the mobile app
+
+The Android and iOS apps tag every API call with `X-MobileHeal-Client: android|ios`. When the backend fails on one of
+those calls, it records the server-side incident but **does not start healing**. It waits for the app. The app's
+API-failure reporter (`ApiFailureInterceptor.kt` on Android, `ApiFailureReporter` in `MobileHealKit` on iOS) sees the HTTP
+5xx and posts it to `POST /api/client-errors` with the endpoint, status, device, and the incident key from the 500 body.
+MobileHeal links the report to the incident, marks it **Detected by the Android app**, and starts the normal flow: Jira
+defect → analysis → your approval → automatic fix → PR → tests → merge. After the merge, the same app call returns 200.
+
+To simulate it, run **Android app gets HTTP 500 from the API** on the Crash demo page. To see it on a real device, run the
+Android app against a profile with no `city` and open the Profile screen.
 
 Crashes that can't be replayed on the server (Android/Kotlin, or input that can't be serialised) go to the **static fix
 agent**. It uses built-in Kotlin/Python fix patterns, or Claude when a key is set, checks the patch's structure, and opens a PR

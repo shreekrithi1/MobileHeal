@@ -11,6 +11,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import com.mobileheal.data.remote.ApiFailureInterceptor
+import com.mobileheal.data.remote.BaseUrl
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -25,7 +27,8 @@ abstract class DataModule {
     companion object {
         @Provides
         @Singleton
-        fun okHttpClient(): OkHttpClient = OkHttpClient.Builder()
+        fun okHttpClient(@BaseUrl baseUrl: String): OkHttpClient = OkHttpClient.Builder()
+            .addInterceptor(ApiFailureInterceptor(baseUrl))
             .pingInterval(20, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()

@@ -17,7 +17,10 @@ public struct RemoteProfileRepository: ProfileRepository {
     }
 
     public func load(id: Int) async throws -> SaveOutcome {
-        try await send(URLRequest(url: baseURL.appendingPathComponent("api/profiles/\(id)")))
+        let outcome = try await send(URLRequest(url: baseURL.appendingPathComponent("api/profiles/\(id)")))
+        // Contact card is non-critical: a 5xx is reported to MobileHeal (see `ApiFailureReporter`) and healed server-side.
+        _ = try? await raw(URLRequest(url: baseURL.appendingPathComponent("api/profiles/\(id)/contact")))
+        return outcome
     }
 
     public func save(id: Int?, fields: [String: String]) async throws -> SaveOutcome {
@@ -29,6 +32,12 @@ public struct RemoteProfileRepository: ProfileRepository {
     }
 
     private func send(_ request: URLRequest) async throws -> SaveOutcome {
+        try Mapping.saveOutcome(from: try await raw(request))
+    }
+
+    private func raw(_ request: URLRequest) async throws -> Data {
+        var request = request
+        request.setValue("ios", forHTTPHeaderField: "X-MobileHeal-Client")
         let data: Data
         let response: URLResponse
         do {
@@ -38,9 +47,46 @@ public struct RemoteProfileRepository: ProfileRepository {
         }
         guard let http = response as? HTTPURLResponse else { throw MobileHealError.badResponse("not HTTP") }
         guard (200..<300).contains(http.statusCode) else {
-            throw MobileHealError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+            let body = String(data: data, encoding: .utf8) ?? ""
+            if http.statusCode >= 500 {
+                await ApiFailureReporter(baseURL: baseURL, session: session).report(request: request, status: http.statusCode, body: body)
+            }
+            throw MobileHealError.http(http.statusCode, body)
         }
-        return try Mapping.saveOutcome(from: data)
+        return data
+    }
+}
+
+/// Reports API failures (HTTP 5xx) to MobileHeal (`POST /api/client-errors`). The app's report starts the
+/// auto-heal: MobileHeal links it to the server-side incident (key from the 500 body) and opens the defect.
+public struct ApiFailureReporter: Sendable {
+    let baseURL: URL
+    let session: URLSession
+
+    public init(baseURL: URL, session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    public static func payload(request: URLRequest, status: Int, body: String, device: String) -> [String: Any] {
+        let incident = (try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])?["incident"] as? String
+        var endpoint = request.url?.path ?? ""
+        if let q = request.url?.query { endpoint += "?" + q }
+        var p: [String: Any] = ["platform": "ios", "method": request.httpMethod ?? "GET", "endpoint": endpoint,
+                                "status": status, "body": String(body.prefix(2000)), "device": device, "screen": "Profile"]
+        if let incident { p["incident"] = incident }
+        return p
+    }
+
+    public func report(request: URLRequest, status: Int, body: String) async {
+        guard request.url?.path != "/api/client-errors" else { return }
+        var req = URLRequest(url: baseURL.appendingPathComponent("api/client-errors"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("ios", forHTTPHeaderField: "X-MobileHeal-Client")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: Self.payload(
+            request: request, status: status, body: body, device: ProcessInfo.processInfo.hostName))
+        _ = try? await session.data(for: req)
     }
 }
 

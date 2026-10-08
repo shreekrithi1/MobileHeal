@@ -27,6 +27,7 @@ def completion(profile: dict, fields: list) -> dict:
     percent = round(100 * filled / len(fields))
     return {"percent": percent, "filled": filled, "total": len(fields)}
 ''',
+    "backend/app/features/contact.py": '"""Contact card shown on the mobile apps\' Profile screen (GET /api/profiles/{id}/contact)."""\n\n\ndef contact_card(profile: dict) -> dict:\n    city = profile["city"]\n    phone = profile.get("phone_number") or ""\n    return {"name": profile.get("name") or "", "email": profile.get("email") or "",\n            "phone": ("•••• " + phone[-4:]) if phone else "", "city": city or ""}\n',
 }
 
 SCENARIOS = [
@@ -42,6 +43,14 @@ SCENARIOS = [
      "kind": "backend", "file": "backend/app/features/completion.py", "module": "app.features.completion",
      "fingerprint_func": "completion", "endpoint": "GET /api/profiles/{id}/completion?fields=",
      "expect": "One fix: return 0% when there is nothing to measure."},
+    {"id": "mobile_api", "title": "Android app gets HTTP 500 from the API",
+     "story": "The Android app opens the Profile screen and calls the contact-card API for a customer who never entered a "
+              "city. The backend reads profile[\"city\"] and fails with HTTP 500. The app's API-failure "
+              "interceptor reports the 500 to MobileHeal, which starts the heal.",
+     "kind": "mobile_api", "file": "backend/app/features/contact.py", "module": "app.features.contact",
+     "fingerprint_func": "contact_card", "endpoint": "GET /api/profiles/{id}/contact",
+     "expect": "Detected by the Android app → Jira defect → analysis → approval → `.get()` fix → PR → tests → merge. "
+               "The app's next call returns 200."},
     {"id": "android", "title": "Android app crashes on Save",
      "story": "The Save button normalises the phone number with a `!!` null-assertion. Customers whose rules don't "
               "include a phone number crash the app; the on-device CrashReporter uploads the stack trace.",
@@ -125,7 +134,7 @@ class Demo:
             fp_tail = f":{sc['file']}:{sc['fingerprint_func']}"
             related = [{k: c.get(k) for k in ("id", "key", "status", "occurrences", "created_at", "title", "tested")}
                        for c in incs if ((c.get("incident") or {}).get("fingerprint") or "").endswith(fp_tail)]
-            if sc["kind"] == "backend":
+            if sc["kind"] in ("backend", "mobile_api"):
                 fixed = self._read(sc["file"]).strip() != ORIGINALS[sc["file"]].strip()
             elif sc["kind"] == "ios":
                 if not (self.root / IOS_FILE).exists():
