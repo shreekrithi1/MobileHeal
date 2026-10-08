@@ -1,52 +1,126 @@
-# MobileHeal (Auto-Heal)
+# MobileHeal
 
-Reactive schema enforcement: a background agent watches `backend/requirements.txt` every 60 s,
-finds profiles missing required fields, and pushes `HEAL_REQUIRED` events over a WebSocket to an
-Android app, which prompts the user to fill them in.
+**Autonomous delivery and self-healing for a mobile app.** Business users write requirements in plain
+English; agents design the change, write the Android code and tests, and open a pull request to try
+out and merge. Crashes (development or production) become Jira defects that are analysed, approved,
+auto-fixed and shipped. A DataWatchdog agent keeps backend data valid and notifies users and the team.
+
+| Area | What you get |
+|---|---|
+| **Home** | Attention queue, KPIs, delivery pipeline, system status, recent activity, ⌘K command palette |
+| **Requirements** | Plain English → follow-up questions until agreed → UX design (Figma) → Android developer agent → PR → test → merge |
+| **Incidents** | Crash → Jira defect → Analyze → Approve → Auto-fix → PR → Test → Merge |
+| **Data health** | DataWatchdog: missing mandatory data, invalid values, duplicates; in-app + team notifications |
+| **Settings** | Agent model (14 LLM providers), Jira, Android repo, Zephyr, Figma, DataWatchdog, approvals |
+
+---
+
+## 1. Prerequisites
+
+| Tool | Version | Needed for |
+|---|---|---|
+| macOS, Linux or Windows (WSL) | — | `start.command` is a bash script |
+| Python | 3.9 or newer | backend (`python3 --version`) |
+| git | any | branches / PRs created by the agents |
+| Android Studio | Koala (2024.1) or newer | the Android app (optional for the web workflow) |
+
+No API keys are required. Everything runs out of the box in **parser mode**.
+
+## 2. Start everything (one command)
+
+```bash
+cd ~/Downloads/mobileheal
+chmod +x start.command          # first time only
+./start.command                 # or double-click start.command in Finder
+```
+
+The script creates a Python virtual environment, installs dependencies, starts the server, opens the
+web app at **http://localhost:8000**, and opens the `android/` project in Android Studio. Press **Ctrl+C**
+(or close the window) to stop.
+
+| Command | Does |
+|---|---|
+| `./start.command` | server + web app + Android Studio |
+| `./start.command --server` | server + web app only |
+| `./start.command --android` | open Android Studio only |
+| `./start.command --test` | run the backend test suite |
+
+Port in use? `MOBILEHEAL_PORT=8010 ./start.command`.
+If macOS blocks the double-click ("unidentified developer"): right-click → **Open** once, or run it from Terminal.
+
+## 3. Run the Android app
+
+1. Android Studio opens the `android/` folder — wait for **Gradle sync** to finish.
+2. **Device Manager** → create/start an emulator (API 26+).
+3. Press **▶ Run**. The app talks to `http://10.0.2.2:8000` (your computer's localhost as seen from the
+   emulator). Allow notifications when asked.
+   - Physical device: set `BASE_URL` in `android/app/build.gradle.kts` to your computer's LAN IP and add
+     it to `res/xml/network_security_config.xml`.
+
+## 4. Agent model: LLM or parser mode
+
+Without a key the agents run in **parser mode**: requirements are read by the built-in phrase parser,
+code comes from templates and crash fixes from deterministic playbooks — the full workflow still works.
+
+To use an LLM: **Settings → Agent model** → pick a provider (Anthropic Claude is the default; OpenAI,
+Google Gemini, Mistral, xAI, DeepSeek, Groq, Cohere, Perplexity, Together, OpenRouter, Azure OpenAI,
+Ollama or any OpenAI-compatible endpoint) → paste the key → **Save & test connection**.
+Keys can also come from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, …).
+
+**Secrets are never committed.** Keys and tokens entered in Settings are stored only in the local
+database `backend/mobileheal.db`, which is git-ignored, and are never sent back to the browser.
+
+## 5. Optional integrations (Settings)
+
+| Integration | Without it | With it |
+|---|---|---|
+| **Jira** (site URL, email, API token, project key) | defects go to a built-in mock tracker | real Bugs, comments and transitions |
+| **Android repository** (public https git URL) | — | agent follows the repo's modules/stack/conventions (default: Now in Android) |
+| **Zephyr Scale** token | import CSV/JSON exports | import/export via API |
+| **Figma** token | Figma links are embedded | colours, labels and fields extracted from frames |
+| **Team webhook** (Slack/Teams/Chat) | notifications in the 🔔 bell | also posted to the channel |
+| **GitHub** — start with `GITHUB_TOKEN` + `GITHUB_REPO` env vars | local git branches | PRs mirrored to GitHub |
+
+## 6. A 5-minute tour
+
+1. **Home** → *New requirement* → type “Make the save button green and call it ‘Save changes’” →
+   answer any follow-up questions → **Yes, that's what I want** → **Generate UX design**.
+2. Approve the design → watch the Android developer agent → **Test** in the preview → **Merge**.
+3. **Crash demo** → run a scenario → a Jira defect is filed → **Approve auto-fix** → test → merge.
+4. **Data health** → *Scan now* → see users with missing/invalid data; they're notified in the app.
+
+## 7. Project layout
 
 ```
 mobileheal/
-├── run_backend.sh                 # one-command backend start
+├── start.command                 # one-command launcher (server + web app + Android Studio)
 ├── backend/
-│   ├── requirements.txt           # ← the rules spec (FR-2), edit live
-│   ├── pip-requirements.txt       # Python dependencies
-│   ├── app/main.py                # REST API, WebSocket, dashboard route
-│   ├── app/agent.py               # 60 s watcher + delta engine + START/STOP
-│   ├── app/rules.py               # spec parser (malformed → keep last valid)
-│   ├── app/db.py                  # SQLite, JSON column for dynamic fields, atomic updates
-│   ├── app/ws.py                  # WebSocket connection manager
-│   ├── app/static/dashboard.html  # admin dashboard with toggle switch
-│   └── tests/test_flow.py         # end-to-end verification trace
-└── android/                       # Kotlin + Jetpack Compose + OkHttp client
+│   ├── requirements.txt          # live business rules (fields, look & feel, navigation)
+│   ├── pip-requirements.txt      # Python dependencies
+│   ├── app/main.py               # REST API, WebSocket, pages
+│   ├── app/agent.py              # Auto-heal agent (60 s rules reconciliation)
+│   ├── app/watchdog.py           # DataWatchdog agent
+│   ├── app/workflow.py           # requirements → design → code → PR → test → merge
+│   ├── app/healer.py, jira.py    # crash analysis, approval gate, auto-fix, Jira sync
+│   ├── app/english.py            # plain English → rules (LLM or parser) with follow-up questions
+│   ├── app/android_agent.py      # Android developer agent (skill-driven Kotlin generation)
+│   ├── app/ai.py                 # settings store + multi-provider LLM client
+│   ├── app/repo.py               # connected Android repository
+│   ├── app/static/workflow.html  # the web app (Home, Requirements, Incidents, Data health, …)
+│   └── tests/                    # pytest suite (`./start.command --test`)
+└── android/                      # Kotlin, Clean Architecture (:app / :data / :domain), Hilt, Compose
 ```
 
-## Run the backend
+Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, default 60), `MOBILEHEAL_SPEC`,
+`MOBILEHEAL_DB`, `MOBILEHEAL_ENV` (development/staging/production).
 
-```bash
-./run_backend.sh
-```
-- Dashboard: http://localhost:8000
-- API docs: http://localhost:8000/docs
-- Tests: `cd backend && source .venv/bin/activate && pytest -q`
+## Troubleshooting
 
-Environment overrides: `MOBILEHEAL_INTERVAL` (seconds, default 60), `MOBILEHEAL_SPEC`, `MOBILEHEAL_DB`.
-
-## Run the Android app
-
-1. Open the `android/` folder in Android Studio (Koala or newer); let it sync Gradle.
-2. Start an emulator (API 26+) and press Run. The app talks to `http://10.0.2.2:8000`
-   (your Mac's localhost from the emulator). On first launch it creates profile #1
-   (Jane Doe) if none exists. Allow notifications when asked.
-   - Physical device: change `BASE_URL` in `android/app/build.gradle.kts` to your Mac's LAN IP
-     and add it to `res/xml/network_security_config.xml`.
-
-## Try the heal cycle (spec §5)
-
-1. App shows Jane Doe / jane@example.com, header says **● Live**.
-2. Append `phone_number: required` to `backend/requirements.txt`.
-3. Within 60 s (or click **Run check now** on the dashboard) the agent detects the delta.
-4. The phone gets a notification + orange banner, and a **Phone Number** field appears.
-5. Enter a number, tap **Save** → the alert clears and the dashboard shows ✓ healthy.
+- **`python3: command not found` / too old** — install Python 3.9+ from python.org, then re-run.
+- **Emulator shows “Offline”** — make sure the server is running and the app uses `10.0.2.2:8000`.
+- **Gradle sync fails** — *File → Sync Project with Gradle Files*; use the JDK bundled with Android Studio
+  (*Settings → Build Tools → Gradle → Gradle JDK*).
+- **Start fresh** — stop the server and delete `backend/mobileheal.db*` (this also removes saved keys).
 
 ## API
 

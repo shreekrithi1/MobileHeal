@@ -14,7 +14,7 @@ private val META_KEYS = setOf("id", "updated_at", "missing")
 fun JSONObject.toProfileDto(): ProfileDto {
     val fields = buildMap {
         keys().forEach { key ->
-            if (key !in META_KEYS && !isNull(key)) put(key, get(key).toString())
+            if (key !in META_KEYS && !isNull(key)) put(key, this@toProfileDto.get(key).toString())
         }
     }
     return ProfileDto(id = getInt("id"), fields = fields, missing = optJSONArray("missing")?.toStringList().orEmpty())
@@ -26,7 +26,10 @@ fun ProfileDto.toSaveOutcome(): SaveOutcome = SaveOutcome(toDomain(), missing)
 
 /** Maps one WebSocket message; returns null for message types this app doesn't handle. */
 fun JSONObject.toLiveEvent(): LiveEvent? = when (optString("type")) {
-    "HEAL_REQUIRED" -> LiveEvent.HealRequired(optJSONArray("missing")?.toStringList().orEmpty())
+    "HEAL_REQUIRED" -> LiveEvent.HealRequired(
+        missing = optJSONArray("missing")?.toStringList().orEmpty(),
+        reasons = optJSONObject("issues")?.let { o -> o.keys().asSequence().associateWith { o.optString(it) } }.orEmpty(),
+    )
     "HEAL_RESOLVED" -> LiveEvent.HealResolved
     "CONFIG_UPDATED" -> LiveEvent.RulesUpdated(toAppRules())
     else -> null

@@ -122,6 +122,7 @@ def android_capture(report: dict) -> dict:
     exc_type = (report.get("exception") or "Exception").split(".")[-1]
     return {"source": "android", "exc_type": exc_type, "message": (report.get("message") or "")[:500],
             "traceback": stack[-6000:], "frames": [], "file": file, "line": line, "function": func,
+            "environment": (report.get("environment") or report.get("build_type") or "production").lower(),
             "request": {"device": report.get("device"), "app_version": report.get("app_version"),
                         "screen": report.get("screen")},
             "fingerprint": f"android:{exc_type}:{file}:{func}"}
@@ -146,8 +147,14 @@ class Healer:
         self.wf.db.set_setting("autoheal", "on" if on else "off")
 
     # ------------------------------------------------------------ intake
+    @property
+    def require_approval(self) -> bool:
+        return self.wf.settings.get("require_fix_approval") != "off"
+
     def record(self, data: dict) -> dict:
         now = self.wf_now()
+        if not data.get("environment"):
+            data["environment"] = (os.getenv("MOBILEHEAL_ENV") or self.wf.settings.get("runtime_environment") or "development").lower()
         for inc in self._incidents():
             if (inc.get("incident") or {}).get("fingerprint") != data["fingerprint"]:
                 continue
@@ -163,7 +170,7 @@ class Healer:
             self.wf._save(inc)
             return inc
 
-        title = f"{data['exc_type']} in {data.get('function') or 'unknown'}" + (
+        title = ("[PROD] " if data["environment"].startswith("prod") else "[DEV] ") + f"{data['exc_type']} in {data.get('function') or 'unknown'}" + (
             f" ({Path(data['file']).name}:{data.get('line')})" if data.get("file") else "")
         inc = {"kind": "incident", "title": title, "description": data["message"], "author": "MobileHeal",
                "status": "detected", "stage": 0, "tested": False, "created_at": now, "first_seen": now,
@@ -171,9 +178,13 @@ class Healer:
                "samples": [{"ts": now, "request": data.get("request")}]}
         inc = self.wf._save(inc)
         self.wf._event(inc, "MobileHeal", "detect",
-                       f"detected a production crash: {data['exc_type']}: {data['message'][:120]}"
+                       f"detected a {data['environment']} crash: {data['exc_type']}: {data['message'][:120]}"
                        + (f" (regression of {data['regression_of']})" if data.get("regression_of") else ""))
         self.wf._save(inc)
+        w = getattr(self.wf, "watchdog", None)
+        if w is not None:
+            w.notify("error", f"{inc['key']}: {data['environment']} crash detected", f"{data['exc_type']}: {data['message'][:200]}",
+                     f"#cr/{inc['id']}", source="Auto-heal")
         if self.autoheal:
             self.start(inc["id"])
         return inc
@@ -194,10 +205,67 @@ class Healer:
         inc = self.wf.get(cid)
         inc["status"], inc["stage"], inc["tested"] = "diagnosing", 1, False
         inc["coding_log"] = []
-        self.wf._event(inc, actor, "heal", "started auto-heal")
+        inc["fix_approved"] = False
+        inc.pop("error", None)
+        self.wf._event(inc, actor, "heal", "started crash analysis")
         self.wf._save(inc)
         self.wf.spawn(self._run, cid)
         return inc
+
+    def approve(self, cid: int, actor: str, note: str = "") -> dict:
+        inc = self.wf.get(cid)
+        if inc["status"] != "awaiting_approval":
+            raise ValueError("This defect isn't waiting for approval")
+        inc["fix_approved"], inc["approval"] = True, {"by": actor, "note": note.strip(), "ts": self.wf_now()}
+        inc["status"], inc["stage"] = "fixing", 3
+        inc["coding_log"] = [{"step": "Approval", "status": "done", "detail": f"approved by {actor}" + (f": {note.strip()}" if note.strip() else ""),
+                              "ts": self.wf_now()}]
+        self.wf._event(inc, actor, "approve", "approved the automatic fix" + (f": “{note.strip()}”" if note.strip() else ""))
+        self.wf._save(inc)
+        self.wf.spawn(self._run, cid)
+        return inc
+
+    def reject(self, cid: int, actor: str, note: str = "") -> dict:
+        inc = self.wf.get(cid)
+        if inc["status"] != "awaiting_approval":
+            raise ValueError("This defect isn't waiting for approval")
+        inc["status"], inc["stage"] = "needs_engineer", 2
+        inc["error"] = f"Automatic fix declined by {actor}" + (f": {note.strip()}" if note.strip() else "") + " — assigned to an engineer."
+        self.wf._event(inc, actor, "reject", "declined the automatic fix — routed to an engineer" + (f": “{note.strip()}”" if note.strip() else ""))
+        return self.wf._save(inc)
+
+    def _gate(self, inc, plan: dict) -> bool:
+        """Pause after analysis until a human approves the automatic fix. Returns True if paused."""
+        inc["analysis"] = {**plan, "ts": self.wf_now()}
+        if not self.require_approval or inc.get("fix_approved"):
+            if not inc.get("fix_approved"):
+                self._log(inc, "Approval", "done", "auto-approved (approval not required in Settings)")
+            inc["status"], inc["stage"] = "fixing", 3
+            self.wf._save(inc)
+            return False
+        inc["status"], inc["stage"] = "awaiting_approval", 2
+        self._log(inc, "Approval", "warn", "waiting for a human to approve the automatic fix")
+        self.wf._event(inc, "MobileHeal", "analysis", "finished analysis — waiting for approval to auto-fix")
+        self.wf._save(inc)
+        return True
+
+    def _plan(self, inc, source: str, line: int, exc_type: str, msg: str, lang: str, replayable: bool) -> dict:
+        lines = source.splitlines()
+        cur = lines[line - 1].strip() if 0 < line <= len(lines) else ""
+        p = patcher.patch_source_lang(source, line, exc_type, msg, lang) if lang != "python" else patcher.patch_source(source, line, exc_type, msg)
+        if p:
+            engine, preview = "playbook", {"before": p[1], "after": p[2], "why": p[3]}
+        elif self.ai_key:
+            engine, preview = "llm", None
+        else:
+            engine, preview = None, None
+        risk = "low" if engine == "playbook" and replayable else "medium" if engine else "high"
+        return {"engine": engine, "preview": preview, "line": cur, "risk": risk, "replayable": replayable,
+                "approach": ("Apply a deterministic fix pattern" if engine == "playbook" else
+                             f"Ask the agent's LLM ({self.wf.ai.model}) to write a minimal fix" if engine == "llm" else
+                             "No automatic fix is known (parser mode) — approving will retry; otherwise assign an engineer"),
+                "verification": ("Replay the captured input against the patched code, then run the full test suite"
+                                 if replayable else "Static validation + test suite; verify on a device/CI before merge")}
 
     # ------------------------------------------------------------ pipeline
     def _log(self, inc, step, status, detail=""):
@@ -237,7 +305,10 @@ class Healer:
             else:
                 self._log(inc, "Reproduce", "done", f"reproduced {r0['type']} at line {r0['line']}")
 
-            # 3. patch loop
+            # 3. approval gate
+            if not r0.get("ok") and self._gate(inc, self._plan(inc, original, r0["line"], r0["type"], r0["msg"], "python", True)):
+                return
+            # 4. patch loop
             self._log(inc, "Fix", "running")
             source, attempts = original, []
             result = r0
@@ -253,7 +324,7 @@ class Healer:
                     attempts.append({"n": n, "error": f"{result['type']}: {result['msg']}", "line": result["line"],
                                      "engine": None, "fixed": False,
                                      "note": "No playbook rule matches" + ("" if self.ai_key else
-                                             " (add an Anthropic API key in Settings to let Claude propose a fix)")})
+                                             " (parser mode — add a model API key in Settings so the agent's LLM can propose a fix)")})
                     break
                 before = f"{result['type']}: {result['msg']}"
                 source, old_line, new_line, why = p
@@ -344,6 +415,8 @@ class Healer:
                             "context": self._context(original, d["line"])}
         self._log(inc, "Diagnose", "done", inc["diagnosis"]["summary"])
         self._log(inc, "Reproduce", "warn", f"skipped — {reason}")
+        if self._gate(inc, self._plan(inc, original, d["line"], d["exc_type"], d["message"], lang, False)):
+            return
 
         self._log(inc, "Fix", "running")
         engine, new_src, why, old_line, new_line = None, None, None, line_text, None
@@ -359,7 +432,7 @@ class Healer:
         if not new_src:
             inc["attempts"] = [{"n": 1, "error": f"{d['exc_type']}: {d['message']}", "line": line_text, "engine": None,
                                 "fixed": False, "note": "No fix pattern matches" + ("" if self.wf.ai.available else
-                                " — add an Anthropic API key in Settings and the agent will ask Claude for a fix")}]
+                                " — parser mode: add a model API key in Settings and the agent's LLM will propose a fix")}]
             inc["status"], inc["stage"] = "needs_engineer", 2
             self._log(inc, "Fix", "fail", "no fix found")
             self.wf._event(inc, "MobileHeal", "error", "couldn't produce a fix — needs an engineer")

@@ -18,7 +18,7 @@ PROJECT = Path(__file__).resolve().parents[2]
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
     root = tmp_path / "mobileheal"
-    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".venv", "*.db*", "__pycache__", "build"))
+    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".mobileheal", ".venv", "*.db*", "__pycache__", "build"))
     (root / "backend" / "requirements.txt").write_text("name: required\nemail: required\n")
     monkeypatch.setenv("MOBILEHEAL_ROOT", str(root))
     monkeypatch.setenv("MOBILEHEAL_SPEC", str(root / "backend" / "requirements.txt"))

@@ -45,7 +45,7 @@
 <body>
 <main>
   <h1>MobileHeal Control Dashboard</h1>
-  <p class="sub">Auto-Heal agent status and schema enforcement · <a href="/workflow">Open Delivery workflow →</a> <span class="muted">(change requests → design → PR → test → merge)</span></p>
+  <p class="sub">Auto-Heal agent status and schema enforcement · <a href="/#home">← Back to MobileHeal home</a> <span class="muted">(change requests → design → PR → test → merge)</span></p>
 
   <section class="card">
     <div class="row">
@@ -197,7 +197,7 @@ async function refreshHealth(){
     const h = await fetch("/api/healer").then(r=>r.json());
     $("hOpen").textContent = h.open; $("hReview").textContent = h.awaiting_review; $("hFixed").textContent = h.resolved;
     $("ahToggle").checked = h.autoheal;
-    const lbl = {detected:"Detected", diagnosing:"Auto-healing…", needs_engineer:"Needs engineer", pr_open:"Fix PR ready for review", merged:"Fixed", closed:"Closed"};
+    const lbl = {detected:"Detected", diagnosing:"Analyzing…", awaiting_approval:"Awaiting approval", fixing:"Auto-fixing…", needs_engineer:"Needs engineer", pr_open:"Fix PR ready for review", merged:"Fixed", closed:"Closed"};
     $("hRecent").innerHTML = h.recent.map(i => `<div class="row" style="border-top:1px solid var(--line);padding:8px 0;font-size:14px">
       <span><b>${esc(i.key)}</b> ${esc(i.title)} ${i.occurrences>1?`<span class="muted">×${i.occurrences}</span>`:""}</span>
       <a href="/workflow#cr/${i.id}" style="color:inherit">${lbl[i.status]||i.status} →</a></div>`).join("");

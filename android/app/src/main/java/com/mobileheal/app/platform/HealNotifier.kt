@@ -19,7 +19,7 @@ import javax.inject.Singleton
 
 /** Abstraction so the ViewModel stays unit-testable. */
 interface HealAlerts {
-    fun show(missing: List<String>)
+    fun show(missing: List<String>, reasons: Map<String, String> = emptyMap())
     fun clear()
 }
 
@@ -31,7 +31,7 @@ class HealNotifier @Inject constructor(@ApplicationContext private val context: 
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    override fun show(missing: List<String>) {
+    override fun show(missing: List<String>, reasons: Map<String, String>) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return  // the in-app banner still shows
@@ -43,6 +43,12 @@ class HealNotifier @Inject constructor(@ApplicationContext private val context: 
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Complete your profile")
             .setContentText("Please add: ${missing.joinToString { it.toLabel() }}")
+            .apply {
+                if (reasons.isNotEmpty()) {
+                    setContentTitle("Action needed on your profile")
+                    setStyle(NotificationCompat.BigTextStyle().bigText(missing.joinToString("\n") { "• " + (reasons[it] ?: "Add your ${it.toLabel()}") }))
+                }
+            }
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)

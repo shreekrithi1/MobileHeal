@@ -17,7 +17,7 @@ PROJECT = Path(__file__).resolve().parents[2]
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
     root = tmp_path / "mobileheal"
-    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".venv", "*.db*", "__pycache__", "build"))
+    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".mobileheal", ".venv", "*.db*", "__pycache__", "build"))
     (root / "backend" / "requirements.txt").write_text("name: required\nemail: required\n")
     from app.demo import ORIGINALS
     for rel, src in ORIGINALS.items():          # start every test from the buggy code
@@ -45,6 +45,8 @@ def wait(c, cid, statuses, timeout=90):
         inc = c.get(f"/api/cr/{cid}").json()
         if inc["status"] in statuses:
             return inc
+        if inc["status"] == "awaiting_approval":      # human approval gate: approve the analysed fix
+            c.post(f"/api/incidents/{cid}/approve", json={"note": "ok"})
         time.sleep(0.25)
     raise AssertionError(inc["status"])
 

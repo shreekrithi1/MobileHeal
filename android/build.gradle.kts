@@ -1,10 +1,10 @@
 // Clean Architecture: :domain (pure Kotlin) ← :data (Android, infra) ← :app (Compose UI, DI wiring)
 plugins {
-    id("com.android.application") version "8.5.2" apply false
-    id("com.android.library") version "8.5.2" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.20" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.0.20" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.20" apply false
-    id("com.google.devtools.ksp") version "2.0.20-1.0.25" apply false
-    id("com.google.dagger.hilt.android") version "2.52" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.hilt) apply false
 }

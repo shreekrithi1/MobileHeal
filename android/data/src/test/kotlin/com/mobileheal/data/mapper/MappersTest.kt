@@ -27,6 +27,10 @@ class MappersTest {
 
     @Test fun `heal events and unknown types`() {
         assertEquals(LiveEvent.HealRequired(listOf("phone_number")), JSONObject("""{"type":"HEAL_REQUIRED","missing":["phone_number"]}""").toLiveEvent())
+        assertEquals(
+            LiveEvent.HealRequired(listOf("email"), mapOf("email" to "not valid")),
+            JSONObject("""{"type":"HEAL_REQUIRED","missing":["email"],"issues":{"email":"not valid"}}""").toLiveEvent(),
+        )
         assertEquals(LiveEvent.HealResolved, JSONObject("""{"type":"HEAL_RESOLVED"}""").toLiveEvent())
         assertNull(JSONObject("""{"type":"PING"}""").toLiveEvent())
     }

@@ -1,7 +1,8 @@
-"""Settings store + Anthropic (Claude) client.
+"""Settings store + multi-provider LLM client that powers the agent.
 
-The API key is entered on the Settings page, stored server-side and never sent back to
-the browser (only a masked hint). ANTHROPIC_API_KEY in the environment is used as a fallback.
+Pick any provider/model on the Settings page; its API key is stored server-side and never sent back
+to the browser (only a masked hint). Provider env vars (ANTHROPIC_API_KEY, OPENAI_API_KEY, ...) are a
+fallback. With no key the agent runs in PARSER MODE (deterministic parser / templates / playbooks).
 """
 from __future__ import annotations
 
@@ -17,9 +18,48 @@ from typing import Any, Dict, List, Optional
 log = logging.getLogger("mobileheal.ai")
 
 MODELS = ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"]
-SECRET_KEYS = {"anthropic_api_key", "zephyr_token", "github_token", "figma_token"}
+
+# wire: "anthropic" = Messages API; "openai" = Chat Completions (most vendors expose this format)
+PROVIDERS: Dict[str, dict] = {
+    "anthropic":  {"name": "Anthropic Claude", "wire": "anthropic", "base": "https://api.anthropic.com/v1", "env": "ANTHROPIC_API_KEY",
+                   "models": MODELS, "key_hint": "sk-ant-…", "console": "console.anthropic.com"},
+    "openai":     {"name": "OpenAI", "wire": "openai", "base": "https://api.openai.com/v1", "env": "OPENAI_API_KEY",
+                   "models": ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o", "o3"], "key_hint": "sk-…", "console": "platform.openai.com"},
+    "google":     {"name": "Google Gemini", "wire": "openai", "base": "https://generativelanguage.googleapis.com/v1beta/openai", "env": "GEMINI_API_KEY",
+                   "models": ["gemini-2.5-pro", "gemini-2.5-flash"], "key_hint": "AIza…", "console": "aistudio.google.com"},
+    "mistral":    {"name": "Mistral", "wire": "openai", "base": "https://api.mistral.ai/v1", "env": "MISTRAL_API_KEY",
+                   "models": ["mistral-large-latest", "mistral-medium-latest", "codestral-latest"], "key_hint": "", "console": "console.mistral.ai"},
+    "xai":        {"name": "xAI Grok", "wire": "openai", "base": "https://api.x.ai/v1", "env": "XAI_API_KEY",
+                   "models": ["grok-4", "grok-3-mini"], "key_hint": "xai-…", "console": "console.x.ai"},
+    "deepseek":   {"name": "DeepSeek", "wire": "openai", "base": "https://api.deepseek.com/v1", "env": "DEEPSEEK_API_KEY",
+                   "models": ["deepseek-chat", "deepseek-reasoner"], "key_hint": "sk-…", "console": "platform.deepseek.com"},
+    "groq":       {"name": "Groq", "wire": "openai", "base": "https://api.groq.com/openai/v1", "env": "GROQ_API_KEY",
+                   "models": ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"], "key_hint": "gsk_…", "console": "console.groq.com"},
+    "cohere":     {"name": "Cohere", "wire": "openai", "base": "https://api.cohere.ai/compatibility/v1", "env": "COHERE_API_KEY",
+                   "models": ["command-a-03-2025"], "key_hint": "", "console": "dashboard.cohere.com"},
+    "perplexity": {"name": "Perplexity", "wire": "openai", "base": "https://api.perplexity.ai", "env": "PERPLEXITY_API_KEY",
+                   "models": ["sonar-pro", "sonar"], "key_hint": "pplx-…", "console": "perplexity.ai/settings/api"},
+    "together":   {"name": "Together AI", "wire": "openai", "base": "https://api.together.xyz/v1", "env": "TOGETHER_API_KEY",
+                   "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct-Turbo"], "key_hint": "", "console": "api.together.ai"},
+    "openrouter": {"name": "OpenRouter (any model)", "wire": "openai", "base": "https://openrouter.ai/api/v1", "env": "OPENROUTER_API_KEY",
+                   "models": ["openrouter/auto", "anthropic/claude-sonnet-4.5", "openai/gpt-5", "google/gemini-2.5-pro"], "key_hint": "sk-or-…", "console": "openrouter.ai/keys"},
+    "azure":      {"name": "Azure OpenAI", "wire": "openai", "base": "", "env": "AZURE_OPENAI_API_KEY", "models": [],
+                   "key_hint": "", "console": "portal.azure.com", "needs_base": True,
+                   "base_hint": "https://<resource>.openai.azure.com/openai/deployments/<deployment>?api-version=2024-10-21"},
+    "ollama":     {"name": "Ollama (local, no key)", "wire": "openai", "base": "http://localhost:11434/v1", "env": "", "keyless": True,
+                   "models": ["llama3.1", "qwen2.5-coder", "mistral"], "key_hint": "", "console": "ollama.com"},
+    "custom":     {"name": "Custom OpenAI-compatible", "wire": "openai", "base": "", "env": "", "models": [], "key_hint": "",
+                   "console": "", "needs_base": True, "base_hint": "https://your-gateway/v1"},
+}
+DEFAULT_PROVIDER = "anthropic"
+SECRET_KEYS = {"jira_api_token", "zephyr_token", "github_token", "figma_token"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
 DEFAULTS = {
+    "llm_provider": DEFAULT_PROVIDER, "llm_model": "", "llm_base_url": "",
     "anthropic_model": MODELS[0], "user_name": "You",
+    "jira_base_url": "", "jira_email": "", "jira_project_key": "MH", "require_fix_approval": "on",
+    "runtime_environment": "development",
+    "watchdog_enabled": "on", "watchdog_autofix": "on", "notify_webhook_url": "",
+    "android_repo_url": "https://github.com/android/nowinandroid", "android_repo_branch": "",
     "zephyr_base_url": "https://api.zephyrscale.smartbear.com/v2", "zephyr_project_key": "", "zephyr_cycle_key": "",
     "merge_policy": "tests_required",  # tests_required | review_only
 }
@@ -35,8 +75,9 @@ class Settings:
 
     def get(self, key: str) -> str:
         v = self.db.get_setting("cfg:" + key, "")
-        if not v and key == "anthropic_api_key":
-            return os.getenv("ANTHROPIC_API_KEY", "")
+        if not v and key.endswith("_api_key") and key[:-8] in PROVIDERS:
+            env = PROVIDERS[key[:-8]]["env"]
+            return os.getenv(env, "") if env else ""
         if not v and key == "figma_token":
             return os.getenv("FIGMA_TOKEN", "")
         if not v and key == "github_token":
@@ -61,6 +102,9 @@ class Settings:
             else:
                 out[k] = v
         out["models"] = MODELS
+        out["jira_mode"] = "live" if all(self.get(k) for k in ("jira_base_url", "jira_email", "jira_api_token", "jira_project_key")) else "mock"
+        out["providers"] = {k: dict(p) for k, p in PROVIDERS.items()}
+        out["default_provider"] = DEFAULT_PROVIDER
         return out
 
     def update(self, data: dict, actor: str) -> dict:
@@ -97,7 +141,7 @@ class AIError(RuntimeError):
 
 
 class AI:
-    """Thin Messages API client returning parsed JSON."""
+    """Provider-agnostic chat client. `available` is False in parser mode (no key configured)."""
 
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -105,48 +149,97 @@ class AI:
         self.last_error: Optional[str] = None
 
     @property
+    def provider(self) -> str:
+        p = self.settings.get("llm_provider") or DEFAULT_PROVIDER
+        return p if p in PROVIDERS else DEFAULT_PROVIDER
+
+    @property
+    def spec(self) -> dict:
+        return PROVIDERS[self.provider]
+
+    @property
     def key(self) -> str:
-        return self.settings.get("anthropic_api_key")
+        return "" if self.spec.get("keyless") else self.settings.get(f"{self.provider}_api_key")
+
+    @property
+    def base_url(self) -> str:
+        return (self.settings.get("llm_base_url") if self.spec.get("needs_base") or self.provider == "ollama" else "") or self.spec["base"]
 
     @property
     def model(self) -> str:
-        return self.settings.get("anthropic_model") or MODELS[0]
+        m = self.settings.get("llm_model")
+        if not m and self.provider == "anthropic":
+            m = self.settings.get("anthropic_model")
+        return m or (self.spec["models"][0] if self.spec["models"] else "")
 
     @property
     def available(self) -> bool:
-        return bool(self.key)
+        if self.spec.get("needs_base") and not self.base_url:
+            return False
+        return bool(self.key) or bool(self.spec.get("keyless"))
+
+    @property
+    def mode(self) -> str:
+        return "live" if self.available else "parser"
 
     def status(self) -> dict:
-        return {"available": self.available, "model": self.model if self.available else None,
+        return {"available": self.available, "mode": self.mode, "provider": self.provider,
+                "provider_name": self.spec["name"], "model": self.model if self.available else None,
                 "calls": self.calls, "last_error": self.last_error}
 
-    def _post(self, payload: dict) -> dict:
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages", method="POST", data=json.dumps(payload).encode(),
-            headers={"x-api-key": self.key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+    # ---- wires
+    def _http(self, url: str, payload: dict, headers: dict) -> dict:
+        req = urllib.request.Request(url, method="POST", data=json.dumps(payload).encode(),
+                                     headers={"content-type": "application/json", **headers})
+        name = self.spec["name"]
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
                 return json.loads(r.read())
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", "replace")[:400]
-            raise AIError(f"Anthropic API {e.code}: {body}")
+            raise AIError(f"{name} API {e.code}: {body}")
         except urllib.error.URLError as e:
-            raise AIError(f"Cannot reach Anthropic API: {e.reason}")
+            raise AIError(f"Cannot reach {name}: {e.reason}")
+
+    def _post(self, payload: dict) -> dict:
+        """Anthropic Messages API."""
+        return self._http(self.base_url.rstrip("/") + "/messages", payload,
+                          {"x-api-key": self.key, "anthropic-version": "2023-06-01"})
+
+    def _post_openai(self, payload: dict) -> dict:
+        """OpenAI-compatible Chat Completions (OpenAI, Gemini, Mistral, Grok, DeepSeek, Groq, Azure, Ollama...)."""
+        base = self.base_url
+        if self.provider == "azure":
+            path, _, query = base.partition("?")
+            url = path.rstrip("/") + "/chat/completions" + ("?" + query if query else "")
+            headers = {"api-key": self.key}
+        else:
+            url = base.rstrip("/") + "/chat/completions"
+            headers = {"authorization": f"Bearer {self.key}"} if self.key else {}
+        return self._http(url, payload, headers)
 
     def text(self, system: str, user: str, max_tokens: int = 2000) -> str:
         if not self.available:
-            raise AIError("No Anthropic API key configured — add one in Settings")
+            raise AIError("Parser mode — no model API key configured. Add one in Settings.")
         t0 = time.perf_counter()
         try:
-            data = self._post({"model": self.model, "max_tokens": max_tokens, "system": system,
-                               "messages": [{"role": "user", "content": user}]})
+            if self.spec["wire"] == "anthropic":
+                data = self._post({"model": self.model, "max_tokens": max_tokens, "system": system,
+                                   "messages": [{"role": "user", "content": user}]})
+                out = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+            else:
+                tok = {"max_completion_tokens": max_tokens} if self.provider in ("openai", "azure") else {"max_tokens": max_tokens}
+                data = self._post_openai({"model": self.model, **tok, "messages": [
+                    {"role": "system", "content": system}, {"role": "user", "content": user}]})
+                msg = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                out = msg if isinstance(msg, str) else "".join(x.get("text", "") for x in msg if isinstance(x, dict))
             self.last_error = None
         except AIError as e:
             self.last_error = str(e)
             raise
         self.calls += 1
-        log.info("claude call %.1fs", time.perf_counter() - t0)
-        return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        log.info("%s/%s call %.1fs", self.provider, self.model, time.perf_counter() - t0)
+        return out
 
     def json(self, system: str, user: str, max_tokens: int = 3000) -> Any:
         raw = self.text(system + "\n\nRespond with ONLY valid JSON — no prose, no markdown fences.", user, max_tokens)
@@ -155,7 +248,7 @@ class AI:
     def ping(self) -> dict:
         t0 = time.perf_counter()
         out = self.text("You are a health check.", "Reply with the single word: ok", 10)
-        return {"ok": True, "model": self.model, "reply": out.strip()[:40], "ms": round((time.perf_counter() - t0) * 1000)}
+        return {"ok": True, "provider": self.spec["name"], "model": self.model, "reply": out.strip()[:40], "ms": round((time.perf_counter() - t0) * 1000)}
 
 
 def parse_json(raw: str) -> Any:

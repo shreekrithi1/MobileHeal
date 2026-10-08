@@ -19,7 +19,7 @@ PROJECT = Path(__file__).resolve().parents[2]
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
     root = tmp_path / "mobileheal"
-    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".venv", "*.db*", "__pycache__", "build"))
+    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".mobileheal", ".venv", "*.db*", "__pycache__", "build"))
     monkeypatch.setenv("MOBILEHEAL_ROOT", str(root))
     monkeypatch.setenv("MOBILEHEAL_SPEC", str(root / "backend" / "requirements.txt"))
     monkeypatch.setenv("MOBILEHEAL_DB", str(tmp_path / "h.db"))
@@ -37,6 +37,8 @@ def wait(c, cid, statuses, timeout=90):
         inc = c.get(f"/api/cr/{cid}").json()
         if inc["status"] in statuses:
             return inc
+        if inc["status"] == "awaiting_approval":      # human approval gate: approve the analysed fix
+            c.post(f"/api/incidents/{cid}/approve", json={"note": "ok"})
         time.sleep(0.25)
     raise AssertionError(f"stuck in {inc['status']}: {inc.get('coding_log')}")
 
@@ -103,3 +105,47 @@ def test_playbook_rules():
     assert propose('x = d["k"].lower()', "KeyError", "'k'")[0] == 'x = d.get("k").lower()'
     assert propose("r = a / b", "ZeroDivisionError", "division by zero")[0] == "r = (a / b if b else 0)"
     assert propose("y = items[0]", "IndexError", "list index out of range")[0] == "y = (items or [None])[0]"
+
+
+def test_crash_creates_jira_defect_and_waits_for_approval(env):
+    c = env[0] if isinstance(env, tuple) else env
+    pid = c.post("/api/profiles", json={"name": "Jane", "email": "j@x.io"}).json()["id"]
+    assert c.get(f"/api/profiles/{pid}/completion?fields=").status_code == 500
+    inc = next(x for x in c.get("/api/cr").json() if x["kind"] == "incident")
+    t0 = time.time()
+    while time.time() - t0 < 60:
+        full = c.get(f"/api/cr/{inc['id']}").json()
+        if full["status"] == "awaiting_approval":
+            break
+        time.sleep(0.25)
+    assert full["status"] == "awaiting_approval", full.get("coding_log")
+    assert full["title"].startswith("[DEV] ") and full["incident"]["environment"] == "development"
+    j = full["jira"]
+    assert j["mode"] == "mock" and j["key"] == "MH-1" and j["status"] == "Awaiting Approval"
+    assert full["analysis"]["engine"] == "playbook" and full["analysis"]["preview"]["after"]
+    assert "files" not in full or not full.get("pr")                     # nothing fixed before approval
+    issue = c.get("/api/jira/issues/MH-1").json()
+    assert "Stack trace" in issue["description"] and "approval needed" in issue["comments"][-1]["body"]
+
+    c.post(f"/api/incidents/{inc['id']}/approve", json={"note": "go"})
+    full = wait(c, inc["id"], {"pr_open", "needs_engineer"})
+    assert full["status"] == "pr_open" and full["approval"]["note"] == "go"
+    assert c.get("/api/jira/issues/MH-1").json()["status"] == "In Review"
+    c.post(f"/api/cr/{inc['id']}/test", json={"passed": True, "notes": "verified"})
+    assert c.post(f"/api/cr/{inc['id']}/merge").status_code == 200
+    issue = c.get("/api/jira/issues/MH-1").json()
+    assert issue["status"] == "Done"
+    assert [h["to"] for h in issue["history"]] == ["To Do", "In Progress", "Awaiting Approval", "In Progress", "In Review", "Done"]
+
+
+def test_reject_routes_to_engineer(env):
+    c = env[0] if isinstance(env, tuple) else env
+    pid = c.post("/api/profiles", json={"name": "Jane", "email": "j@x.io"}).json()["id"]
+    c.get(f"/api/profiles/{pid}/completion?fields=")
+    inc = next(x for x in c.get("/api/cr").json() if x["kind"] == "incident")
+    t0 = time.time()
+    while c.get(f"/api/cr/{inc['id']}").json()["status"] != "awaiting_approval" and time.time() - t0 < 60:
+        time.sleep(0.25)
+    r = c.post(f"/api/incidents/{inc['id']}/reject", json={"note": "touches billing"}).json()
+    assert r["status"] == "needs_engineer" and "touches billing" in r["error"]
+    assert c.get("/api/jira/issues/MH-1").json()["status"] == "To Do"

@@ -57,7 +57,7 @@ private class FakeRules(initial: AppRules) : RulesRepository {
 private class FakeAlerts : HealAlerts {
     var shown: List<String>? = null
     var cleared = 0
-    override fun show(missing: List<String>) { shown = missing }
+    override fun show(missing: List<String>, reasons: Map<String, String>) { shown = missing }
     override fun clear() { cleared++ }
 }
 

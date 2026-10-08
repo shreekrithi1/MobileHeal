@@ -134,6 +134,8 @@ def toolchain(root: Path) -> dict:
     if not sdk and (android / "local.properties").exists():
         m = re.search(r"sdk\.dir=(.+)", (android / "local.properties").read_text())
         sdk = m.group(1).strip() if m else None
+    if sdk and not Path(sdk).is_dir():          # e.g. local.properties copied from another machine
+        sdk = None
     ready = bool(gradle and sdk and (java_home or shutil.which("java")))
     reason = None if ready else (
         "no Gradle wrapper — open android/ in Android Studio once (it creates gradlew), or run `gradle wrapper` in android/"
@@ -385,6 +387,27 @@ class AndroidAgent:
                 out.append(p.read_text(encoding="utf-8"))
         return "\n".join(out)
 
+    def _repo_context(self) -> str:
+        try:
+            from .repo import AndroidRepo
+            ctx = AndroidRepo(self.root, self.wf.settings).agent_context()
+        except Exception:
+            return ""
+        return ("\n\nREFERENCE CODEBASE — follow its conventions (naming, module layout, state handling, DI) "
+                "where they don't conflict with the skill:\n" + ctx) if ctx else ""
+
+    def _repo_note(self) -> Optional[str]:
+        try:
+            from .repo import AndroidRepo
+            st = AndroidRepo(self.root, self.wf.settings).status()
+        except Exception:
+            return None
+        a = st.get("analysis")
+        if st.get("status") != "synced" or not a:
+            return None
+        return (f"Connected repo {st['url'].split('://')[-1]} @ {st['sha'][:7]}: "
+                + ", ".join(k for k, v in a["stack"].items() if v) + " — generated code follows the same stack.")
+
     # ------------------------------------------------------------ main entry
     def run(self, cr: dict, progress=None) -> dict:
         say = progress or (lambda *_: None)
@@ -417,7 +440,7 @@ class AndroidAgent:
                         {"path": f"{APP_TEST_DIR}/generated/screens/{P}ViewModelTest.kt", "action": "create",
                          "purpose": "unit tests for state mapping, fallback title and route contract"},
                         {"path": GEN_DESTINATIONS, "action": "modify", "purpose": f"register route screen/{target}"}]
-        notes = []
+        notes = [n for n in [self._repo_note()] if n]
         if target == "success_screen" and before.ui.get("after_save") != "success_screen":
             notes.append("Success screen: already implemented by InfoScreen + ResolveNavigationUseCase; the new rule activates it — no code change needed.")
         fields_changed = {r.field: r.constraint for r in after.rules} != {r.field: r.constraint for r in before.rules}
@@ -432,7 +455,7 @@ class AndroidAgent:
                                       f"destination with ViewModel, previews and tests" if files else
                                       "No new code required — this change is fully data-driven in the current architecture."),
                           "changes": changes, "notes": notes or ([] if files else ["No behavioural change detected."]),
-                          "limits": "Template engine: dedicated screens & navigation. Add an Anthropic key for arbitrary requirements."}
+                          "limits": "Template engine: dedicated screens & navigation. Parser mode — add a model API key in Settings for arbitrary requirements."}
         say("Plan", "done", result["plan"]["summary"])
         result["files"] = files
         self._verify(result, say, repair=None)
@@ -449,7 +472,8 @@ class AndroidAgent:
         req = cr.get("requirement_text") or cr.get("description") or cr["title"]
         brief = (f"Requirement (plain English): {req}\n\nRules before:\n```\n{cr.get('base_spec') or ''}\n```\n"
                  f"Rules after:\n```\n{cr['spec_text']}\n```\nUX design notes: {json.dumps(cr['design']['notes'])}\n\n"
-                 f"Project files:\n" + "\n".join(self._tree()) + "\n\nKey sources:\n" + self._context())
+                 f"Project files:\n" + "\n".join(self._tree()) + "\n\nKey sources:\n" + self._context()
+                 + self._repo_context())
         say("Plan", "running", "Claude is planning the change…")
         plan = ai.json(self._system(), brief + '\n\nFirst, PLAN the change. Return JSON: {"summary": "", '
                        '"changes": [{"path": "android/…", "action": "create|modify", "purpose": ""}], '
@@ -519,5 +543,5 @@ class AndroidAgent:
 
     # ------------------------------------------------------------ status for Settings
     def status(self) -> dict:
-        return {"skill_path": str(SKILL_PATH), "skill_chars": len(self.skill), "engine": "claude" if self.wf.ai.available else "templates",
+        return {"repo_connected": bool(self._repo_note()), "skill_path": str(SKILL_PATH), "skill_chars": len(self.skill), "engine": "claude" if self.wf.ai.available else "templates",
                 "toolchain": toolchain(self.root)}

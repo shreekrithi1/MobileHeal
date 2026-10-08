@@ -36,6 +36,8 @@ class AutoHealAgent:
         self._task: asyncio.Task | None = None
         self._wake = asyncio.Event()
         self.running = db.get_setting("agent_state", "START") == "START"
+        self.watchdog = None                  # DataWatchdog, attached by the app at startup
+        self.last_watchdog: Optional[dict] = None
 
     # ---- control -------------------------------------------------------
     @property
@@ -126,6 +128,11 @@ class AutoHealAgent:
         t0 = time.perf_counter()
         await self.reload_and_broadcast()
         events = []
+        if self.watchdog is not None:
+            try:
+                self.last_watchdog = self.watchdog.scan(self.rules)
+            except Exception:
+                log.exception("data watchdog scan failed")
         for profile in self.db.list_profiles():
             events.extend(await self.evaluate_profile(profile))
         self.last_duration_ms = round((time.perf_counter() - t0) * 1000, 2)
@@ -135,11 +142,15 @@ class AutoHealAgent:
     async def evaluate_profile(self, profile: dict) -> list[dict]:
         pid = profile["id"]
         missing = missing_fields(self.rules, profile)
+        issues = self.watchdog.attention(profile, self.rules) if self.watchdog is not None and self.watchdog.enabled else {}
+        missing += [f for f in issues if f not in missing]       # invalid values must be fixed too
         prev = self.active_alerts.get(pid)
         events = []
         if missing:
             self.active_alerts[pid] = missing
             evt = {"type": "HEAL_REQUIRED", "profile_id": pid, "missing": missing,
+                   "issues": {f: issues.get(f) or f"{f.replace('_', ' ')} is required" for f in missing},
+                   "message": "Please update your profile: " + "; ".join(issues.get(f) or f"add your {f.replace('_', ' ')}" for f in missing),
                    "ts": datetime.now(timezone.utc).isoformat()}
             await self.publish(pid, evt)
             events.append(evt)

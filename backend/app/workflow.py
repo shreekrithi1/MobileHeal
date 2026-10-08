@@ -68,6 +68,7 @@ class Workflow:
                 id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL)""")
         self._tasks: set = set()
         self.healer = None  # set by main
+        self.watchdog = None  # set by main
 
     # ------------------------------------------------------------ storage
     def _save(self, cr: dict) -> dict:
@@ -89,7 +90,80 @@ class Workflow:
                 cr["id"] = cur.lastrowid
                 cr["key"] = f"{'INC' if cr.get('kind') == 'incident' else 'CR'}-{cr['id']}"
                 self.db._conn.execute("UPDATE change_requests SET data=? WHERE id=?", (json.dumps(cr), cr["id"]))
+        if cr.get("kind") == "incident":
+            self._jira_sync(cr)
         return cr
+
+    # ------------------------------------------------------------ Jira defect sync
+    def _jira_sync(self, cr: dict, force: bool = False):
+        """Mirror the incident's workflow stage onto its Jira defect (create → comment/transition per stage)."""
+        from .jira import Jira
+        sig = f"{cr.get('status')}:{bool(cr.get('tested'))}"
+        j = cr.setdefault("jira", {})
+        if j.get("synced") == sig and not force:
+            return
+        jira = Jira(self.settings)
+        try:
+            if not j.get("key"):
+                d = cr.get("incident") or {}
+                env = d.get("environment", "production")
+                desc = (f"Detected automatically by MobileHeal ({cr['key']}) in {env}.\n\n"
+                        f"Error: {d.get('exc_type')}: {d.get('message')}\n"
+                        f"Location: {d.get('file') or 'unknown'}:{d.get('line') or ''} in {d.get('function') or '?'}()\n"
+                        f"Source: {'Android app' if d.get('source') == 'android' else 'Backend'}\n"
+                        + (f"Device: {(d.get('request') or {}).get('device')} · app {(d.get('request') or {}).get('app_version')}\n"
+                           if (d.get('request') or {}).get('device') else "")
+                        + (f"Regression of {d['regression_of']}\n" if d.get("regression_of") else "")
+                        + f"\nStack trace:\n```\n{(d.get('traceback') or '')[-4000:]}\n```\n\n"
+                        "Workflow: Defect → Analyze → Approve → Auto-fix → PR → Test → Merge (tracked by MobileHeal).")
+                labels = ["mobileheal", "crash", env, d.get("source") or "backend"] + (["regression"] if d.get("regression_of") else [])
+                j.update(jira.create(cr["title"], desc, labels, priority="Highest" if env.startswith("prod") else "High"))
+                self._event(cr, "MobileHeal", "jira", f"created {'Jira' if j['mode'] == 'live' else 'mock Jira'} defect {j['key']}")
+            text, state = self._jira_message(cr)
+            if text:
+                jira.comment(j["key"], text)
+            if state:
+                j["status"] = jira.transition(j["key"], state) or j.get("status")
+            j.pop("error", None)
+        except Exception as e:
+            log.warning("jira sync failed: %s", e)
+            j["error"] = str(e)[:300]
+        j["synced"] = sig
+        with self.db._lock:
+            self.db._conn.execute("UPDATE change_requests SET data=? WHERE id=?", (json.dumps(cr), cr["id"]))
+
+    def _jira_message(self, cr: dict):
+        st, a = cr.get("status"), cr.get("analysis") or {}
+        if st == "diagnosing":
+            return "🔎 MobileHeal started analyzing this crash.", "analyzing"
+        if st == "awaiting_approval":
+            dg = cr.get("diagnosis") or {}
+            pv = a.get("preview") or {}
+            return ("🧠 Analysis complete — approval needed before the automatic fix runs.\n\n"
+                    f"Root cause: {dg.get('summary', '')}\nProposed approach: {a.get('approach', '')}\n"
+                    f"Risk: {a.get('risk', '?')} · Verification: {a.get('verification', '')}\n"
+                    + (f"\nProposed change:\n```\n- {pv.get('before')}\n+ {pv.get('after')}\n```" if pv else "")
+                    + f"\nApprove or decline in MobileHeal ({cr['key']})."), "awaiting_approval"
+        if st == "fixing":
+            ap = cr.get("approval") or {}
+            return (f"✅ Automatic fix approved by {ap.get('by', 'policy')}" + (f": {ap['note']}" if ap.get("note") else "")
+                    + ". Auto-fix running."), "fixing"
+        if st == "pr_open" and not cr.get("tested"):
+            pr, s = cr.get("pr") or {}, cr.get("checks_summary") or {}
+            return (f"🔀 Fix PR #{pr.get('number')} opened on branch {pr.get('branch')} "
+                    f"(+{(cr.get('stats') or {}).get('additions', 0)} −{(cr.get('stats') or {}).get('deletions', 0)}). "
+                    f"Checks: {s.get('pass', 0)} passed, {s.get('warn', 0)} warnings, {s.get('fail', 0)} failed."
+                    + (f"\n{pr['github_url']}" if pr.get("github_url") else "") + "\nReady for testing."), "in_review"
+        if st == "pr_open" and cr.get("tested"):
+            return f"🧪 Fix tested and approved" + (f": {cr.get('test_notes')}" if cr.get("test_notes") else "."), None
+        if st == "needs_engineer":
+            return f"⚠️ Auto-heal needs an engineer: {cr.get('error') or (cr.get('diagnosis') or {}).get('summary', '')}", "needs_engineer"
+        if st == "merged":
+            return (f"🚀 Fix merged" + (f" as {cr['merged_commit']}" if cr.get("merged_commit") else "")
+                    + (f" and deployed ({cr['deployed']})" if cr.get("deployed") else "") + ". Resolving."), "done"
+        if st == "closed":
+            return "Closed in MobileHeal without merging a fix.", "wont_fix"
+        return None, None
 
     def get(self, cid: int) -> dict:
         with self.db._lock:
@@ -136,7 +210,20 @@ class Workflow:
         except RuleParseError:
             base = parse_spec("")
         new = parse_spec(new_text)
-        return codegen.design_brief(base, new, self.db.list_profiles())
+        profiles = self.db.list_profiles()
+        d = codegen.design_brief(base, new, profiles)
+        if self.watchdog is not None:
+            try:
+                imp = self.watchdog.preview(new_text, profiles)
+                d["data_impact"] = imp
+                if imp["missing_by_field"]:
+                    d["notes"].append("DataWatchdog: once live, " + ", ".join(
+                        f"{n} existing profile{'s' if n > 1 else ''} will be missing {f.replace('_', ' ')}"
+                        for f, n in imp["missing_by_field"].items())
+                        + " — those users get an in-app notification to complete it, and the team is alerted.")
+            except Exception:
+                pass
+        return d
 
     # ------------------------------------------------------------ 1. requirements → 2. design
     def create(self, title: str, description: str, spec_text: str, author: Optional[str] = None,

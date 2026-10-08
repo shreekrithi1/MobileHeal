@@ -65,6 +65,7 @@ class FigmaApplyIn(BaseModel):
 
 class TranslateIn(BaseModel):
     text: str
+    answers: List[Dict[str, Any]] = []
 
 
 class SettingsIn(BaseModel):
@@ -141,6 +142,10 @@ async def lifespan(app: FastAPI):
     app.state.healer = Healer(app.state.wf)
     app.state.wf.healer = app.state.healer
     app.state.demo = Demo(app.state.wf)
+    from .watchdog import DataWatchdog
+    app.state.watchdog = DataWatchdog(app.state.db, app.state.wf.settings.get)
+    app.state.agent.watchdog = app.state.watchdog
+    app.state.wf.watchdog = app.state.watchdog
     yield
     await app.state.agent.stop()
 
@@ -364,6 +369,106 @@ def incident_heal(cid: int):
     return _wf(app.state.healer.start, cid, "You")
 
 
+class ApprovalIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/incidents/{cid}/approve")
+def incident_approve(cid: int, body: ApprovalIn):
+    try:
+        return app.state.healer.approve(cid, app.state.wf.user, body.note)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/incidents/{cid}/reject")
+def incident_reject(cid: int, body: ApprovalIn):
+    try:
+        return app.state.healer.reject(cid, app.state.wf.user, body.note)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/incidents/{cid}/jira-sync")
+def incident_jira_sync(cid: int):
+    cr = app.state.wf.get(cid)
+    app.state.wf._jira_sync(cr, force=True)
+    return app.state.wf.get(cid)
+
+
+@app.get("/api/jira")
+def jira_status():
+    from .jira import Jira
+    j = Jira(app.state.wf.settings)
+    return {**j.status(), "issues": j.mock_issues()[:100] if not j.live else []}
+
+
+@app.get("/api/jira/issues/{key}")
+def jira_issue(key: str):
+    from .jira import Jira
+    i = Jira(app.state.wf.settings).mock_issue(key)
+    if not i:
+        raise HTTPException(404, "Issue not found in the mock tracker")
+    return i
+
+
+@app.post("/api/settings/test-jira")
+def settings_test_jira():
+    from .jira import Jira
+    try:
+        return Jira(app.state.wf.settings).ping()
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+# ---------------- DataWatchdog + notifications ----------------
+@app.get("/api/data-health")
+def data_health(status: str = "open"):
+    w = app.state.watchdog
+    return {**w.summary(), "issues": w.issues(status)}
+
+
+@app.post("/api/data-health/scan")
+async def data_health_scan():
+    w = app.state.watchdog
+    if not w.enabled:
+        raise HTTPException(409, "DataWatchdog is turned off in Settings")
+    agent = app.state.agent
+    await agent.reload_and_broadcast()
+    r = w.scan(agent.rules)
+    for p in app.state.db.list_profiles():          # push fresh alerts to affected apps right away
+        await agent.evaluate_profile(p)
+    return {**w.summary(), "scan": {k: v for k, v in r.items() if k not in ("new_issues", "resolved_issues")}}
+
+
+@app.post("/api/data-health/preview")
+def data_health_preview(body: SpecIn):
+    try:
+        return app.state.watchdog.preview(body.text, app.state.db.list_profiles())
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/data-health/notify/{pid}")
+async def data_health_renotify(pid: int):
+    p = app.state.db.get_profile(pid)
+    if not p:
+        raise HTTPException(404, "profile not found")
+    evts = await app.state.agent.evaluate_profile(p)
+    return {"sent": len(evts), "events": evts}
+
+
+@app.get("/api/notifications")
+def notifications():
+    return app.state.watchdog.notifications()
+
+
+@app.post("/api/notifications/read")
+def notifications_read():
+    app.state.watchdog.mark_read()
+    return app.state.watchdog.notifications()
+
+
 # ---------------- Settings, AI, audit ----------------
 def _settings():
     return app.state.wf.settings
@@ -406,6 +511,45 @@ class SkillIn(BaseModel):
     text: str
 
 
+def _repo():
+    from .repo import AndroidRepo
+    return AndroidRepo(PROJECT_ROOT, app.state.wf.settings)
+
+
+@app.get("/api/repo")
+def repo_status():
+    return _repo().status()
+
+
+@app.post("/api/repo/sync")
+def repo_sync():
+    from .repo import RepoError
+    try:
+        st = _repo().sync_async()
+    except RepoError as e:
+        raise HTTPException(400, str(e))
+    app.state.wf.settings.audit(app.state.wf.user, "repo.sync", st["url"], st.get("branch") or "")
+    return st
+
+
+@app.get("/api/repo/tree")
+def repo_tree(path: str = ""):
+    from .repo import RepoError
+    try:
+        return _repo().tree(path)
+    except RepoError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/repo/file")
+def repo_file(path: str):
+    from .repo import RepoError
+    try:
+        return _repo().read(path)
+    except RepoError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/android")
 def android_status():
     from .android_agent import AndroidAgent
@@ -438,7 +582,7 @@ def audit(limit: int = 200):
 def translate_requirement(body: TranslateIn):
     live = app.state.agent.read_text()
     try:
-        r = english.translate(body.text, live, app.state.wf.ai)
+        r = english.translate(body.text, live, app.state.wf.ai, body.answers)
     except Exception as e:
         raise HTTPException(400, f"Couldn't translate: {e}")
     r["validation"] = validate_requirements(SpecIn(text=r["spec_text"]))
@@ -725,5 +869,10 @@ def workflow_page():
 
 # ---------------- Dashboard (FR-4.2) ----------------
 @app.get("/")
+def home():
+    return FileResponse(STATIC / "workflow.html")
+
+
+@app.get("/dashboard")
 def dashboard():
     return FileResponse(STATIC / "dashboard.html")

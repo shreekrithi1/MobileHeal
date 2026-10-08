@@ -7,7 +7,9 @@
 <style>
 :root{
   --bg:#f5f6f8; --panel:#ffffff; --sunk:#f0f2f5; --fg:#151a21; --muted:#5f6b7a; --faint:#8a95a3; --line:#e2e6eb;
-  --accent:#4f46e5; --accent-fg:#fff; --accent-soft:#eef0ff;
+  --accent:#0a6cff; --accent-fg:#fff; --accent-soft:#e8f1ff;
+  --rail:rgba(246,247,249,.86); --rail-hover:rgba(0,0,0,.05); --rail-on:rgba(10,108,255,.12);
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --ease:cubic-bezier(.2,.8,.2,1);
   --green:#14804a; --green-soft:#e7f6ee; --amber:#b25e09; --amber-soft:#fff4e2; --red:#c4320a; --red-soft:#fdecea;
   --blue:#175cd3; --blue-soft:#eaf2ff; --purple:#6941c6; --purple-soft:#f2edff;
   --add:#e6f6ec; --add-strong:#c5ecd3; --del:#fdeceb; --del-strong:#f8d0cd;
@@ -16,19 +18,73 @@
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#0d1014; --panel:#151a20; --sunk:#10151a; --fg:#e8ecf1; --muted:#9aa5b3; --faint:#6e7987; --line:#262d36;
-  --accent:#8b85ff; --accent-fg:#0d1014; --accent-soft:#232350;
+  --accent:#3b8cff; --accent-fg:#fff; --accent-soft:#132a4d;
+  --rail:rgba(20,24,30,.86); --rail-hover:rgba(255,255,255,.06); --rail-on:rgba(59,140,255,.18);
   --green:#4ade80; --green-soft:#12291c; --amber:#fbbf24; --amber-soft:#2d2210; --red:#f87171; --red-soft:#331616;
   --blue:#7cb1ff; --blue-soft:#13233d; --purple:#b69cff; --purple-soft:#241a3d;
   --add:#11291b; --add-strong:#1b4a2e; --del:#331617; --del-strong:#5a2224; --shadow:none;
 }}
 *{box-sizing:border-box} html,body{margin:0;height:100%}
-body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- app shell: sidebar + content ---------- */
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);height:100%}
+.rail{background:var(--rail);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px 10px;overflow:auto;z-index:20}
+.rail-brand{display:flex;align-items:center;gap:10px;padding:6px 8px 12px}
+.rail-brand b{display:block;font-size:15px;letter-spacing:-.01em}.rail-brand small{color:var(--muted);font-size:11.5px}
+.rail-search{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px 10px;color:var(--muted);cursor:pointer;margin-bottom:10px;font-size:13px}
+.rail-search kbd{margin-left:auto;font:11px var(--mono);border:1px solid var(--line);border-radius:5px;padding:0 5px;color:var(--faint)}
+.rail-label{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;padding:14px 10px 4px}
+.rail a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--fg);text-decoration:none;font-size:13.5px;font-weight:500;min-height:34px;transition:background .15s var(--ease)}
+.rail a svg{width:18px;height:18px;flex:none;color:var(--muted)}
+.rail a:hover{background:var(--rail-hover)} .rail a.on{background:var(--rail-on);color:var(--accent)} .rail a.on svg{color:var(--accent)}
+.rail .badge{margin-left:auto;background:var(--red);color:#fff;font-size:11px;font-weight:700;border-radius:99px;padding:0 7px;line-height:18px}
+.rail .badge.amber{background:#f79009}.rail .badge:empty{display:none}
+.rail-foot{margin-top:auto;padding:12px 8px 4px;border-top:1px solid var(--line);display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.rail-foot div{display:flex;align-items:center;gap:7px}.dot8{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}.dot8.ok{background:#12b76a}.dot8.warn{background:#f79009}.dot8.err{background:var(--red)}
+.content{display:flex;flex-direction:column;min-width:0;height:100%}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);min-width:0;overflow:hidden;white-space:nowrap}
+.crumbs b{color:var(--fg);font-weight:600;overflow:hidden;text-overflow:ellipsis}.crumbs a{color:var(--muted);text-decoration:none}.crumbs a:hover{color:var(--fg)}
+.rail-toggle{display:none;border:0;background:none;font-size:20px;padding:4px 6px;cursor:pointer;color:var(--fg)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#5ac8fa,#0a6cff);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px;flex:none;cursor:pointer;text-decoration:none}
+@media (max-width:980px){.shell{grid-template-columns:1fr}.rail{position:fixed;inset:0 auto 0 0;width:270px;transform:translateX(-102%);transition:transform .25s var(--ease);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .shell.rail-open .rail{transform:none}.rail-toggle{display:inline-block}}
+
+/* ---------- command palette ---------- */
+.pal-bg{position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:60;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+.pal{width:min(620px,calc(100vw - 32px));background:var(--panel);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.3);overflow:hidden;border:1px solid var(--line)}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--line);padding:16px 18px;font-size:17px;background:transparent;outline:none}
+.pal ul{list-style:none;margin:0;padding:6px;max-height:50vh;overflow:auto}.pal li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:14px}
+.pal li small{margin-left:auto;color:var(--faint);font-size:12px}.pal li.on{background:var(--accent);color:#fff}.pal li.on small{color:rgba(255,255,255,.8)}
+.pal .grp{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px 2px}
+
+/* ---------- home ---------- */
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:6px 0 22px}
+.hero h1{font-size:30px;line-height:1.15;letter-spacing:-.022em;margin:0 0 6px;font-weight:700}.hero p{margin:0;color:var(--muted);font-size:15px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow);text-decoration:none;color:inherit;transition:transform .15s var(--ease),box-shadow .15s}
+.kpi:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,24,40,.08)}
+.kpi .l{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}.kpi .v{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.2;margin-top:4px}.kpi .s{font-size:12px;color:var(--faint)}
+.home-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px} @media (max-width:1100px){.home-grid{grid-template-columns:1fr}}
+.att{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}.att:first-child{border-top:0}
+.att .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:16px}
+.att .tx{min-width:0;flex:1}.att .tx b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.att .tx span{font-size:12.5px;color:var(--muted)}
+.ic-red{background:var(--red-soft);color:var(--red)}.ic-amber{background:var(--amber-soft);color:var(--amber)}.ic-blue{background:var(--blue-soft);color:var(--blue)}.ic-green{background:var(--green-soft);color:var(--green)}.ic-purple{background:var(--purple-soft);color:var(--purple)}
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.flow a{background:var(--sunk);border-radius:10px;padding:12px;text-decoration:none;color:inherit;position:relative}
+.flow a b{font-size:22px;display:block;letter-spacing:-.02em}.flow a span{font-size:12px;color:var(--muted)}
+@media (max-width:700px){.flow{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:24px}}
+.sysrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}.sysrow:first-child{border-top:0}.sysrow .st{margin-left:auto;color:var(--muted);font-size:12.5px;text-align:right}
+.act-row{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}.act-row:first-child{border-top:0}.act-row time{color:var(--faint);font-size:12px;white-space:nowrap;margin-left:auto}
+.index-empty{max-width:560px;margin:8vh auto;text-align:center}.index-empty .big{font-size:44px}.index-empty h2{font-size:22px;letter-spacing:-.015em;margin:8px 0}.index-empty p{color:var(--muted)}
 button,input,textarea,select{font:inherit;color:inherit}
 a{color:var(--accent)}
 code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px 5px;border-radius:4px}
 
 /* top bar */
-.top{height:52px;display:flex;align-items:center;gap:18px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top{height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em}
 .logo{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#22c55e);display:grid;place-items:center;color:#fff;font-size:13px}
 .nav a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:7px;font-weight:500}
@@ -38,7 +94,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px
 .pill .d{width:7px;height:7px;border-radius:50%;background:var(--green)}
 
 /* layout */
-.app{display:grid;grid-template-columns:300px 1fr;height:calc(100% - 52px)}
+.app{display:grid;grid-template-columns:300px 1fr;flex:1;min-height:0}
 .side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .side-h{padding:14px;border-bottom:1px solid var(--line)}
 .list{overflow:auto;flex:1;padding:6px}
@@ -51,7 +107,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px
 .empty{color:var(--faint);text-align:center;padding:40px 10px;font-size:13px}
 
 /* buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:550;white-space:nowrap;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px 14px;min-height:34px;transition:background .15s var(--ease),filter .15s;cursor:pointer;font-weight:550;white-space:nowrap;box-shadow:var(--shadow)}
 .btn:hover{background:var(--sunk)} .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)} .btn.primary:hover{filter:brightness(1.08)}
 .btn.green{background:#1a7f37;border-color:#1a7f37;color:#fff} .btn.green:hover{filter:brightness(1.08)}
@@ -72,7 +128,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px
 .branch{font-family:var(--mono);font-size:12px;background:var(--blue-soft);color:var(--blue);padding:1px 7px;border-radius:5px}
 
 /* stepper */
-.steps{display:grid;grid-template-columns:repeat(6,1fr);margin:20px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 10px;box-shadow:var(--shadow)}
+.steps{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;margin:20px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 10px;box-shadow:var(--shadow)}
 .step{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;font-size:12.5px;color:var(--faint);font-weight:550;text-align:center}
 .step:not(:last-child)::after{content:"";position:absolute;top:13px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:var(--line)}
 .step.done:not(:last-child)::after{background:var(--green)}
@@ -189,9 +245,14 @@ pre.out{background:var(--sunk);border-radius:8px;padding:10px;font-size:11.5px;o
 .skel{background:linear-gradient(90deg,var(--sunk),var(--line),var(--sunk));background-size:200% 100%;animation:sh 1.2s infinite;border-radius:6px;height:12px;margin:8px 0}
 @keyframes sh{to{background-position:-200% 0}}
 .hide{display:none!important}
-.s-detected,.s-needs_engineer{background:var(--red-soft);color:var(--red)} .s-diagnosing{background:var(--amber-soft);color:var(--amber)}
-.filters{display:flex;gap:4px;padding:8px 8px 0} .filters button{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:4px 0;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
-.filters button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.s-detected,.s-needs_engineer{background:var(--red-soft);color:var(--red)} .s-diagnosing,.s-fixing{background:var(--amber-soft);color:var(--amber)}
+.s-awaiting_approval{background:#FFF4E5;color:#B54708;box-shadow:inset 0 0 0 1px #F79009}
+.jira{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:#0052CC;font-size:12.5px}.jira i{width:12px;height:12px;border-radius:3px;background:linear-gradient(135deg,#2684FF,#0052CC);display:inline-block}
+.approve-card{border:1.5px solid #F79009;background:linear-gradient(#FFFAF2,var(--bg))}
+.filters{display:flex;gap:2px;margin:10px 10px 2px;padding:2px;background:var(--sunk);border-radius:9px} .filters button{flex:1;border:0;background:none;border-radius:7px;padding:5px 0;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;transition:background .15s var(--ease)}
+.filters button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+a.btn,a.btn:hover{text-decoration:none;color:inherit} a.btn.primary{color:var(--accent-fg)} a.btn.green{color:#fff} .card-h a,.hint a{text-decoration:none}
+.app.full ~ * .mobile-list, body:has(.app.full) .mobile-list{display:none!important}
 .inc-ico{width:18px;height:18px;border-radius:5px;display:inline-grid;place-items:center;font-size:11px;background:var(--red-soft);color:var(--red);font-weight:800}
 .inc-ico.ok{background:var(--green-soft);color:var(--green)}
 .errbox{background:var(--red-soft);border:1px solid color-mix(in srgb,var(--red) 25%,transparent);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:13px;color:var(--red);word-break:break-word}
@@ -208,7 +269,7 @@ pre.trace .hl{background:rgba(248,113,113,.18);display:block;color:#fecaca}
 .switch span:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
 .switch input:checked+span{background:#1a7f37} .switch input:checked+span:before{transform:translateX(14px)}
 .mobile-list{display:none} @media (max-width:980px){.mobile-list{display:inline-flex}}
-@media (max-width:640px){.repo{display:none}.top{gap:10px;padding:0 12px}.wrap{padding:16px 16px 48px}.nav a{padding:6px 7px}.mobile-list{margin-left:auto}.hdr h1{font-size:19px}.step{font-size:11px}}
+@media (max-width:640px){#ah{display:none}.repo{display:none}.top{gap:10px;padding:0 12px}.wrap{padding:16px 16px 48px}.nav a{padding:6px 7px}.mobile-list{margin-left:auto}.hdr h1{font-size:19px}.step{font-size:11px}}
 
 /* ---- modal, runner, tests ---- */
 .modal{position:fixed;inset:0;background:rgba(15,20,26,.45);z-index:30;display:grid;place-items:center;padding:20px;animation:fade .15s}
@@ -258,26 +319,60 @@ textarea.big{font-size:15px;line-height:1.55}
 .chk.sub{padding-left:44px;padding-top:7px;padding-bottom:7px} .chk.sub .dot{width:16px;height:16px;font-size:9px}
 details.adv{border:1px dashed var(--line);border-radius:10px;padding:10px 12px} details.adv summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(--muted)}
 .trbox{background:var(--sunk);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.qcard{border:1px solid var(--amber);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--bg)}
+.qcard .qt{font-weight:600;margin-bottom:8px}.qopts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.qa{font-size:12.5px;color:var(--muted);margin:2px 0}.qa b{color:var(--fg);font-weight:550}
+.agree{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
 .dsrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .spinner{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-1px}
 .app.full{grid-template-columns:1fr} .app.full .side{display:none}
+.bell{position:relative;background:none;border:0;font-size:17px;cursor:pointer;padding:4px 8px;border-radius:8px;color:var(--fg)}.bell:hover{background:var(--sunk)}
+.bell b{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:10px;border-radius:9px;padding:1px 5px;min-width:16px}
+.npanel{position:fixed;top:56px;right:14px;width:min(420px,calc(100vw - 28px));max-height:70vh;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);z-index:30}
+.nitem{padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px}.nitem.unread{background:var(--sunk)}.nitem .t{font-weight:600;display:flex;gap:6px;align-items:center}
+.nitem pre{white-space:pre-wrap;font:inherit;margin:4px 0 0;color:var(--muted)}
+.lv{width:8px;height:8px;border-radius:50%;display:inline-block}.lv-error{background:var(--red)}.lv-warn{background:var(--amber)}.lv-ok{background:#12B76A}.lv-info{background:#2E90FA}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.tile{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px}.tile b{font-size:26px;display:block}.tile span{color:var(--muted);font-size:12.5px}
 table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child(4),table.lib td:nth-child(5){white-space:nowrap}
 </style>
 </head>
 <body>
+<div class="shell" id="shell">
+<nav class="rail" id="rail" aria-label="Primary">
+  <div class="rail-brand"><div class="logo" aria-hidden="true">✚</div><div><b>MobileHeal</b><small>Autonomous app delivery</small></div></div>
+  <button class="rail-search" onclick="openPalette()" aria-label="Search and commands"><span style="width:15px;display:inline-flex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>Search<kbd>⌘K</kbd></button>
+  <a href="#home" data-r="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</a>
+  <div class="rail-label">Deliver</div>
+  <a href="#delivery" data-r="delivery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l1 2h3v15H5V6h3z"/><path d="M9 12h6M9 16h4"/></svg>Requirements<span class="badge amber" id="b-req"></span></a>
+  <a href="#tests" data-r="tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg>Test library</a>
+  <div class="rail-label">Operate</div>
+  <a href="#incidents" data-r="incidents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>Incidents<span class="badge" id="b-inc"></span></a>
+  <a href="#data" data-r="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/></svg>Data health<span class="badge" id="b-data"></span></a>
+  <a href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Live monitor</a>
+  <a href="#demo" data-r="demo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></svg>Crash demo</a>
+  <div class="rail-label">Configure</div>
+  <a href="#settings" data-r="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
+  <a href="#audit" data-r="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>Audit log</a>
+  <div class="rail-foot" id="rail-foot" aria-live="polite"></div>
+</nav>
+<div class="content">
 <header class="top">
-  <div class="brand"><div class="logo">✚</div>MobileHeal</div>
-  <nav class="nav" id="nav"><a href="/">Dashboard</a><a href="/workflow#" data-r="delivery">Delivery</a><a href="/workflow#tests" data-r="tests">Test library</a><a href="/workflow#demo" data-r="demo">Crash demo</a><a href="/workflow#settings" data-r="settings">Settings</a><a href="/workflow#audit" data-r="audit">Audit</a></nav>
-  <button class="btn sm mobile-list" onclick="document.querySelector('.app').classList.toggle('list-open')">Requests</button>
+  <button class="rail-toggle" aria-label="Open navigation" onclick="$('#shell').classList.toggle('rail-open')">☰</button>
+  <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+  <button class="btn sm mobile-list" onclick="document.querySelector('.app').classList.toggle('list-open')">List</button>
   <div class="repo" id="repo"></div>
+  <button class="bell" id="bell" aria-label="Notifications" onclick="toggleNotifs()">🔔</button>
+  <a class="avatar" id="avatar" href="#settings" aria-label="Your settings"></a>
 </header>
 <div class="app">
   <aside class="side">
     <div class="side-h"><button class="btn primary block" onclick="go('new')">＋ New change request</button></div>
-    <div class="filters"><button data-f="all" class="on">All</button><button data-f="change">Changes</button><button data-f="incident">Incidents</button></div>
+    <div class="filters" role="tablist" aria-label="Filter"><button data-f="change" class="on">Changes</button><button data-f="incident">Incidents</button><button data-f="all">All</button></div>
     <div class="list" id="list"></div>
   </aside>
-  <main class="main"><div class="wrap" id="view"></div></main>
+  <main class="main" id="main"><div class="wrap" id="view"></div></main>
+</div>
+</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -287,11 +382,11 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const SMALL = new Set(["of","and","the","or","to","in","on","for","a","an"]);
 const label = k => k.split("_").filter(Boolean).map((w,i) => i && SMALL.has(w) ? w : w[0].toUpperCase() + w.slice(1)).join(" ");
 const STATUS = {design_review:"Design review", coding:"Coding", pr_open:"PR open", merged:"Merged", closed:"Closed", failed:"Failed",
-  detected:"Detected", diagnosing:"Auto-healing", needs_engineer:"Needs engineer"};
+  detected:"Detected", diagnosing:"Analyzing", awaiting_approval:"Awaiting approval", fixing:"Auto-fixing", needs_engineer:"Needs engineer"};
 const isInc = cr => cr && cr.kind === "incident";
 const UI_DEF = {after_save:"stay", success_title:"Profile saved", success_message:"Thanks — your details are up to date.", app_title:"MobileHeal", button_label:"Save", button_color:"#6750A4", button_text_color:"#FFFFFF",
   banner_color:"#FFF4E5", banner_text_color:"#B54708", background_color:"#FFFFFF"};
-let state = {filter:"all", healer:null, seen:null, list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
+let state = {filter:"change", healer:null, seen:null, list:[], info:null, cr:null, tab:null, route:null, poll:null, preview:{mode:"after", values:{}, profile:null}, testChecks:{}};
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
 async function api(path, opts={}) {
@@ -301,6 +396,35 @@ async function api(path, opts={}) {
   return data;
 }
 function ago(ts){ const s=(Date.now()-new Date(ts))/1000; if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+"m ago"; if(s<86400) return Math.floor(s/3600)+"h ago"; return new Date(ts).toLocaleDateString(); }
+function jiraLink(j){ return j.url ? `<a class="jira" href="${esc(j.url)}" target="_blank" rel="noopener" title="Open in Jira"><i></i>${esc(j.key)} · ${esc(j.status||"")}</a>`
+  : `<a class="jira" href="javascript:void 0" onclick="showJira('${esc(j.key)}')" title="Mock Jira — configure Jira in Settings"><i></i>${esc(j.key)} · ${esc(j.status||"")}</a>`; }
+async function showJira(key){
+  try { const i = await api("/api/jira/issues/"+encodeURIComponent(key));
+    modal(`<div class="card-h"><span class="jira"><i></i>${esc(i.key)}</span><span style="display:flex;gap:8px;align-items:center"><span class="chip s-design_review">${esc(i.status)}</span><span class="chip s-closed">Mock Jira</span><button class="btn sm" onclick="closeModal()">Close</button></span></div>
+      <div class="card-b" style="max-height:72vh;overflow:auto;display:grid;gap:12px">
+        <div><b style="font-size:16px">${esc(i.summary)}</b><div class="hint" style="margin:4px 0 0">${esc(i.type)} · priority ${esc(i.priority)} · ${i.labels.map(esc).join(", ")} · created ${esc(i.created.replace("T"," "))}</div></div>
+        <pre class="trace" style="white-space:pre-wrap;max-height:240px;overflow:auto">${esc(i.description)}</pre>
+        <div><div class="label">Workflow</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${i.history.map((h,k)=>`${k?"<span class='hint' style='margin:0'>→</span>":""}<span class="chip s-closed" title="${esc(h.ts)}">${esc(h.to)}</span>`).join("")}</div></div>
+        <div><div class="label">Comments (${i.comments.length})</div>${i.comments.map(c=>`<div style="border-left:3px solid #2684FF;padding:6px 10px;margin:6px 0;background:var(--sunk);border-radius:0 8px 8px 0"><div class="hint" style="margin:0 0 4px">${esc(c.author)} · ${esc(c.ts.replace("T"," "))}</div><div style="white-space:pre-wrap;font-size:13px">${esc(c.body)}</div></div>`).join("")}</div>
+        <div class="hint" style="margin:0">Mock mode — add your Jira site, email and API token in Settings to file real defects.</div></div>`);
+  } catch(e){ toast(e.message); }
+}
+async function approveFix(){ const note = ($("#ap-note")||{}).value||"";
+  await act(async()=>{ state.cr = await api(`/api/incidents/${state.cr.id}/approve`,{method:"POST",body:{note}}); await loadCR(state.cr.id,"diagnosis"); }, "Approved — auto-fix running"); }
+async function rejectFix(){ const note = ($("#ap-note")||{}).value || prompt("Why decline the automatic fix? (shared on the Jira defect)") || "";
+  await act(async()=>{ state.cr = await api(`/api/incidents/${state.cr.id}/reject`,{method:"POST",body:{note}}); await refreshList(); renderCR(); }, "Declined — assigned to an engineer"); }
+async function jiraRetry(){ await act(async()=>{ state.cr = await api(`/api/incidents/${state.cr.id}/jira-sync`,{method:"POST"}); renderCR(); }, "Jira synced"); }
+function approvalCard(cr){
+  const a = cr.analysis||{}, dg = cr.diagnosis||{}, pv = a.preview;
+  const risk = {low:["s-pr_open","Low risk"], medium:["s-diagnosing","Medium risk"], high:["s-failed","High risk"]}[a.risk]||["s-closed","?"];
+  return `<div class="card approve-card" style="margin-bottom:16px"><div class="card-h"><span>🧑‍⚖️ Approval needed — run the automatic fix?</span><span class="chip ${risk[0]}">${risk[1]}</span></div><div class="card-b" style="display:grid;gap:10px">
+    <div><div class="label">Root cause</div>${md(dg.summary||"").replace(/^<p>|<\/p>$/g,"")}</div>
+    <div class="grid g2" style="gap:10px"><div><div class="label">Proposed approach</div>${esc(a.approach||"")}</div><div><div class="label">Verification</div>${esc(a.verification||"")}</div></div>
+    ${pv?`<div><div class="label">Proposed change</div><div class="codeline r">- ${esc(pv.before)}</div><div class="codeline a">+ ${esc(pv.after)}</div><div class="hint" style="margin:6px 0 0">${md(pv.why||"").replace(/^<p>|<\/p>$/g,"")}</div></div>`:""}
+    ${cr.jira&&cr.jira.key?`<div class="hint" style="margin:0">The analysis was posted to ${jiraLink(cr.jira)}; your decision will be recorded there too.</div>`:""}
+    <input id="ap-note" class="input" placeholder="Note for the record (optional)">
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="rejectFix()">Decline → assign engineer</button><button class="btn primary" onclick="approveFix()">✓ Approve auto-fix</button></div></div></div>`;
+}
 function chip(cr){ if(cr.status==="pr_open" && cr.tested) return `<span class="chip s-tested">✓ ${isInc(cr)?"Approved":"Tested"}</span>`;
   if (isInc(cr) && cr.status==="merged") return `<span class="chip s-merged">Fixed</span>`;
   if (isInc(cr) && cr.status==="pr_open") return `<span class="chip s-pr_open">Fix ready</span>`;
@@ -309,18 +433,36 @@ function chip(cr){ if(cr.status==="pr_open" && cr.tested) return `<span class="c
 /* ---------------- routing ---------------- */
 function go(r){ location.hash = r; }
 window.addEventListener("hashchange", route);
+const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", data:"Data health", demo:"Crash demo", settings:"Settings", audit:"Audit log"};
+function setNav(active){ document.querySelectorAll("#rail a[data-r]").forEach(a => { const on = a.dataset.r === active; a.classList.toggle("on", on); on ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"); }); }
+function setCrumbs(parts){ $("#crumbs").innerHTML = parts.map((p,i)=> i===parts.length-1 ? `<b>${esc(p[0])}</b>` : `<a href="${p[1]}">${esc(p[0])}</a><span aria-hidden="true">›</span>`).join(""); document.title = parts[parts.length-1][0] + " · MobileHeal"; }
 async function route(){
-  const h = location.hash.slice(1) || "";
+  const h = location.hash.slice(1) || "home";
   clearInterval(state.poll);
-  document.querySelector('.app').classList.remove('list-open');
-  const page = ["tests","settings","audit","demo"].find(p => h===p || h.startsWith(p+"/"));
-  document.querySelectorAll("#nav a[data-r]").forEach(a => a.classList.toggle("on", a.dataset.r === (page || "delivery")));
+  document.querySelector('.app').classList.remove('list-open'); $("#shell").classList.remove("rail-open");
+  const page = ["home","tests","settings","audit","demo","data"].find(p => h===p || h.startsWith(p+"/"));
   document.querySelector(".app").classList.toggle("full", !!page);
-  if (page) { state.route = page; state.cr = null; await ({tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo})[page](h); return; }
-  if (h === "new" || (!h && !state.list.length)) { state.route="new"; renderNew(); }
-  else if (h.startsWith("cr/")) { const [, id, tab] = h.split("/"); state.route="cr"; await loadCR(+id, tab); }
-  else if (state.list.length) { go("cr/" + state.list[0].id); return; }
+  $("#main").scrollTop = 0;
+  if (page) { state.route = page; state.cr = null; setNav(page); setCrumbs([[PAGE_TITLE[page], "#"+page]]);
+    await ({home:renderHome, tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData})[page](h); return; }
+  if (h === "delivery" || h === "incidents") {
+    state.filter = h==="incidents" ? "incident" : "change"; state.route = h; state.cr = null; setNav(h); setCrumbs([[PAGE_TITLE[h], "#"+h]]);
+    renderIndex(h); renderList(); return; }
+  if (h === "new") { state.route="new"; state.filter="change"; setNav("delivery"); setCrumbs([["Requirements","#delivery"],["New change request","#new"]]); renderNew(); }
+  else if (h.startsWith("cr/")) { const [, id, tab] = h.split("/"); state.route="cr"; await loadCR(+id, tab);
+    const inc = isInc(state.cr); state.filter = inc ? "incident" : "change"; setNav(inc ? "incidents" : "delivery");
+    setCrumbs([[inc?"Incidents":"Requirements", inc?"#incidents":"#delivery"],[state.cr.key + " · " + state.cr.title, location.hash]]); }
   renderList();
+}
+function renderIndex(kind){
+  const inc = kind==="incidents", items = state.list.filter(c => (c.kind==="incident") === inc);
+  const open = items.filter(c => !["merged","closed"].includes(c.status));
+  $("#view").innerHTML = `<div class="index-empty"><div class="big" aria-hidden="true">${inc?"🛡️":"📝"}</div>
+    <h2>${inc ? (open.length ? `${open.length} open incident${open.length>1?"s":""}` : "No open incidents") : (open.length ? `${open.length} change${open.length>1?"s":""} in flight` : "Start a change")}</h2>
+    <p>${inc ? "Crashes from development and production land here automatically with a Jira defect. Pick one from the list to analyse, approve and ship the fix."
+             : "Describe what the business needs in plain English. The agent designs it, writes the Android code and tests, and opens a pull request for you to try."}</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:18px">${inc ? `<a class="btn" href="#demo">Simulate a crash</a>${open[0]?`<a class="btn primary" href="#cr/${open[0].id}">Open ${esc(open[0].key)}</a>`:""}`
+      : `<a class="btn primary" href="#new">＋ New change request</a>${open[0]?`<a class="btn" href="#cr/${open[0].id}">Continue ${esc(open[0].key)}</a>`:""}`}</div></div>`;
 }
 async function refreshList(){ state.list = await api("/api/cr"); renderList(); }
 async function refreshInfo(){
@@ -398,7 +540,7 @@ function phone({rules, ui, values, interactive=false, highlight=[], id="", onInp
 
 /* ---------------- new CR (Requirements) ---------------- */
 async function renderNew(prefill){
-  state.cr = null; state.translation = null; state.lastTranslated = null;
+  state.cr = null; state.translation = null; state.lastTranslated = null; state.answers = []; state.agreed = false;
   const live = (state.info && state.info.live_spec) || "";
   const ai = state.settings && state.settings.ai.available;
   $("#view").innerHTML = `
@@ -408,7 +550,7 @@ async function renderNew(prefill){
     <div class="grid g-side" style="margin-top:18px">
       <div class="card"><div class="card-b">
         <div class="field"><label for="f-eng" style="display:flex;justify-content:space-between;align-items:center">Requirement
-            <span class="chip ${ai?'s-coding':'s-closed'}" title="${ai?'Claude reads your requirement':'Add an Anthropic key in Settings for smarter translation'}">${ai?'✦ Claude':'Built-in parser'}</span></label>
+            <span class="chip ${ai?'s-coding':'s-closed'}" title="${ai?'The agent reads your requirement with '+esc(state.settings.ai.provider_name+' · '+state.settings.ai.model):'Parser mode — no model API key. Add one in Settings.'}">${ai?'✦ Built with Agent · '+esc(state.settings.ai.model):'Built with Agent · Parser mode'}</span>${ai?'':` <a class="hint" href="#settings" style="margin:0">Add model key →</a>`}</label>
           <textarea id="f-eng" class="input big" rows="5" placeholder="e.g. Support needs a callback number for every customer, so make phone number required. Marketing wants the save button in brand red with the label “Update profile”. Date of birth is optional.">${esc(prefill?.requirement_text||"")}</textarea>
           <div class="quick" style="margin-top:8px"><span class="hint" style="margin:0">Try:</span>
             ${["Collect phone numbers from every customer","Make the save button green and call it “Save changes”","Date of birth is optional; the banner should be light yellow"].map(x=>`<button class="btn sm" onclick="$('#f-eng').value=this.textContent;translateEng()">${esc(x)}</button>`).join("")}</div>
@@ -467,6 +609,8 @@ async function submitNew(){
     if (!eng && !state.manualRules) throw new Error("Describe what you need first");
     if (eng && eng !== state.lastTranslated && !state.manualRules) { b.innerHTML = `<span class="spinner"></span> Understanding your requirement…`; await translateEng(); }
     if (eng && !state.translation && !state.manualRules) throw new Error("Couldn't turn that into rules — rephrase it or edit the rules under Advanced");
+    if (eng && !state.manualRules && (state.translation.questions||[]).length) { $("#qa-0")&&$("#qa-0").scrollIntoView({block:"center",behavior:"smooth"}); throw new Error("Answer the open questions first so we agree on what to build"); }
+    if (eng && !state.manualRules && !state.agreed) { $("#f-agree")&&$("#f-agree").scrollIntoView({block:"center",behavior:"smooth"}); throw new Error("Confirm “Yes, that's what I want” first"); }
     b.innerHTML = `<span class="spinner"></span> Generating design…`;
     const title = $("#f-title").value.trim() || shortTitle(eng) || "Rules change";
     const cr = await api("/api/cr", {method:"POST", body:{title, description:$("#f-desc").value || eng, spec_text:$("#f-spec").value,
@@ -479,19 +623,19 @@ async function submitNew(){
 
 /* ---------------- CR detail ---------------- */
 function stageOf(cr){
-  if (isInc(cr)) return ({detected:1, diagnosing:2, needs_engineer:2, pr_open: cr.tested?5:4, merged:6, closed:cr.pr?4:1})[cr.status] ?? 1;
+  if (isInc(cr)) return ({detected:1, diagnosing:1, awaiting_approval:2, fixing:3, needs_engineer: cr.fix_approved?3:(cr.analysis?2:1), pr_open: cr.tested?6:5, merged:7, closed:cr.pr?5:1})[cr.status] ?? 1;
   return cr.status==="merged" ? 6 : cr.status==="coding" ? 2 : cr.status==="design_review" ? 1 :
   cr.status==="pr_open" ? (cr.tested ? 5 : 4) : cr.status==="failed" ? 2 : cr.stage||1; }
 function stepper(cur, cr){
-  const names = isInc(cr) ? ["Detected","Diagnosis","Fix","Pull Request","Review","Deploy"] : ["Requirements","UX Design","Coding","Pull Request","Test","Merge"];
+  const names = isInc(cr) ? ["Defect","Analyze","Approve","Auto-fix","Pull Request","Test","Merge"] : ["Requirements","UX Design","Coding","Pull Request","Test","Merge"];
   return `<div class="steps">${names.map((n,i)=>{
     let cls = i<cur ? "done" : i===cur ? "cur" : "";
-    if (cr && ["coding","diagnosing"].includes(cr.status) && i===2) cls += " spin";
-    if (cr && ["failed","needs_engineer"].includes(cr.status) && i===2) cls = "err";
+    if (cr && ["coding","diagnosing","fixing"].includes(cr.status) && i===cur) cls += " spin";
+    if (cr && ["failed","needs_engineer"].includes(cr.status) && i===cur) cls = "err";
     if (cr && cr.status==="closed") cls = i<cur ? "done" : "";
     return `<div class="step ${cls}"><div class="n">${i<cur?"✓":i+1}</div>${n}</div>`; }).join("")}</div>`;
 }
-const defaultTab = cr => isInc(cr) ? ({detected:"overview", diagnosing:"diagnosis", needs_engineer:"diagnosis", pr_open: cr.tested?"pr":"test", merged:"pr", closed:"overview"})[cr.status]||"overview" : ({design_review:"design", coding:"code", failed:"code", pr_open: cr.tested ? "pr" : "test", merged:"pr", closed:"overview"})[cr.status] || "overview";
+const defaultTab = cr => isInc(cr) ? ({detected:"overview", diagnosing:"diagnosis", awaiting_approval:"diagnosis", fixing:"diagnosis", needs_engineer:"diagnosis", pr_open: cr.tested?"pr":"test", merged:"pr", closed:"overview"})[cr.status]||"overview" : ({design_review:"design", coding:"code", failed:"code", pr_open: cr.tested ? "pr" : "test", merged:"pr", closed:"overview"})[cr.status] || "overview";
 
 async function loadCR(id, tab){
   try { state.cr = await api(`/api/cr/${id}`); } catch(e){ $("#view").innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
@@ -503,12 +647,12 @@ async function loadCR(id, tab){
   state.tab = tab || defaultTab(state.cr);
   if (!isInc(state.cr)) await loadTests(); else state.tests = null;
   renderCR();
-  if (["coding","diagnosing"].includes(state.cr.status)) state.poll = setInterval(async () => {
+  if (["coding","diagnosing","fixing"].includes(state.cr.status)) state.poll = setInterval(async () => {
     const cr = await api(`/api/cr/${id}`);
     if (JSON.stringify(cr.coding_log) !== JSON.stringify(state.cr.coding_log) || cr.status !== state.cr.status) {
-      const done = !["coding","diagnosing"].includes(cr.status); state.cr = cr;
+      const done = !["coding","diagnosing","fixing"].includes(cr.status); state.cr = cr;
       if (done) { clearInterval(state.poll); state.tab = defaultTab(cr); await refreshList(); await refreshInfo(); if (!isInc(cr)) await loadTests();
-        toast(cr.status==="pr_open" ? (isInc(cr) ? `Fix PR #${cr.pr.number} is ready for your review` : `PR #${cr.pr.number} opened — try it in the Test tab`) : isInc(cr) ? "Couldn't auto-fix — needs an engineer" : "Coding failed"); }
+        toast(cr.status==="awaiting_approval" ? "Analysis ready — approve the automatic fix" : cr.status==="pr_open" ? (isInc(cr) ? `Fix PR #${cr.pr.number} is ready for your review` : `PR #${cr.pr.number} opened — try it in the Test tab`) : isInc(cr) ? "Couldn't auto-fix — needs an engineer" : "Coding failed"); }
       renderCR();
     }
   }, 700);
@@ -526,7 +670,7 @@ function renderCR(){
      ${cr.pr.github_url?`<a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">View on GitHub ↗</a>`:""}` : "";
   $("#view").innerHTML = `
     <div class="hdr"><div style="min-width:0">
-      <div class="meta" style="margin-bottom:6px">${chip(cr)}<span>${esc(cr.author)} opened ${ago(cr.created_at)}</span>${cr.revision>1?`<span>· rev ${cr.revision}</span>`:""}</div>
+      <div class="meta" style="margin-bottom:6px">${chip(cr)}${isInc(cr)&&cr.jira&&cr.jira.key?jiraLink(cr.jira):""}<span>${esc(cr.author)} opened ${ago(cr.created_at)}</span>${cr.revision>1?`<span>· rev ${cr.revision}</span>`:""}</div>
       <h1>${esc(cr.title)} <span class="key">${esc(cr.key)}</span></h1>
       <div class="meta">${prLine}</div></div>
       <div style="display:flex;gap:8px">${headerActions(cr)}</div></div>
@@ -540,7 +684,8 @@ function renderCR(){
 }
 function headerActions(cr){
   if (isInc(cr)) {
-    if (cr.status==="detected") return `<button class="btn primary" onclick="heal()">Start auto-heal</button>`;
+    if (cr.status==="detected") return `<button class="btn primary" onclick="heal()">Analyze crash</button>`;
+    if (cr.status==="awaiting_approval") return `<button class="btn" onclick="rejectFix()">Decline</button><button class="btn primary" onclick="approveFix()">Approve auto-fix</button>`;
     if (cr.status==="needs_engineer") return `<button class="btn" onclick="heal()">Retry auto-heal</button>`;
     if (cr.status==="pr_open" && !cr.tested) return `<button class="btn primary" onclick="setTab('test')">Review fix →</button>`;
     if (cr.status==="pr_open") return `<button class="btn green" onclick="setTab('pr')">Merge fix →</button>`;
@@ -621,7 +766,7 @@ function diffTable(diff){
 function bar5(a,r){ const t=a+r||1, na=Math.round(5*a/t); return `<span class="bar5">${[0,1,2,3,4].map(i=>`<i class="${i<na?'a':i<5&&r?'r':''}"></i>`).join("")}</span>`; }
 function codingLog(cr){
   const log = cr.coding_log||[];
-  const steps = isInc(cr) ? ["Diagnose","Reproduce","Fix","Run checks","Open pull request"]
+  const steps = isInc(cr) ? ["Diagnose","Reproduce","Approval","Fix","Run checks","Open pull request"]
     : ["Generate code","Generate test cases","Android developer agent", ...[...new Set(log.map(e=>e.step).filter(x=>x.startsWith("Agent · ")))], "Run checks","Open pull request"];
   return `<div class="card" style="margin-bottom:16px"><div class="card-h">Build pipeline ${cr.status==="coding"?'<span class="chip s-coding">running</span>':""}</div>
     ${steps.map(s=>{ const ev=[...log].reverse().find(e=>e.step===s); let st=ev?ev.status:"pending"; if(st==="warn") st="warn";
@@ -634,7 +779,7 @@ function agentCard(cr){
   const p = a.plan || {}, lint = a.lint || [], b = a.build || {};
   const errs = lint.filter(i=>i.severity==="error");
   const bst = {pass:["pass","✓ compiled & tests passed"], fail:["fail","✕ build failed"], skipped:["warn","skipped"]}[b.status] || ["info","not run"];
-  return `<div class="card" style="margin-bottom:16px"><div class="card-h"><span>🤖 Android Developer Agent <span class="chip ${a.engine==='claude'?'s-coding':'s-closed'}">${a.engine==='claude'?'✦ Claude':'templates'}</span>
+  return `<div class="card" style="margin-bottom:16px"><div class="card-h"><span>🤖 Android Developer Agent <span class="chip ${a.engine==='claude'?'s-coding':'s-closed'}">${a.engine==='claude'?'✦ LLM':'parser mode · templates'}</span>
       ${a.iterations>1?`<span class="chip s-diagnosing">${a.iterations} iterations</span>`:""}</span><a class="hint" style="margin:0" href="#settings">skill ↗</a></div>
     <div class="card-b">
       ${a.error?`<div class="banner-err" style="margin:0 0 10px">${esc(a.error)}</div>`:""}
@@ -651,7 +796,7 @@ function agentCard(cr){
       </div></div></div>`;
 }
 function tCode(cr){
-  if (!cr.files && isInc(cr)) return codingLog(cr) + (cr.status==="diagnosing"?`<div class="skel"></div><div class="skel" style="width:70%"></div>`:"");
+  if (!cr.files && isInc(cr)) return codingLog(cr) + (["diagnosing","fixing"].includes(cr.status)?`<div class="skel"></div><div class="skel" style="width:70%"></div>`:"");
   if (!cr.files) return cr.status==="design_review" ? `<div class="empty">Code is generated after the design is approved.</div>` : codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:70%"></div>`;
   return `${["coding","failed","diagnosing"].includes(cr.status)?codingLog(cr):""}${agentCard(cr)}
     <div class="meta" style="margin-bottom:12px">Showing <b>${cr.files.length} changed files</b> with <span class="plus">${cr.stats.additions} additions</span> and <span class="minus">${cr.stats.deletions} deletions</span>${cr.pr&&cr.pr.commit?` · commit <code>${esc(cr.pr.commit)}</code>`:""}</div>
@@ -775,7 +920,7 @@ function traceHtml(d){
 }
 function iOverview(cr){
   const d = cr.incident, r = d.request||{};
-  const icon = {detect:"!", heal:"✚", pr:"⇄", test:"✓", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
+  const icon = {jira:"J", analysis:"🧠", approve:"✓", reject:"✕", detect:"!", heal:"✚", pr:"⇄", test:"✓", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
   return `<div class="grid g-side">
     <div class="grid" style="align-content:start">
       <div class="card"><div class="card-h"><span>Error</span><span class="chip s-${d.source==='android'?'coding':'detected'}">${d.source==='android'?'Android app':'Backend'}</span></div>
@@ -787,6 +932,9 @@ function iOverview(cr){
       ${d.repro_kwargs?`<div class="card"><div class="card-h">Captured input <span class="hint" style="margin:0">used to reproduce the crash</span></div><div class="card-b" style="padding:0"><pre class="out" style="margin:0;border-radius:0 0 12px 12px">${esc(JSON.stringify(d.repro_kwargs,null,2))}</pre></div></div>`:""}
     </div>
     <div class="grid" style="align-content:start">
+      ${cr.jira&&cr.jira.key?`<div class="card"><div class="card-h"><span>Jira defect</span><span class="chip ${cr.jira.mode==='live'?'s-pr_open':'s-closed'}">${cr.jira.mode==='live'?'Jira':'Mock Jira'}</span></div><div class="card-b" style="font-size:13.5px;display:grid;gap:6px">
+        <div>${jiraLink(cr.jira)}</div><div class="hint" style="margin:0">Environment: <b>${esc(d.environment||"production")}</b> · every workflow step is mirrored to the defect.</div>
+        ${cr.jira.error?`<div class="hint err" style="margin:0">Last sync failed: ${esc(cr.jira.error)} <a href="javascript:void 0" onclick="jiraRetry()">Retry</a></div>`:""}</div></div>`:""}
       <div class="card"><div class="card-h">Impact</div><div class="card-b"><div class="stat">
         <div><b>${cr.occurrences||1}</b><span>occurrences</span></div><div><b style="font-size:14px;line-height:2.1">${ago(cr.last_seen||cr.created_at)}</b><span>last seen</span></div></div>
         <div class="hint" style="margin-top:10px">First seen ${new Date(cr.first_seen||cr.created_at).toLocaleString()}</div>
@@ -798,8 +946,8 @@ function iOverview(cr){
 }
 function iDiagnosis(cr){
   const dg = cr.diagnosis, rp = cr.reproduction||{};
-  if (!dg) return codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:60%"></div>`;
-  return `${["diagnosing","needs_engineer"].includes(cr.status)?codingLog(cr):""}
+  if (!dg) return codingLog(cr) + (["diagnosing","fixing"].includes(cr.status)?`<div class="skel"></div><div class="skel" style="width:60%"></div>`:"");
+  return `${cr.status==="awaiting_approval"?approvalCard(cr):""}${["diagnosing","needs_engineer","awaiting_approval","fixing"].includes(cr.status)?codingLog(cr):""}
   <div class="grid g-side">
     <div class="grid" style="align-content:start">
       <div class="card"><div class="card-h">Root cause</div><div class="card-b">
@@ -877,8 +1025,8 @@ async function saveRevision(){
   await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/revise`,{method:"POST",body:{title:$("#e-title").value, description:state.cr.description,
     spec_text:$("#e-spec").value, requirement_text: eng, translation: state.editTr}}); state.tab="design"; await refreshList(); renderCR(); }, "Design regenerated"); }
 
-window.__init = async () => { await refreshInfo(); await refreshHealer(); await loadSettings(); await refreshList(); state.seen = state.list.filter(c=>c.kind==="incident").map(c=>c.id+":"+c.status+":"+c.occurrences).join("|");
-  await route(); setInterval(refreshInfo, 15000); setInterval(watchIncidents, 4000); setInterval(refreshHealer, 15000); };
+window.__init = async () => { state.filter = state.filter || "change"; await refreshInfo(); await refreshHealer(); await loadSettings(); await refreshList(); state.seen = state.list.filter(c=>c.kind==="incident").map(c=>c.id+":"+c.status+":"+c.occurrences).join("|");
+  await route(); refreshShell(); setInterval(refreshShell, 6000); setInterval(refreshInfo, 15000); setInterval(watchIncidents, 4000); setInterval(refreshHealer, 15000); };
 </script>
 <script>
 /* =====================================================================
@@ -890,7 +1038,7 @@ async function loadSettings(){
   const ai = state.settings.ai;
   let el = document.getElementById("aipill");
   if (!el){ el = document.createElement("a"); el.id="aipill"; el.href="#settings"; el.style.textDecoration="none"; $("#repo").prepend(el); }
-  el.innerHTML = `<span class="pill" title="${ai.available?'Claude is powering translation, test generation and crash fixes':'Add an Anthropic API key in Settings'}"><span class="d" style="background:${ai.available?'var(--accent)':'var(--faint)'}"></span>${ai.available?'Claude · '+esc(ai.model):'Claude off'}</span>`;
+  el.innerHTML = `<span class="pill" title="${ai.available?'The agent runs on '+esc(ai.provider_name)+' — requirements, test generation, Android code and crash fixes':'Parser mode: no model API key — the agent uses its built-in parser, templates and playbooks. Add a key in Settings.'}"><span class="d" style="background:${ai.available?'var(--accent)':'var(--amber)'}"></span>${ai.available?'Agent · '+esc(ai.model):'Agent · Parser mode'}</span>`;
 }
 
 /* ---------- modal ---------- */
@@ -905,22 +1053,48 @@ function closeModal(){ const m=document.getElementById("modal"); if(m) m.remove(
 document.addEventListener("keydown", e => { if (e.key==="Escape" && !state.run) closeModal(); });
 
 /* ---------- plain English → rules ---------- */
-function translationHtml(t){
-  return `<div class="trbox">${t.summary?`<div><b>${t.engine==='claude'?'✦ Claude':'Parser'}:</b> ${esc(t.summary)}</div>`:""}
+const qText = q => typeof q === "string" ? q : q.text;
+function translationHtml(t, live=false){
+  const who = t.engine==='claude'?`✦ Agent (${t.model||'LLM'})`:'Agent (parser mode)';
+  const und = (t.understanding&&t.understanding.length?t.understanding:(t.summary&&t.summary!=="No changes recognised"?[t.summary]:[]));
+  const qs = t.questions||[], ans = t.answers||[];
+  return `<div class="trbox">
+    ${und.length?`<div class="label" style="margin:0 0 4px">${who} understood</div><ul class="notes">${und.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>`
+      :`<div><b>${who}:</b> I haven't been able to turn this into a change yet.</div>`}
+    ${ans.length?`<div class="label" style="margin:10px 0 4px">Your answers</div>${ans.map(a=>`<div class="qa">${esc(qText(a))} → <b>${esc(a.answer)}</b></div>`).join("")}`:""}
     ${(t.assumptions||[]).length?`<div class="label" style="margin:10px 0 4px">Assumptions</div><ul class="notes">${t.assumptions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>`:""}
-    ${(t.questions||[]).length?`<div class="label" style="margin:10px 0 4px;color:var(--amber)">Open questions</div><ul class="notes">${t.questions.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>`:""}</div>`;
+    ${qs.length?`<div class="label" style="margin:10px 0 4px;color:var(--amber)">${live?`${who} needs ${qs.length===1?"one answer":qs.length+" answers"} before we agree`:"Open questions"}</div>
+      ${live?qs.map((q,i)=>`<div class="qcard"><div class="qt">${esc(qText(q))}</div>
+        ${(q.options||[]).length?`<div class="qopts">${q.options.map((o,j)=>`<button class="btn sm" onclick="answerQ(${i},${j})">${esc(o)}</button>`).join("")}</div>`:""}
+        <div style="display:flex;gap:6px"><input class="input" id="qa-${i}" placeholder="…or answer in your own words" onkeydown="if(event.key==='Enter')answerQ(${i})"><button class="btn sm" onclick="answerQ(${i})">Reply</button></div></div>`).join("")
+      :`<ul class="notes">${qs.map(q=>`<li>${esc(qText(q))}</li>`).join("")}</ul>`}`:""}
+    ${live&&!qs.length&&und.length?(state.agreed?`<div class="agree"><span class="ok">✓ Agreed — this is what will be built</span><button class="btn sm" onclick="state.agreed=false;renderTr()">Change something</button></div>`
+      :`<div class="agree"><button class="btn primary sm" id="f-agree" onclick="state.agreed=true;state.translation.agreed=true;renderTr()">✓ Yes, that's what I want</button><span class="hint" style="margin:0">Not quite? Edit the text above or add a sentence — I'll re-read it.</span></div>`):""}
+  </div>`;
 }
-async function translateEng(silent=false){
+function renderTr(){ if (state.translation) $("#f-trout").innerHTML = translationHtml(state.translation, true); }
+async function answerQ(i, j){
+  const q = state.translation.questions[i]; const inp = $("#qa-"+i);
+  const answer = j!==undefined ? q.options[j] : (inp&&inp.value.trim());
+  if (!answer) return toast("Pick an option or type an answer");
+  state.answers = [...(state.answers||[]), {...q, answer}];
+  await translateEng(false, true);
+}
+async function translateEng(silent=false, keepAnswers=false){
   const text = $("#f-eng").value.trim(); if (!text) { if(!silent) toast("Describe the requirement first"); return; }
   if (silent && text === state.lastTranslated) return;
-  const b = $("#f-tr"); if (b){ b.disabled = true; b.innerHTML = `<span class="spinner"></span> ${state.settings&&state.settings.ai.available?"Claude is reading…":"Translating…"}`; }
+  if (!keepAnswers && text !== state.lastTranslated) { state.answers = []; }
+  state.agreed = false;
+  const b = $("#f-tr"); if (b){ b.disabled = true; b.innerHTML = `<span class="spinner"></span> ${state.settings&&state.settings.ai.available?"Agent is reading…":"Agent is reading…"}`; }
   try {
-    const r = await api("/api/requirements/translate", {method:"POST", body:{text}});
+    const r = await api("/api/requirements/translate", {method:"POST", body:{text, answers: state.answers||[]}});
     if ($("#f-eng").value.trim() !== text) return;           // user kept typing
-    state.translation = {summary:r.summary, assumptions:r.assumptions, questions:r.questions, engine:r.engine};
+    state.translation = {summary:r.summary, understanding:r.understanding, assumptions:r.assumptions, questions:r.questions,
+                         answers:r.answers, engine:r.engine, model:r.model, ready:r.ready};
     state.lastTranslated = text; state.manualRules = false;
     $("#f-spec").value = r.spec_text; validateNew();
-    $("#f-trout").innerHTML = translationHtml(state.translation);
+    renderTr();
+    const q0 = $("#qa-0"); if (q0 && !silent) q0.scrollIntoView({block:"nearest", behavior:"smooth"});
   } catch(e){ if(!silent) toast(e.message); }
   if (b){ b.disabled = false; b.textContent = "Preview what will change ↓"; }
 }
@@ -941,7 +1115,7 @@ function figmaCard(cr){
       <div>
         ${f.error?`<div class="banner-err" style="margin:0 0 10px;font-size:13px">${esc(f.error)}</div>`:""}
         ${!f.fetched?`<div class="hint" style="margin:0 0 8px">Embedded for visual comparison. Add a Figma personal access token in <a href="#settings">Settings</a> to extract rules automatically.</div>`:""}
-        ${sug.length?`<div class="label">Design ↔ rules <span style="text-transform:none;font-weight:400">· read ${f.engine==="claude"?"by ✦ Claude":"from layer names"}</span></div>
+        ${sug.length?`<div class="label">Design ↔ rules <span style="text-transform:none;font-weight:400">· read ${f.engine==="claude"?"by ✦ the agent's LLM":"from layer names"}</span></div>
           <table class="t figt"><tr><th></th><th>Rule</th><th>Figma</th><th>Rules today</th></tr>
           ${sug.map((x,i)=>`<tr class="${x.match?'m':''}"><td>${x.match?'<span class="ok">✓</span>':x.valid&&inReview?`<input type="checkbox" class="fg-pick" value="${esc(x.key)}" checked>`:'<span class="hint">—</span>'}</td>
             <td><code>${esc(x.key)}</code>${x.layer?`<div class="hint" style="margin:0">layer “${esc(x.layer)}”</div>`:""}</td>
@@ -961,7 +1135,7 @@ async function applyFigma(){ const keys=[...document.querySelectorAll(".fg-pick:
 
 /* ---------- test cases on a CR ---------- */
 async function loadTests(){ try { state.tests = await api(`/api/cr/${state.cr.id}/tests`); } catch(e){ state.tests = null; } }
-const SRC = {claude:["✦ Claude","s-coding"], generated:["Generated","s-closed"], zephyr:["Zephyr","s-design_review"], manual:["Manual","s-closed"], library:["Library","s-closed"]};
+const SRC = {claude:["✦ Agent","s-coding"], generated:["Generated","s-closed"], zephyr:["Zephyr","s-design_review"], manual:["Manual","s-closed"], library:["Library","s-closed"]};
 function srcChip(c){ const [t,k] = SRC[c.source]||[c.source||"—","s-closed"]; return `<span class="chip ${k}">${t}${c.source==="zephyr"&&c.external_key?" · "+esc(c.external_key):""}</span>`; }
 function runChip(r){ if(!r) return `<span class="chip s-closed">Not run</span>`;
   return `<span class="chip ${r.status==='passed'?'s-pr_open':r.status==='failed'?'s-failed':'s-diagnosing'}">${r.status==='passed'?'✓ Passed':r.status==='failed'?'✕ Failed':'Blocked'}</span>`; }
@@ -1031,7 +1205,7 @@ function openImport(crId=null){
     <div id="im-p2" class="hide"><p class="hint" style="margin-top:0">Zephyr exports (CSV or JSON) with Name, Step, Test Data and Expected Result columns. One row per step.</p>
       <input type="file" id="im-file" accept=".csv,.json,text/csv,application/json" class="input">
       <textarea id="im-paste" class="input code" rows="5" style="min-height:0;margin-top:8px" placeholder="…or paste CSV/JSON here"></textarea></div>
-    <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="im-auto" checked> ${state.settings&&state.settings.ai.available?"Use Claude to make steps runnable in the preview":"Auto-detect runnable steps"}</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="im-auto" checked> ${state.settings&&state.settings.ai.available?"Use the agent's LLM to make steps runnable in the preview":"Auto-detect runnable steps"}</label>
     <div id="im-out"></div></div>
     <div class="modal-f"><button class="btn" onclick="closeModal()">Close</button><button class="btn primary" id="im-go" onclick="doImport(${crId===null?"null":crId})" ${z?"":""}>Import</button></div>`);
   state.imTab = 1;
@@ -1087,7 +1261,7 @@ function renderEditor(){
       <span title="${s.auto?esc(s.auto.map(o=>o.op).join(', ')):'manual'}">${s.auto?"🤖":"👤"}</span>
       <button class="btn sm" onclick="ceDel(${i})">✕</button></div>`).join("")}</div>
     <button class="btn sm" style="margin-top:6px" onclick="ceAdd()">+ Step</button>
-    <div class="hint">🤖 = runs automatically in the preview · 👤 = you judge it. After saving, use “Make runnable” to let ${state.settings&&state.settings.ai.available?"Claude":"the parser"} automate edited steps.</div></div>
+    <div class="hint">🤖 = runs automatically in the preview · 👤 = you judge it. After saving, use “Make runnable” to let ${state.settings&&state.settings.ai.available?"the agent's LLM":"the parser (parser mode)"} automate edited steps.</div></div>
     <div class="modal-f">${c.id?`<button class="btn" onclick="ceAutomate()">✦ Make runnable</button>`:""}<span style="flex:1"></span>
       <button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="ceSave()">Save</button></div>`, "wide");
 }
@@ -1250,7 +1424,7 @@ async function renderLibrary(){
   const crs = state.list.filter(c=>c.kind!=="incident");
   const byCr = id => (crs.find(c=>c.id===id)||{}).key || "";
   $("#view").innerHTML = `
-   <div class="hdr"><div><h1>Test library</h1><div class="meta">Plain-English test cases from MobileHeal, Claude and Zephyr. ${cases.length} case(s).</div></div>
+   <div class="hdr"><div><h1>Test library</h1><div class="meta">Plain-English test cases from MobileHeal, the agent and Zephyr. ${cases.length} case(s).</div></div>
      <div style="display:flex;gap:8px"><button class="btn" onclick="openImport(null)">Import from Zephyr…</button><button class="btn primary" onclick="openCaseEditor(null,null)">+ New test case</button></div></div>
    <div class="grid g-side" style="margin-top:18px">
     <div class="card"><div class="card-b" style="padding:0">
@@ -1284,12 +1458,32 @@ async function renderSettings(){
    <div class="hdr"><div><h1>Settings</h1><div class="meta">Secrets are stored on this server and never sent back to the browser.</div></div>
      <button class="btn primary" onclick="saveSettings()">Save settings</button></div>
    <div class="grid g2" style="margin-top:18px">
-    <div class="card"><div class="card-h"><span>✦ Anthropic (Claude)</span><span class="chip ${s.ai.available?'s-pr_open':'s-closed'}">${s.ai.available?'Connected':'Not configured'}</span></div><div class="card-b">
-      <div class="field"><label>API key</label>${secret("anthropic_api_key","sk-ant-…")}<div class="hint">Get one at console.anthropic.com. Leave blank to keep the current key.</div></div>
-      <div class="field"><label>Model</label><select id="s-anthropic_model" class="input">${s.models.map(m=>`<option ${s.anthropic_model===m?"selected":""}>${m}</option>`).join("")}</select></div>
-      <div class="hint" style="margin-bottom:10px">Used for: plain-English → rules, test case generation, automating imported Zephyr steps, and fixing crashes no built-in pattern covers.</div>
-      <button class="btn" onclick="testAI()">Test connection</button> <span id="s-ai-out" class="hint"></span>
-      ${s.ai.last_error?`<div class="hint err">Last error: ${esc(s.ai.last_error)}</div>`:""}</div></div>
+    <div class="card"><div class="card-h"><span>✦ Agent model (LLM)</span><span class="chip ${s.ai.available?'s-pr_open':'s-diagnosing'}">${s.ai.available?'Live · '+esc(s.ai.provider_name):'Parser mode'}</span></div><div class="card-b" id="llm-card"></div></div>
+    <div class="card" style="grid-column:1/-1"><div class="card-h"><span>📦 Android repository</span><span id="repo-chip"></span></div><div class="card-b">
+      <div class="hint" style="margin:0 0 8px">The codebase the Android Developer Agent works against. MobileHeal clones it, maps its modules and stack, and the agent follows its conventions. Public repos need no token.</div>
+      <div class="grid g2" style="gap:10px;grid-template-columns:3fr 1fr"><div class="field"><label>Git URL (https)</label><input id="s-android_repo_url" class="input" value="${esc(s.android_repo_url)}" placeholder="https://github.com/org/app"></div>
+        <div class="field"><label>Branch <span class="hint">(blank = default)</span></label><input id="s-android_repo_branch" class="input" value="${esc(s.android_repo_branch)}" placeholder="main"></div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" onclick="syncRepo()">Save &amp; sync</button>
+        <button class="btn" onclick="$('#s-android_repo_url').value='https://github.com/android/nowinandroid';$('#s-android_repo_branch').value=''">Use sample (Now in Android)</button>
+        <button class="btn" id="repo-browse" onclick="browseRepo('')" disabled>Browse files</button></div>
+      <div id="repo-out" style="margin-top:12px"></div></div></div>
+    <div class="card"><div class="card-h"><span><span class="jira"><i></i></span> Jira defects</span><span class="chip ${s.jira_mode==='live'?'s-pr_open':'s-closed'}">${s.jira_mode==='live'?'Connected':'Mock mode'}</span></div><div class="card-b">
+      <div class="hint" style="margin:0 0 8px">Every crash (development or production) files a Bug and is kept in sync as it moves through Analyze → Approve → Auto-fix → PR → Test → Merge. Without credentials, defects go to a built-in mock tracker.</div>
+      <div class="field"><label>Jira site URL</label><input id="s-jira_base_url" class="input" value="${esc(s.jira_base_url)}" placeholder="https://your-team.atlassian.net"></div>
+      <div class="grid g2" style="gap:10px"><div class="field"><label>Account email</label><input id="s-jira_email" class="input" value="${esc(s.jira_email)}" placeholder="you@company.com"></div>
+        <div class="field"><label>Project key</label><input id="s-jira_project_key" class="input" value="${esc(s.jira_project_key)}" placeholder="MH"></div></div>
+      <div class="field"><label>API token</label>${secret("jira_api_token","Atlassian API token")}<div class="hint">id.atlassian.com → Security → API tokens.</div></div>
+      <div class="grid g2" style="gap:10px"><div class="field"><label>Automatic fix approval</label><select id="s-require_fix_approval" class="input">
+          <option value="on" ${s.require_fix_approval!=="off"?"selected":""}>Required — a human approves after analysis</option>
+          <option value="off" ${s.require_fix_approval==="off"?"selected":""}>Not required — fix runs right after analysis</option></select></div>
+        <div class="field"><label>This backend runs in</label><select id="s-runtime_environment" class="input">
+          ${["development","staging","production"].map(e=>`<option ${s.runtime_environment===e?"selected":""}>${e}</option>`).join("")}</select></div></div>
+      <button class="btn" onclick="testJira()">Save &amp; test</button> <span id="s-j-out" class="hint"></span></div></div>
+    <div class="card"><div class="card-h"><span>🐶 DataWatchdog</span><span class="chip ${s.watchdog_enabled!=='off'?'s-pr_open':'s-closed'}">${s.watchdog_enabled!=='off'?'Watching':'Off'}</span></div><div class="card-b">
+      <div class="hint" style="margin:0 0 8px">Checks backend data against the requirements on every agent tick: missing mandatory fields, invalid emails/phones/dates, duplicates. Notifies affected users in the app and the team here.</div>
+      <div class="grid g2" style="gap:10px"><div class="field"><label>Watchdog</label><select id="s-watchdog_enabled" class="input"><option value="on" ${s.watchdog_enabled!=="off"?"selected":""}>On</option><option value="off" ${s.watchdog_enabled==="off"?"selected":""}>Off</option></select></div>
+        <div class="field"><label>Auto-fix formatting</label><select id="s-watchdog_autofix" class="input"><option value="on" ${s.watchdog_autofix!=="off"?"selected":""}>On — trim spaces, lower-case emails</option><option value="off" ${s.watchdog_autofix==="off"?"selected":""}>Off — report only</option></select></div></div>
+      <div class="field"><label>Team webhook <span class="hint">(optional — Slack/Teams/Google Chat incoming webhook)</span></label><input id="s-notify_webhook_url" class="input" value="${esc(s.notify_webhook_url)}" placeholder="https://hooks.slack.com/services/…"></div></div></div>
     <div class="card"><div class="card-h"><span>Zephyr Scale</span><span class="chip ${s.zephyr_configured?'s-pr_open':'s-closed'}">${s.zephyr_configured?'Connected':'Not configured'}</span></div><div class="card-b">
       <div class="field"><label>API base URL</label><input id="s-zephyr_base_url" class="input" value="${esc(s.zephyr_base_url)}"></div>
       <div class="field"><label>API token</label>${secret("zephyr_token","Zephyr Scale API access token")}</div>
@@ -1312,29 +1506,152 @@ async function renderSettings(){
       <div>Git: ${state.info&&state.info.git?(state.info.repo?"local repository ✓":"ready (initialised on first PR)"):"not installed"}</div>
       <div>GitHub mirroring: ${s.github?esc(s.github):'off — start the backend with <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> to enable'}</div></div></div>
    </div>`;
-  loadAgentSettings();
+  renderLLM(s.llm_provider || s.default_provider); loadAgentSettings(); loadRepo();
+}
+async function loadRepo(){
+  let r; try { r = await api("/api/repo"); } catch(e){ return; }
+  const chip = {synced:["s-pr_open","Synced"], syncing:["s-coding","Syncing…"], error:["s-failed","Error"], not_synced:["s-closed","Not synced"]}[r.status||"not_synced"] || ["s-closed", r.status];
+  if (!$("#repo-chip")) return;
+  $("#repo-chip").innerHTML = `<span class="chip ${chip[0]}">${chip[1]}</span>`;
+  $("#repo-browse").disabled = !r.cloned;
+  const a = r.analysis, o = $("#repo-out");
+  if (r.status==="syncing"){ o.innerHTML = `<span class="spinner"></span> Cloning ${esc(r.url)}…`; clearTimeout(state.repoT); state.repoT = setTimeout(loadRepo, 2000); return; }
+  if (r.status==="error"){ o.innerHTML = `<div class="banner-err" style="margin:0">${esc(r.error)}</div>`; return; }
+  if (!a){ o.innerHTML = `<div class="hint" style="margin:0">Not synced yet — click “Save &amp; sync”.</div>`; return; }
+  const on = Object.entries(a.stack).filter(([k,v])=>v).map(([k])=>k);
+  o.innerHTML = `<div style="font-size:13.5px;display:grid;gap:8px">
+    <div><b>${esc(a.title||r.url.split("/").pop())}</b> · <code>${esc((r.sha||"").slice(0,7))}</code> on <code>${esc(r.branch_checked_out||"")}</code> · “${esc(r.commit_msg||"")}” <span class="hint" style="margin:0">synced ${esc((r.synced_at||"").replace("T"," "))}</span></div>
+    <div>${a.counts.modules} modules · ${a.counts.kotlin} Kotlin files${a.counts.java?` · ${a.counts.java} Java`:""} · ${a.counts.tests} test files${a.application_id?` · <code>${esc(a.application_id)}</code>`:""}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${on.map(x=>`<span class="chip s-design_review">${esc(x)}</span>`).join("")}</div>
+    ${Object.keys(a.versions).length?`<div class="hint" style="margin:0">${Object.entries(a.versions).map(([k,v])=>`${esc(k)} ${esc(v)}`).join(" · ")}</div>`:""}
+    ${a.conventions.length?`<div><div class="label">Conventions the agent will follow</div><ul class="notes">${a.conventions.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>`:""}
+    ${a.screens.length?`<div class="hint" style="margin:0">Screens: ${a.screens.slice(0,12).map(esc).join(", ")}${a.screens.length>12?"…":""}</div>`:""}
+    ${a.modules.length?`<details><summary class="hint" style="cursor:pointer">Modules (${a.modules.length})</summary><div class="hint">${a.modules.map(esc).join(" · ")}</div></details>`:""}</div>`;
+}
+async function syncRepo(){
+  const body = {android_repo_url: $("#s-android_repo_url").value.trim(), android_repo_branch: $("#s-android_repo_branch").value.trim()};
+  try { await api("/api/settings",{method:"PUT",body}); await loadSettings(); await api("/api/repo/sync",{method:"POST"}); toast("Syncing repository…"); }
+  catch(e){ return toast(e.message); }
+  loadRepo();
+}
+async function browseRepo(path){
+  try {
+    const items = await api("/api/repo/tree?path="+encodeURIComponent(path));
+    const up = path ? path.split("/").slice(0,-1).join("/") : null;
+    modal(`<div class="card-h"><span>📦 ${esc(path||"/")}</span><button class="btn sm" onclick="closeModal()">Close</button></div>
+      <div class="card-b" style="max-height:70vh;overflow:auto"><div style="display:grid;gap:2px;font-size:13.5px">
+      ${up!==null?`<a href="javascript:void 0" onclick="browseRepo('${esc(up)}')">⬑ ..</a>`:""}
+      ${items.map(i=>`<a href="javascript:void 0" onclick="${i.dir?`browseRepo('${esc(i.path)}')`:`viewRepoFile('${esc(i.path)}')`}">${i.dir?"📁":"📄"} ${esc(i.name)}${i.dir?"":` <span class="hint" style="margin:0">${(i.size/1024).toFixed(1)} KB</span>`}</a>`).join("")}</div></div>`);
+  } catch(e){ toast(e.message); }
+}
+async function viewRepoFile(path){
+  try {
+    const f = await api("/api/repo/file?path="+encodeURIComponent(path));
+    const up = path.split("/").slice(0,-1).join("/");
+    modal(`<div class="card-h"><span><a href="javascript:void 0" onclick="browseRepo('${esc(up)}')">⬑</a> ${esc(path)}</span><button class="btn sm" onclick="closeModal()">Close</button></div>
+      <div class="card-b" style="max-height:70vh;overflow:auto">${f.binary?`<div class="hint">Binary file (${f.size} bytes)</div>`:`<pre class="code" style="margin:0;white-space:pre;font-size:12px">${esc(f.text)}</pre>`}</div>`);
+  } catch(e){ toast(e.message); }
+}
+function renderLLM(pid){
+  const s = state.settings, P = s.providers, p = P[pid] || P[s.default_provider];
+  const k = s[pid + "_api_key"], active = pid === (s.llm_provider || s.default_provider);
+  const curModel = active ? (s.llm_model || (pid==="anthropic" ? s.anthropic_model : "")) : "";
+  $("#llm-card").innerHTML = `
+    <div class="field"><label>Provider</label><select id="s-llm_provider" class="input" onchange="renderLLM(this.value)">
+      ${Object.entries(P).map(([id,x])=>`<option value="${id}" ${id===pid?"selected":""}>${esc(x.name)}${id===s.default_provider?" (default)":""}</option>`).join("")}</select></div>
+    <div class="field"><label>Model</label><input id="s-llm_model" class="input" list="llm-models" value="${esc(curModel || p.models[0] || "")}" placeholder="model id">
+      <datalist id="llm-models">${p.models.map(m=>`<option value="${esc(m)}">`).join("")}</datalist>
+      <div class="hint">Pick a suggestion or type any model id the provider offers.</div></div>
+    ${p.needs_base||pid==="ollama"?`<div class="field"><label>Endpoint URL</label><input id="s-llm_base_url" class="input" value="${esc(active?s.llm_base_url:"")}" placeholder="${esc(p.base_hint||p.base)}"></div>`:""}
+    ${p.keyless?`<div class="hint">No API key needed — make sure Ollama is running where the backend can reach it.</div>`
+      :`<div class="field"><label>API key</label><input id="s-llm_key" class="input" type="password" autocomplete="off" placeholder="${k&&k.set?esc(k.hint)+(k.from_env?" (from "+esc(p.env)+")":""):esc(p.key_hint||"API key")}">
+        <div class="hint">${p.console?"Get one at "+esc(p.console)+". ":""}Leave blank to keep the current key${p.env?" · env fallback: <code>"+esc(p.env)+"</code>":""}.</div></div>`}
+    <div class="hint" style="margin-bottom:10px">The agent runs on this model for requirements, test cases, Zephyr automation, Android code and crash fixes.
+      <b>Without a key it runs in Parser mode</b> (built-in parser, templates and playbooks), so demos still work offline.</div>
+    <button class="btn" onclick="testAI()">Save &amp; test connection</button> <span id="s-ai-out" class="hint"></span>
+    ${s.ai.last_error&&pid===s.ai.provider?`<div class="hint err">Last error: ${esc(s.ai.last_error)}</div>`:""}`;
 }
 async function loadAgentSettings(){
   try {
     const [sk, st] = await Promise.all([api("/api/settings/android-skill"), api("/api/android")]);
     $("#ag-skill").value = sk.text;
-    $("#ag-status").innerHTML = `engine: <b>${st.engine==="claude"?"✦ Claude":"templates (add an Anthropic key for any requirement)"}</b>`;
+    $("#ag-status").innerHTML = `engine: <b>${st.engine==="claude"?"✦ LLM · "+esc((state.settings.ai||{}).model||""):"parser mode · templates (add a model API key for any requirement)"}</b>`;
     const t = st.toolchain;
     $("#ag-tc").innerHTML = t.ready ? `<span class="ok">✓ Gradle build verification ready</span> (${esc(t.gradle)})` : `Build verification off: ${esc(t.reason)}`;
   } catch(e){}
 }
 async function saveSkill(){ await act(async()=>{ await api("/api/settings/android-skill",{method:"PUT",body:{text:$("#ag-skill").value}}); }, "Skill saved — the agent uses it on the next change"); }
-async function saveSettings(){
-  const body = {}; ["anthropic_model","zephyr_base_url","zephyr_project_key","zephyr_cycle_key","user_name","merge_policy"].forEach(k=>body[k]=$("#s-"+k).value);
-  ["anthropic_api_key","zephyr_token","figma_token"].forEach(k=>{ const v=$("#s-"+k).value.trim(); if(v) body[k]=v; });
+async function saveSettings(quiet=false){
+  const body = llmBody(); ["watchdog_enabled","watchdog_autofix","notify_webhook_url","jira_base_url","jira_email","jira_project_key","require_fix_approval","runtime_environment","android_repo_url","android_repo_branch","zephyr_base_url","zephyr_project_key","zephyr_cycle_key","user_name","merge_policy"].forEach(k=>body[k]=$("#s-"+k).value);
+  ["jira_api_token","zephyr_token","figma_token"].forEach(k=>{ const v=$("#s-"+k).value.trim(); if(v) body[k]=v; });
+  if (quiet) { await api("/api/settings",{method:"PUT",body}); await loadSettings(); return; }
   await act(async()=>{ await api("/api/settings",{method:"PUT",body}); await renderSettings(); }, "Settings saved");
 }
+async function testJira(){ const o=$("#s-j-out"); o.innerHTML=`<span class="spinner"></span>`;
+  try { await saveSettings(true); const r = await api("/api/settings/test-jira",{method:"POST"}); o.innerHTML=`<span class="ok">✓ ${esc(r.user)} · project ${esc(r.project)}</span>`; }
+  catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } }
+function llmBody(){
+  const pid = $("#s-llm_provider").value, b = {llm_provider: pid, llm_model: $("#s-llm_model").value.trim()};
+  if ($("#s-llm_base_url")) b.llm_base_url = $("#s-llm_base_url").value.trim();
+  const k = $("#s-llm_key") && $("#s-llm_key").value.trim(); if (k) b[pid + "_api_key"] = k;
+  return b;
+}
 async function testAI(){ const o=$("#s-ai-out"); o.innerHTML=`<span class="spinner"></span>`;
-  try { const r = await api("/api/settings/test-ai",{method:"POST"}); o.innerHTML=`<span class="ok">✓ ${esc(r.model)} replied in ${r.ms} ms</span>`; } catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } loadSettings(); }
+  try { await api("/api/settings",{method:"PUT",body:llmBody()}); await loadSettings();
+    const r = await api("/api/settings/test-ai",{method:"POST"}); o.innerHTML=`<span class="ok">✓ ${esc(r.provider||"")} · ${esc(r.model)} replied in ${r.ms} ms</span>`; } catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } loadSettings(); }
 async function testZephyr(){ const o=$("#s-z-out"); o.innerHTML=`<span class="spinner"></span>`;
   try { const r = await api("/api/settings/test-zephyr",{method:"POST"}); o.innerHTML=`<span class="ok">✓ Connected${r.sample?` — e.g. “${esc(r.sample)}”`:""}</span>`; } catch(e){ o.innerHTML=`<span class="err">${esc(e.message)}</span>`; } }
 
 /* ---------- audit ---------- */
+/* ---------------- notifications (bell) ---------------- */
+async function refreshNotifs(){
+  try { const n = await api("/api/notifications"); state.notifs = n;
+    const b = $("#bell"); if (!b) return; b.innerHTML = "🔔" + (n.unread?`<b>${n.unread>99?"99+":n.unread}</b>`:"");
+    const top = n.items[0];
+    if (top && state.lastNotif !== undefined && top.id > state.lastNotif && !top.read) toast(`🔔 ${top.title}`);
+    state.lastNotif = top ? top.id : 0;
+    if ($("#npanel")) paintNotifs();
+  } catch(e){}
+}
+function paintNotifs(){
+  const n = state.notifs || {items:[]};
+  $("#npanel").innerHTML = `<div class="card-h" style="position:sticky;top:0;background:var(--bg)"><span>Notifications</span><span style="display:flex;gap:6px"><button class="btn sm" onclick="readNotifs()">Mark all read</button><button class="btn sm" onclick="toggleNotifs()">✕</button></span></div>
+    ${n.items.map(i=>`<div class="nitem ${i.read?"":"unread"}"><div class="t"><span class="lv lv-${esc(i.level)}"></span>${i.link?`<a href="${esc(i.link)}" onclick="toggleNotifs()">${esc(i.title)}</a>`:esc(i.title)}</div>
+      <div class="hint" style="margin:2px 0 0">${esc(i.source)} · ${ago(i.ts)}</div><pre>${esc(i.body)}</pre></div>`).join("") || `<div class="empty">No notifications yet.</div>`}`;
+}
+function toggleNotifs(){ const ex = $("#npanel"); if (ex) { ex.remove(); return; }
+  const d = document.createElement("div"); d.id="npanel"; d.className="npanel"; document.body.appendChild(d); paintNotifs(); }
+async function readNotifs(){ state.notifs = await api("/api/notifications/read",{method:"POST"}); paintNotifs(); refreshNotifs(); }
+setInterval(refreshNotifs, 5000); setTimeout(refreshNotifs, 300);
+
+/* ---------------- Data health (DataWatchdog) ---------------- */
+const KIND = {missing_required:["Missing required","s-failed"], invalid_format:["Invalid value","s-diagnosing"], duplicate:["Duplicate","s-design_review"]};
+async function renderData(){
+  const d = await api("/api/data-health?status="+(state.dataFilter||"open"));
+  const ls = d.last_scan;
+  $("#view").innerHTML = `<div class="hdr"><div><h1>Data health</h1><div class="meta">🐶 DataWatchdog checks every profile against the business rules on each agent tick${ls?` · last scan ${ago(ls.ts)} (${ls.profiles} profiles)`:""}.</div></div>
+      <div style="display:flex;gap:8px"><span class="chip ${d.enabled?'s-pr_open':'s-closed'}" style="align-self:center">${d.enabled?"Watching":"Off"}</span><button class="btn primary" onclick="scanData()" ${d.enabled?"":"disabled"}>Scan now</button></div></div>
+    <div class="tiles" style="margin-top:18px">
+      <div class="tile"><b>${d.profiles}</b><span>profiles</span></div>
+      <div class="tile"><b style="color:${d.open?'var(--red)':'inherit'}">${d.open}</b><span>open issues</span></div>
+      <div class="tile"><b>${d.high||0}</b><span>blocking (high)</span></div>
+      <div class="tile"><b>${(d.by_kind||{}).missing_required||0}</b><span>missing mandatory data</span></div>
+      <div class="tile"><b>${(d.by_kind||{}).invalid_format||0}</b><span>invalid values</span></div>
+      <div class="tile"><b>${d.resolved}</b><span>resolved</span></div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h"><span>Issues</span><span style="display:flex;gap:6px">${["open","resolved","all"].map(f=>`<button class="btn sm ${ (state.dataFilter||"open")===f?"primary":""}" onclick="state.dataFilter='${f}';renderData()">${label(f)}</button>`).join("")}</span></div>
+      <div class="card-b" style="padding:0;overflow-x:auto"><table class="t"><tr><th>Profile</th><th>Field</th><th>Problem</th><th>Severity</th><th>Since</th><th>User notified</th><th></th></tr>
+      ${d.issues.map(i=>`<tr><td><b>${esc(i.profile)}</b> <span class="hint" style="margin:0">#${i.profile_id}</span></td><td><code>${esc(i.field)}</code></td>
+        <td><span class="chip ${(KIND[i.kind]||["",""])[1]}">${esc((KIND[i.kind]||[i.kind])[0])}</span> ${esc(i.message)}</td>
+        <td>${i.severity==="high"?'<span class="err">high</span>':esc(i.severity)}</td><td style="white-space:nowrap">${ago(i.first_seen)}</td>
+        <td>${i.status==="resolved"?`<span class="ok">✓ fixed ${ago(i.resolved_at)}</span>`:i.kind==="duplicate"?'<span class="hint" style="margin:0">team only</span>':'📱 in-app'}</td>
+        <td>${i.status==="open"&&i.kind!=="duplicate"?`<button class="btn sm" onclick="renotify(${i.profile_id})">Notify again</button>`:""}</td></tr>`).join("")
+        || `<tr><td colspan="7"><div class="empty">${(state.dataFilter||"open")==="open"?"✓ No open data issues — every profile satisfies the rules.":"Nothing here."}</div></td></tr>`}</table></div></div>
+    <div class="hint" style="margin-top:10px">Mandatory fields come from the live requirements. Users with missing or invalid data get an in-app notification listing exactly what to fix; the team is alerted via 🔔${state.settings&&state.settings.notify_webhook_url?" and the webhook":""}. Formatting issues (stray spaces, upper-case emails) are ${d.autofix?"fixed automatically":"reported only (auto-fix is off)"}.</div>`;
+}
+async function scanData(){ await act(async()=>{ const r = await api("/api/data-health/scan",{method:"POST"}); await renderData(); refreshNotifs();
+  toast(`Scanned ${r.scan.profiles} profiles · ${r.scan.new} new · ${r.scan.resolved} resolved${r.scan.auto_fixed?` · ${r.scan.auto_fixed} auto-fixed`:""}`); }); }
+async function renotify(pid){ await act(async()=>{ const r = await api(`/api/data-health/notify/${pid}`,{method:"POST"}); }, "Notification sent to the user's app"); }
+
 async function renderAudit(){
   const rows = await api("/api/audit?limit=300");
   $("#view").innerHTML = `<div class="hdr"><div><h1>Audit log</h1><div class="meta">Every decision, override, test run, merge and settings change.</div></div>
@@ -1355,16 +1672,18 @@ const DEMO_STEPS = [
   ["traffic","Production traffic","A real user request hits the live backend"],
   ["crash","Crash","Unhandled exception → HTTP 500 for the user"],
   ["detect","Incident detected","Grouped by fingerprint, input captured"],
+  ["jira","Jira defect","Bug filed automatically and kept in sync"],
   ["diagnose","Diagnosis","Failing line, values and root cause"],
   ["reproduce","Reproduced","Replayed with the exact production input"],
+  ["approve","Approval","A human approves the analysed fix before it runs"],
   ["fix","Fix found","Patch → replay loop until the crash is gone"],
   ["checks","Checks","Regression test + full suite on patched code"],
   ["pr","Pull request","Branch, commit and postmortem — never auto-merged"],
-  ["review","Human review","Approve the fix"],
+  ["review","Test","Test & approve the PR"],
   ["deploy","Merged & deployed","Committed and hot-reloaded into the running server"],
   ["verify","Verified","Same request now succeeds"],
 ];
-const ANDROID_STEPS = ["traffic","crash","detect","diagnose","fix","checks","pr","review","deploy"];
+const ANDROID_STEPS = ["traffic","crash","detect","jira","diagnose","approve","fix","checks","pr","review","deploy"];
 async function renderDemo(){
   const d = await api("/api/demo"); state.demo = state.demo || {}; state.demo.data = d;
   const D = state.demo, h = d.healer;
@@ -1398,6 +1717,7 @@ function demoRunHtml(){
         return `<li class="ds ${st}"><div class="dsn">${st==="done"?"✓":st==="fail"?"✕":st==="wait"?"⏸":st==="running"?"":"·"}</div>
           <div style="flex:1;min-width:0"><div class="dst"><b>${t}</b><span class="hint" style="margin:0">${fmt(m[k])}</span></div>
           <div class="hint" style="margin:1px 0 0">${esc(a.detail[k]||sub)}</div>
+          ${k==="approve"&&st==="wait"?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm primary" onclick="demoApproveFix()">✓ Approve auto-fix</button><a class="btn sm" href="#cr/${a.incId}/diagnosis">See analysis →</a></div>`:""}
           ${k==="review"&&st==="wait"?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm green" onclick="demoApprove()">Approve & merge fix</button><a class="btn sm" href="#cr/${a.incId}/test">Review in detail →</a></div>`:""}
           ${a.extra[k]?`<pre class="out">${esc(a.extra[k])}</pre>`:""}</div></li>`; }).join("")}</ol></div></div>
     <div class="grid" style="align-content:start">
@@ -1416,6 +1736,12 @@ function dmMark(k, st="done", detail=null, extra=null){ const a=state.demo.activ
 function dmLog(t,k){ state.demo.active.log.push({t:`${new Date().toLocaleTimeString()}  ${t}`,k}); dmPaint(); }
 async function resetDemo(id){ await act(async()=>{ const r = await api(`/api/demo/${id}/reset`,{method:"POST"}); await renderDemo(); }, "Bug re-introduced — ready to demo again"); }
 
+async function demoApproveFix(auto=false){
+  const a = state.demo.active; if (!a || !a.incId) return;
+  try { await api(`/api/incidents/${a.incId}/approve`,{method:"POST",body:{note: auto?"auto-play":"approved from demo"}});
+    dmMark("approve","done", auto?"Approved (auto-play)":"Approved by "+(state.settings.user_name||"you")); dmLog("✅ auto-fix approved"); }
+  catch(e){ toast(e.message); }
+}
 async function runDemo(id){
   const D = state.demo, sc = D.data.scenarios.find(s=>s.id===id);
   if (sc.fixed){ if (!confirm("This bug is already fixed. Re-introduce it and run the scenario?")) return; await api(`/api/demo/${id}/reset`,{method:"POST"}); }
@@ -1458,6 +1784,15 @@ async function runDemo(id){
         dmMark(k, e.status==="running"?"running":e.status==="fail"?"fail":"done", e.detail || null);
         if (e.detail) dmLog(`🤖 ${e.step}: ${e.detail}`, e.status==="fail"?"err":"");
       }
+      if (inc.jira && inc.jira.key && D.active.status.jira!=="done") { dmMark("jira","done", `${inc.jira.key} · ${inc.jira.status||""}${inc.jira.mode==="mock"?" (mock Jira)":""}`); dmLog(`🐞 Jira defect ${inc.jira.key} created`); }
+      if (inc.status==="awaiting_approval" && !D.active.approveAsked) {
+        D.active.approveAsked = true;
+        const pv = (inc.analysis||{}).preview;
+        dmMark("approve","wait", `${(inc.analysis||{}).approach||"Proposed fix"} · ${(inc.analysis||{}).risk||"?"} risk`, pv?`- ${pv.before}\n+ ${pv.after}`:null);
+        dmLog("⏸ waiting for approval to run the automatic fix");
+        if (D.autoplay) { await sleep(1800); await demoApproveFix(true); }
+      }
+      if (inc.status==="fixing" && D.active.status.approve==="wait") dmMark("approve","done", "Approved by "+((inc.approval||{}).by||"you"));
       if (["pr_open","needs_engineer","merged","closed"].includes(inc.status)) break;
       await sleep(400);
     }
@@ -1465,7 +1800,7 @@ async function runDemo(id){
        inc.attempts.filter(x=>x.patched).map(x=>`- ${x.line}\n+ ${x.patched}`).join("\n"));
     if (inc.status === "needs_engineer") {
       if (sc.kind==="android") dmMark("diagnose","done", inc.diagnosis ? inc.diagnosis.summary : "Stack trace recorded");
-      dmMark("pr","fail","No verified automatic fix — routed to an engineer" + (state.settings.ai.available?"":" (add an Anthropic key so Claude can propose one)"));
+      dmMark("pr","fail","No verified automatic fix — routed to an engineer" + (state.settings.ai.available?"":" (parser mode — add a model API key so the agent's LLM can propose one)"));
       D.active.done = true; D.active.outcome = "engineer"; D.active.outcomeText = "Needs engineer"; D.running=false; await renderDemo(); return;
     }
     D.active.prBranch = inc.pr && inc.pr.branch;
@@ -1503,6 +1838,127 @@ async function demoAfterMerge(inc){
   } else { a.outcome="fixed"; a.outcomeText="Fix merged — ship & verify on device"; dmLog("📦 next: build the app (./gradlew assembleDebug) and verify on a device"); }
   a.done = true; D.running=false; refreshList(); await renderDemo();
 }
+
+/* =====================================================================
+   App shell: sidebar badges + agent status, Home, command palette
+   ===================================================================== */
+async function refreshShell(){
+  try {
+    const [d, ag] = await Promise.all([api("/api/data-health").catch(()=>null), api("/api/agent").catch(()=>null)]);
+    state.dataHealth = d; state.agentStatus = ag;
+    const L = state.list || [];
+    const incOpen = L.filter(c=>c.kind==="incident" && !["merged","closed"].includes(c.status)).length;
+    const reqAttn = L.filter(c=>c.kind!=="incident" && (c.status==="design_review" || (c.status==="pr_open"))).length;
+    $("#b-inc").textContent = incOpen || ""; $("#b-req").textContent = reqAttn || ""; $("#b-data").textContent = d && d.open ? d.open : "";
+    const s = state.settings || {}, ai = s.ai || {};
+    const row = (cls, t) => `<div><span class="dot8 ${cls}"></span>${t}</div>`;
+    $("#rail-foot").innerHTML =
+      row(ag && ag.state==="START" ? "ok" : "warn", `Auto-heal agent · ${ag && ag.state==="START" ? "running" : "stopped"}`) +
+      row(d && d.enabled ? (d.high ? "err" : "ok") : "warn", `DataWatchdog · ${d && d.enabled ? (d.open ? d.open+" issue"+(d.open>1?"s":"") : "all clear") : "off"}`) +
+      row(ai.available ? "ok" : "warn", ai.available ? `LLM · ${esc(ai.model)}` : "LLM · parser mode");
+    const n = (s.user_name || "You").trim(); $("#avatar").textContent = n.split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+    $("#avatar").title = n;
+  } catch(e){}
+}
+
+const greet = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
+async function renderHome(){
+  const [list, d, jira, repo, audit, ag] = await Promise.all([api("/api/cr"), api("/api/data-health").catch(()=>({open:0,issues:[]})),
+    api("/api/jira").catch(()=>({})), api("/api/repo").catch(()=>({})), api("/api/audit?limit=8").catch(()=>[]), api("/api/agent").catch(()=>({}))]);
+  state.list = list;
+  const s = state.settings || {}, ai = s.ai || {}, name = (s.user_name && s.user_name!=="You") ? s.user_name.split(" ")[0] : "";
+  const ch = list.filter(c=>c.kind!=="incident"), inc = list.filter(c=>c.kind==="incident");
+  const att = [];
+  inc.filter(c=>c.status==="awaiting_approval").forEach(c=>att.push({ic:"🧑‍⚖️",c:"ic-amber",t:c.title,m:`${c.key} · analysis ready — approve the automatic fix`,a:"Review",h:`#cr/${c.id}/diagnosis`}));
+  inc.filter(c=>c.status==="needs_engineer").forEach(c=>att.push({ic:"⚠️",c:"ic-red",t:c.title,m:`${c.key} · needs an engineer`,a:"Open",h:`#cr/${c.id}`}));
+  list.filter(c=>c.status==="pr_open" && !c.tested).forEach(c=>att.push({ic:"🧪",c:"ic-blue",t:c.title,m:`${c.key} · PR #${(c.pr||{}).number} ready to test`,a:"Test",h:`#cr/${c.id}/test`}));
+  list.filter(c=>c.status==="pr_open" && c.tested).forEach(c=>att.push({ic:"⇡",c:"ic-green",t:c.title,m:`${c.key} · tested — ready to merge`,a:"Merge",h:`#cr/${c.id}/pr`}));
+  ch.filter(c=>c.status==="design_review").forEach(c=>att.push({ic:"🎨",c:"ic-purple",t:c.title,m:`${c.key} · UX design waiting for approval`,a:"Review",h:`#cr/${c.id}/design`}));
+  if (d.high) att.push({ic:"🗄️",c:"ic-red",t:`${d.high} blocking data issue${d.high>1?"s":""}`,m:"Users are missing mandatory data — they've been notified in the app",a:"View",h:"#data"});
+  const flow = [["Design review","design_review"],["Coding","coding"],["Ready to test","pr_open_u"],["Ready to merge","pr_open_t"],["Shipped","merged"]]
+    .map(([l,k])=>[l, ch.filter(c=> k==="pr_open_u" ? c.status==="pr_open"&&!c.tested : k==="pr_open_t" ? c.status==="pr_open"&&c.tested : c.status===k).length]);
+  const fixed = inc.filter(c=>c.status==="merged").length, incOpen = inc.filter(c=>!["merged","closed"].includes(c.status)).length;
+  const sys = [
+    ["Auto-heal agent", ag.state==="START", ag.state==="START" ? `running · every ${ag.interval_seconds}s` : "stopped", "#settings"],
+    ["DataWatchdog", d.enabled!==false, d.enabled===false ? "off" : d.open ? `${d.open} open issue${d.open>1?"s":""}` : "all data valid", "#data"],
+    ["Agent model", !!ai.available, ai.available ? `${esc(ai.provider_name||"")} · ${esc(ai.model)}` : "parser mode — add an API key", "#settings"],
+    ["Jira", jira.mode==="live", jira.mode==="live" ? `project ${esc(jira.project)}` : "mock tracker", "#settings"],
+    ["Android repository", repo.status==="synced", repo.status==="synced" ? `${esc((repo.url||"").split("/").pop())} @ ${esc((repo.sha||"").slice(0,7))}` : "not synced", "#settings"],
+    ["Source control", !!(state.info&&state.info.git), state.info&&state.info.github ? `GitHub · ${esc(state.info.github)}` : state.info&&state.info.git ? "local git" : "git not found", "#settings"],
+  ];
+  const summary = att.length ? `${att.length} item${att.length>1?"s":""} need${att.length>1?"":"s"} your attention.` : "Everything is running smoothly — nothing needs you right now.";
+  $("#view").innerHTML = `
+    <div class="hero"><div><h1>${greet()}${name?", "+esc(name):""}</h1><p>${summary}</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#demo">Simulate a crash</a><a class="btn primary" href="#new">＋ New requirement</a></div></div>
+    <div class="kpis">
+      <a class="kpi" href="#delivery"><div class="l">Changes in flight</div><div class="v">${ch.filter(c=>!["merged","closed"].includes(c.status)).length}</div><div class="s">${ch.filter(c=>c.status==="merged").length} shipped</div></a>
+      <a class="kpi" href="#incidents"><div class="l">Open incidents</div><div class="v" style="color:${incOpen?"var(--red)":"inherit"}">${incOpen}</div><div class="s">${fixed} crash${fixed===1?"":"es"} fixed by the agent</div></a>
+      <a class="kpi" href="#data"><div class="l">Data issues</div><div class="v" style="color:${d.high?"var(--red)":"inherit"}">${d.open||0}</div><div class="s">${d.high||0} blocking · ${d.resolved||0} resolved</div></a>
+      <a class="kpi" href="#tests"><div class="l">Awaiting you</div><div class="v" style="color:${att.length?"var(--accent)":"inherit"}">${att.length}</div><div class="s">approvals, tests and merges</div></a>
+    </div>
+    <div class="home-grid">
+      <div class="grid" style="align-content:start">
+        <section class="card" aria-labelledby="h-att"><div class="card-h"><span id="h-att">Needs your attention</span><span class="hint" style="margin:0">${att.length||""}</span></div>
+          <div>${att.length ? att.slice(0,8).map(x=>`<div class="att"><div class="ic ${x.c}" aria-hidden="true">${x.ic}</div><div class="tx"><b>${esc(x.t)}</b><span>${x.m}</span></div><a class="btn sm" href="${x.h}">${x.a}</a></div>`).join("")
+            : `<div class="empty" style="padding:28px">✓ You're all caught up.</div>`}</div></section>
+        <section class="card" aria-labelledby="h-flow"><div class="card-h"><span id="h-flow">Delivery pipeline</span><a class="hint" style="margin:0" href="#delivery">All requirements →</a></div>
+          <div class="card-b"><div class="flow">${flow.map(([l,n])=>`<a href="#delivery"><b>${n}</b><span>${l}</span></a>`).join("")}</div>
+          <div class="hint" style="margin:12px 0 0">Requirements → UX design → Android developer agent → pull request → test → merge. Crashes and data issues are detected, analysed and fixed by agents with your approval.</div></div></section>
+      </div>
+      <div class="grid" style="align-content:start">
+        <section class="card" aria-labelledby="h-sys"><div class="card-h"><span id="h-sys">System status</span></div><div class="card-b" style="padding-top:4px;padding-bottom:4px">
+          ${sys.map(([n,ok,t,h])=>`<a class="sysrow" href="${h}" style="color:inherit;text-decoration:none"><span class="dot8 ${ok?"ok":"warn"}"></span>${n}<span class="st">${t}</span></a>`).join("")}</div></section>
+        <section class="card" aria-labelledby="h-act"><div class="card-h"><span id="h-act">Recent activity</span><a class="hint" style="margin:0" href="#audit">Audit log →</a></div><div class="card-b" style="padding-top:4px;padding-bottom:4px">
+          ${audit.length ? audit.map(a=>`<div class="act-row"><div><b>${esc(a.actor)}</b> ${esc(a.detail || a.action)}${a.target?` <span class="hint" style="margin:0">· ${esc(a.target)}</span>`:""}</div><time>${ago(a.ts+"Z")}</time></div>`).join("") : `<div class="empty">No activity yet.</div>`}</div></section>
+      </div>
+    </div>`;
+  refreshShell();
+}
+
+/* ---------- ⌘K command palette ---------- */
+function paletteItems(){
+  const nav = [["Home","#home","⌂"],["Requirements","#delivery","📝"],["Incidents","#incidents","🛡️"],["Test library","#tests","🧪"],["Data health","#data","🗄️"],["Crash demo","#demo","▶"],["Settings","#settings","⚙"],["Audit log","#audit","🕘"]]
+    .map(([t,h,i])=>({g:"Go to",t,i,run:()=>go(h.slice(1))}));
+  const acts = [
+    {g:"Actions",t:"New change request",i:"＋",run:()=>go("new")},
+    {g:"Actions",t:"Scan data now (DataWatchdog)",i:"🐶",run:async()=>{ go("data"); setTimeout(scanData, 300); }},
+    {g:"Actions",t:"Simulate a production crash",i:"💥",run:()=>go("demo")},
+    {g:"Actions",t:"Open live monitor",i:"📈",run:()=>{ location.href="/dashboard"; }},
+    {g:"Actions",t:"Sync Android repository",i:"📦",run:()=>{ go("settings"); setTimeout(()=>window.syncRepo&&syncRepo(), 600); }},
+  ];
+  const items = (state.list||[]).map(c=>({g: c.kind==="incident"?"Incidents":"Requirements", t:`${c.key} · ${c.title}`, i: c.kind==="incident"?"⚠":"📄", s: STATUS[c.status]||c.status, run:()=>go("cr/"+c.id)}));
+  return [...acts, ...nav, ...items];
+}
+function openPalette(){
+  if ($("#pal")) return;
+  const bg = document.createElement("div"); bg.className="pal-bg"; bg.id="pal";
+  bg.innerHTML = `<div class="pal" role="dialog" aria-modal="true" aria-label="Command palette"><input id="pal-q" placeholder="Search requirements, incidents, pages and actions…" aria-label="Search" autocomplete="off"><ul id="pal-l" role="listbox"></ul></div>`;
+  bg.addEventListener("click", e => { if (e.target === bg) closePalette(); });
+  document.body.appendChild(bg); state.palIdx = 0; paintPalette(); $("#pal-q").focus();
+  $("#pal-q").addEventListener("input", () => { state.palIdx = 0; paintPalette(); });
+  $("#pal-q").addEventListener("keydown", e => {
+    const n = state.palShown.length;
+    if (e.key==="ArrowDown"){ e.preventDefault(); state.palIdx = (state.palIdx+1)%Math.max(n,1); paintPalette(); }
+    else if (e.key==="ArrowUp"){ e.preventDefault(); state.palIdx = (state.palIdx-1+n)%Math.max(n,1); paintPalette(); }
+    else if (e.key==="Enter"){ e.preventDefault(); const it = state.palShown[state.palIdx]; if (it){ closePalette(); it.run(); } }
+    else if (e.key==="Escape"){ closePalette(); }
+  });
+}
+function closePalette(){ const p = $("#pal"); if (p) p.remove(); }
+function paintPalette(){
+  const q = ($("#pal-q").value||"").toLowerCase().trim();
+  const all = paletteItems().filter(x => !q || x.t.toLowerCase().includes(q) || x.g.toLowerCase().includes(q));
+  state.palShown = all.slice(0, 40);
+  let g = null;
+  $("#pal-l").innerHTML = state.palShown.map((x,i)=>{ const head = x.g!==g ? `<div class="grp">${esc(x.g)}</div>` : ""; g = x.g;
+    return head + `<li role="option" aria-selected="${i===state.palIdx}" class="${i===state.palIdx?"on":""}" onmousemove="if(state.palIdx!==${i}){state.palIdx=${i};paintPalette()}" onclick="state.palIdx=${i};const it=state.palShown[${i}];closePalette();it.run()"><span aria-hidden="true" style="width:20px;text-align:center">${x.i}</span>${esc(x.t)}${x.s?`<small>${esc(x.s)}</small>`:""}</li>`; }).join("")
+    || `<div class="empty">No matches</div>`;
+  const on = $("#pal-l li.on"); if (on) on.scrollIntoView({block:"nearest"});
+}
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase()==="k"){ e.preventDefault(); $("#pal") ? closePalette() : openPalette(); }
+  else if (e.key==="/" && !/input|textarea|select/i.test(document.activeElement.tagName) && !$("#pal")){ e.preventDefault(); openPalette(); }
+});
 
 window.__init();
 </script>

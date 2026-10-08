@@ -23,7 +23,7 @@ MH-T2,Looks right,Low,Open the app,,Everything looks on-brand
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
     root = tmp_path / "mobileheal"
-    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".venv", "*.db*", "__pycache__", "build"))
+    shutil.copytree(PROJECT, root, ignore=shutil.ignore_patterns(".git", ".mobileheal", ".venv", "*.db*", "__pycache__", "build"))
     (root / "backend" / "requirements.txt").write_text("name: required\nemail: required\n")
     monkeypatch.setenv("MOBILEHEAL_ROOT", str(root))
     monkeypatch.setenv("MOBILEHEAL_SPEC", str(root / "backend" / "requirements.txt"))
@@ -121,7 +121,7 @@ def test_claude_is_used_when_key_present(env, monkeypatch):
 
     monkeypatch.setattr(m.app.state.wf.ai.__class__, "_post", fake_post)
     r = c.post("/api/requirements/translate", json={"text": "Collect date of birth"}).json()
-    assert r["engine"] == "claude" and r["questions"] == ["Minimum age?"]
+    assert r["engine"] == "claude" and [q["text"] for q in r["questions"]] == ["Minimum age?"] and r["ready"] is False
     assert calls[0]["model"] and calls[0]["system"]
     cr = c.post("/api/cr", json={"title": "DOB", "spec_text": r["spec_text"]}).json()
     c.post(f"/api/cr/{cr['id']}/approve")
@@ -146,3 +146,84 @@ def test_navigation_requirement_end_to_end(env):
     md = next(f["content"] for f in cr["files"] if f["path"].startswith("docs/tests/"))
     assert "Success screen" in md
     assert c.post("/api/requirements/validate", json={"text": "ui.after_save = Else Where!\n"}).json()["valid"] is False
+
+
+def test_english_remove_with_typo_and_location():
+    from app.english import heuristic
+    out = heuristic("remove phne number field from home screen", "name: required\nemail: required\nphone_number: optional\n")
+    assert "phone_number" not in out["spec_text"] if "spec_text" in out else True
+    assert not out.get("questions"), out
+    out2 = heuristic("remove phne number field from home screen", "name: required\nemail: required\n")
+    assert not out2.get("questions"), out2
+
+
+def test_english_followup_conversation_until_agreed():
+    from app.english import translate
+    cur = "name: required\nemail: required\n"
+    r = translate("Add a nickname field. Make it pop", cur)
+    assert not r["ready"] and len(r["questions"]) == 2
+    nick = next(q for q in r["questions"] if q["about"] == "nickname")
+    vague = next(q for q in r["questions"] if q["replaces"])
+    r2 = translate("Add a nickname field. Make it pop", cur, None,
+                   [dict(nick, answer="nickname is optional"), dict(vague, answer="Make the save button green")])
+    assert r2["ready"] and r2["questions"] == []
+    assert "nickname: optional" in r2["spec_text"] and "ui.button_color = #079455" in r2["spec_text"]
+
+
+def test_llm_providers_and_mock_mode(tmp_path, monkeypatch):
+    from app.db import Database
+    from app.ai import AI, Settings, PROVIDERS
+    for p in PROVIDERS.values():
+        if p["env"]:
+            monkeypatch.delenv(p["env"], raising=False)
+    st = Settings(Database(str(tmp_path / "x.db")))
+    ai = AI(st)
+    assert ai.status()["mode"] == "parser" and ai.provider == "anthropic" and ai.model == "claude-sonnet-5-5"
+    st.update({"llm_provider": "openai", "llm_model": "gpt-5", "openai_api_key": "sk-test"}, "t")
+    assert ai.available and ai.mode == "live"
+    seen = {}
+
+    def fake(self, payload):
+        seen.update(payload)
+        return {"choices": [{"message": {"content": '{"ok": true}'}}]}
+    monkeypatch.setattr(AI, "_post_openai", fake)
+    assert ai.json("sys", "hi") == {"ok": True}
+    assert seen["model"] == "gpt-5" and seen["messages"][0]["role"] == "system" and "max_completion_tokens" in seen
+    pub = st.public()
+    assert pub["openai_api_key"]["set"] and "sk-test" not in str(pub)
+    st.update({"llm_provider": "custom", "llm_model": "m"}, "t")
+    assert not ai.available          # custom needs an endpoint
+    st.update({"llm_provider": "ollama", "llm_model": "llama3.1"}, "t")
+    assert ai.available and ai.key == ""
+
+
+def test_android_repo_validation_and_analysis(tmp_path):
+    from app.repo import AndroidRepo, RepoError, analyze, DEFAULT_REPO
+    for bad in ("file:///etc", "git@github.com:a/b.git", "https://github.com/../x", "ssh://h/x"):
+        with pytest.raises(RepoError):
+            AndroidRepo.validate_url(bad)
+    assert AndroidRepo.validate_url(DEFAULT_REPO) == DEFAULT_REPO
+    r = tmp_path / "r"
+    (r / "gradle").mkdir(parents=True)
+    (r / "settings.gradle.kts").write_text('include(":app")\ninclude(":feature:home")\ninclude(":core:data")\n')
+    (r / "gradle/libs.versions.toml").write_text('[versions]\nkotlin = "2.0.20"\nhilt = "2.52"\n')
+    (r / "app").mkdir()
+    (r / "app/build.gradle.kts").write_text('plugins { id("dagger.hilt.android.plugin") }\nandroid { defaultConfig { applicationId = "com.x.app"\n minSdk = 26 } }\n'
+                                            'dependencies { implementation(libs.androidx.compose.material3); implementation(libs.kotlinx.coroutines) }\n')
+    src = r / "feature/home/src/main/kotlin/x"
+    src.mkdir(parents=True)
+    (src / "HomeScreen.kt").write_text("@Composable fun HomeScreen() {}")
+    (src / "HomeViewModel.kt").write_text("class HomeViewModel")
+    a = analyze(r)
+    assert a["modules"] == [":app", ":feature:home", ":core:data"] and a["application_id"] == "com.x.app"
+    assert a["stack"]["Hilt"] and a["stack"]["Jetpack Compose"] and a["versions"]["kotlin"] == "2.0.20"
+    assert a["screens"] == ["HomeScreen"] and "feature modules under :feature:*" in a["conventions"]
+
+
+def test_repo_api_defaults_and_browse_guard(env):
+    client, _ = env
+    st = client.get("/api/repo").json()
+    assert st["url"] == "https://github.com/android/nowinandroid" and st["status"] == "not_synced"
+    client.put("/api/settings", json={"android_repo_url": "file:///etc"})
+    assert client.post("/api/repo/sync").status_code == 400
+    assert client.get("/api/repo/file", params={"path": "../../../etc/passwd"}).status_code == 400

@@ -6,9 +6,12 @@ android/build/
 android/app/build/
 android/local.properties
 .idea/
+.mobileheal/
 .mh_update*.tgz
 backend/requirements.tmp
 *.db-shm
 *.db-wal
-.mh_update*.tgz
-backend/app/.codegen_fixed.py
+android/*/build/
+android/.kotlin/
+.DS_Store
+*.tgz
