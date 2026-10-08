@@ -26,10 +26,36 @@ auto-fixed and shipped. A DataWatchdog agent keeps backend data valid and notifi
 
 No API keys are required. Everything runs out of the box in **parser mode**.
 
-## 2. Start everything (one command)
+## 2. Get the code and start everything
+
+### 2a. Clone the repository
+
+Pick a folder for your projects (any location works — `~/Projects` is used here) and clone:
 
 ```bash
-cd ~/Downloads/mobileheal
+mkdir -p ~/Projects && cd ~/Projects
+git clone https://github.com/shreekrithi1/MobileHeal.git mobileheal
+cd mobileheal
+```
+
+> Private repo? GitHub will ask for your username and a **personal access token** as the password
+> (github.com → Settings → Developer settings → Personal access tokens), or clone over SSH:
+> `git clone git@github.com:shreekrithi1/MobileHeal.git mobileheal`
+
+**No git?** Download instead: open https://github.com/shreekrithi1/MobileHeal → **Code** → **Download ZIP**,
+then unzip it into your folder and `cd` into it:
+
+```bash
+cd ~/Projects && unzip ~/Downloads/MobileHeal-main.zip && mv MobileHeal-main mobileheal && cd mobileheal
+```
+
+Already have it? Get the latest version with `git pull`.
+
+### 2b. Start everything (one command)
+
+From the `mobileheal` folder:
+
+```bash
 chmod +x start.command          # first time only
 ./start.command                 # or double-click start.command in Finder
 ```
@@ -43,11 +69,20 @@ web app at **http://localhost:8000**, and opens the `android/` project in Androi
 | `./start.command` | server + web app + Android Studio |
 | `./start.command --server` | server + web app only |
 | `./start.command --android` | open Android Studio only |
-| `./start.command --test` | run the backend test suite |
 | `./start.command --demo` | demo mode — isolated workspace, every integration simulated |
+| `./start.command --demo-reset` | delete the demo workspace and database |
+| `./start.command --test` | run the backend test suite |
 
 Port in use? `MOBILEHEAL_PORT=8010 ./start.command`.
 If macOS blocks the double-click ("unidentified developer"): right-click → **Open** once, or run it from Terminal.
+
+**Quick start (copy & paste):**
+
+```bash
+mkdir -p ~/Projects && cd ~/Projects && \
+git clone https://github.com/shreekrithi1/MobileHeal.git mobileheal && \
+cd mobileheal && chmod +x start.command && ./start.command --demo
+```
 
 ## 3. Run the Android app
 
