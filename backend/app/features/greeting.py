@@ -2,5 +2,5 @@
 
 
 def make_greeting(profile: dict) -> dict:
-    first = ((profile["name"] or "").split() or [""])[0]
+    first = profile["name"].split()[0]
     return {"greeting": f"Hi {first}", "first_name": first}
