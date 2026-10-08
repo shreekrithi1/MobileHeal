@@ -209,23 +209,25 @@ def generate_from_design(cr: dict) -> List[dict]:
                                  "auto": [{"op": "expect_ui", "key": c["key"], "value": c["to"]}]} for c in ui]
                       + [{"action": "Look at the screen as a whole", "expected": "Text is readable and nothing looks broken", "auto": None}]})
 
-    if any(c["kind"] == "ui_changed" and c["key"] == "after_save" for c in d["changes"]) and \
-            d["after"]["ui"].get("after_save") == "success_screen":
+    target = d["after"]["ui"].get("after_save")
+    if any(c["kind"] == "ui_changed" and c["key"] == "after_save" for c in d["changes"]) and target and target != "stay":
+        sid = "success" if target == "success_screen" else target
+        sname = "Success" if sid == "success" else d["after"]["ui"].get(f"screen.{sid}.title", label(sid))
         fill = [{"op": "set", "field": k, "value": "{{" + k + "}}"} for k in required]
-        cases.append({"title": "Saving takes the user to the Success screen", "priority": "High",
-                      "objective": "After a successful save the app navigates to the Success screen.",
+        cases.append({"title": f"Saving takes the user to the {sname} screen", "priority": "High",
+                      "objective": f"After a successful save the app navigates to the {sname} screen.",
                       "preconditions": "Signed-in user on the Profile screen.", "test_data": dict(base_data), "steps": [
                 {"action": "Fill in all required fields", "expected": "No alert banner", "auto": fill + [{"op": "expect_banner", "visible": False}]},
-                {"action": "Tap the save button", "expected": "The Success screen is shown",
-                 "auto": [{"op": "tap"}, {"op": "expect_screen", "screen": "success"}]},
-                {"action": "Check the Success screen wording and layout", "expected": "Title and message read well; nothing is cut off", "auto": None},
+                {"action": "Tap the save button", "expected": f"The {sname} screen is shown",
+                 "auto": [{"op": "tap"}, {"op": "expect_screen", "screen": sid}]},
+                {"action": f"Check the {sname} screen wording and layout", "expected": "Title and message read well; nothing is cut off", "auto": None},
                 {"action": "Tap “Back to profile”", "expected": "The profile screen is shown again with the saved values",
                  "auto": [{"op": "tap_back"}, {"op": "expect_screen", "screen": "profile"}]},
             ]})
         if required:
             first = required[-1]
             cases.append({"title": "Incomplete profile does not navigate away", "priority": "High",
-                          "objective": "The Success screen only appears when the profile is complete.", "preconditions": "",
+                          "objective": f"The {sname} screen only appears when the profile is complete.", "preconditions": "",
                           "test_data": dict(base_data), "steps": [
                     {"action": f"Clear {label(first)} and tap the save button", "expected": "User stays on the profile with the alert banner",
                      "auto": [{"op": "clear", "field": first}, {"op": "tap"}, {"op": "expect_screen", "screen": "profile"},

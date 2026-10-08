@@ -402,6 +402,33 @@ def settings_test_zephyr():
         raise HTTPException(400, str(e))
 
 
+class SkillIn(BaseModel):
+    text: str
+
+
+@app.get("/api/android")
+def android_status():
+    from .android_agent import AndroidAgent
+    return AndroidAgent(app.state.wf).status()
+
+
+@app.get("/api/settings/android-skill")
+def android_skill_get():
+    from .android_agent import SKILL_PATH
+    return {"text": SKILL_PATH.read_text(encoding="utf-8") if SKILL_PATH.exists() else "", "path": str(SKILL_PATH)}
+
+
+@app.put("/api/settings/android-skill")
+def android_skill_put(body: SkillIn):
+    from .android_agent import SKILL_PATH
+    if len(body.text.strip()) < 50:
+        raise HTTPException(400, "The skill looks empty — paste the full instructions")
+    SKILL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SKILL_PATH.write_text(body.text, encoding="utf-8")
+    app.state.wf.settings.audit(app.state.wf.user, "settings.android_skill", "android_senior.md", f"{len(body.text)} chars")
+    return android_skill_get()
+
+
 @app.get("/api/audit")
 def audit(limit: int = 200):
     return _settings().audit_log(limit)

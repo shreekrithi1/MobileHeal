@@ -4,4 +4,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "MobileHeal"
-include(":app")
+include(":app", ":data", ":domain")

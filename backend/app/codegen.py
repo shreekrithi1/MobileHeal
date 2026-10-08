@@ -87,14 +87,18 @@ def design_brief(base: Spec, new: Spec, profiles: List[dict]) -> dict:
     for k in sorted(set(base.ui) | set(new.ui)):
         a, b = base.ui.get(k), new.ui.get(k)
         if a != b:
-            changes.append({"kind": "ui_changed", "key": k, "label": label(k),
+            changes.append({"kind": "ui_changed", "key": k, "label": label(k.replace(".", "_")) if k.startswith("screen.") else label(k),
                             "from": a, "to": b, "default": UI_DEFAULTS.get(k),
-                            "known": k in UI_KEYS})
+                            "known": k in UI_KEYS or k.startswith("screen.")})
             if k not in UI_KEYS:
                 notes.append(f"ui.{k} is not a key the current app understands; it is passed through but has no visible effect.")
 
     if base.ui.get("after_save") != new.ui.get("after_save"):
-        if new.ui.get("after_save") == "success_screen":
+        target = new.ui.get("after_save")
+        if target and target not in ("stay", "success_screen"):
+            notes.append(f"New navigation: after a successful save the app opens the “{new.ui.get(f'screen.{target}.title', label(target))}” "
+                         f"screen (route screen/{target}). The Android Developer Agent implements it as a dedicated Compose screen.")
+        elif new.ui.get("after_save") == "success_screen":
             notes.append(f"New navigation: after a successful save the app shows a Success screen "
                          f"(“{new.ui.get('success_title', UI_DEFAULTS['success_title'])}”) with a “Back to profile” action. "
                          "If required fields are missing, the user stays on the profile and sees the alert banner instead.")

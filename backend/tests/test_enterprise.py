@@ -145,4 +145,4 @@ def test_navigation_requirement_end_to_end(env):
     assert "Saving takes the user to the Success screen" in titles
     md = next(f["content"] for f in cr["files"] if f["path"].startswith("docs/tests/"))
     assert "Success screen" in md
-    assert c.post("/api/requirements/validate", json={"text": "ui.after_save = elsewhere\n"}).json()["valid"] is False
+    assert c.post("/api/requirements/validate", json={"text": "ui.after_save = Else Where!\n"}).json()["valid"] is False

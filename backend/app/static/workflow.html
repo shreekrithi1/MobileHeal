@@ -255,6 +255,7 @@ textarea.big{font-size:15px;line-height:1.55}
 .pbody.success{align-items:center;justify-content:center;text-align:center;gap:12px}
 .succ-ico{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:700}
 .succ-t{font-weight:700;font-size:18px} .succ-m{font-size:13px;color:#5f6b7a;max-width:200px} .pbody.success .pbtn{width:100%}
+.chk.sub{padding-left:44px;padding-top:7px;padding-bottom:7px} .chk.sub .dot{width:16px;height:16px;font-size:9px}
 details.adv{border:1px dashed var(--line);border-radius:10px;padding:10px 12px} details.adv summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(--muted)}
 .trbox{background:var(--sunk);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
 .dsrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -367,9 +368,11 @@ function profileFields(rules){
   return fs;
 }
 function missingOf(rules, values){ return rules.filter(r => r.constraint==="required" && !(values[r.field]||"").trim()).map(r=>r.field); }
+const afterSaveScreen = ui => { const t = (ui||{}).after_save; return !t || t==="stay" ? null : t==="success_screen" ? "success" : t; };
 function phone({rules, ui, values, interactive=false, highlight=[], id="", onInput="pvInput", onTap="pvSave", errors=null, screen="profile", onBack="pvBack"}){
   ui = {...UI_DEF, ...ui};
-  if (screen === "success") return `<div class="phone"><div class="screen" style="background:${esc(ui.background_color)}" id="${id}">
+  if (screen !== "profile") { if (screen !== "success") { ui = {...ui, success_title: ui[`screen.${screen}.title`] || label(screen), success_message: ui[`screen.${screen}.message`] || ""}; } }
+  if (screen !== "profile") return `<div class="phone"><div class="screen" style="background:${esc(ui.background_color)}" id="${id}">
     <div class="sb"><span>9:41</span><span>●●● ▮</span></div>
     <div class="appbar"><span>${esc(ui.app_title)}</span><span class="live">● Live</span></div>
     <div class="pbody success"><div class="succ-ico" style="background:${esc(ui.button_color)};color:${esc(ui.button_text_color)}">✓</div>
@@ -449,7 +452,7 @@ function validateNew(){
     $("#f-msg").innerHTML = r.valid ? (changed ? `· <span class="ok">✓ ${r.rules.length} field rules, ${Object.keys(r.ui).length} UI rules</span>` : "· no changes yet") : `· <span class="err">✕ ${esc(r.error)}</span>`;
     if (!r.valid) $("#f-adv").open = true;
     if (r.valid) $("#f-phone").innerHTML = phone({rules:r.rules, ui:r.ui, values:{name:"Jane Doe", email:"jane@example.com"}})
-      + (r.ui.after_save==="success_screen" ? `<div class="pcol"><div class="pcap">After save →</div>${phone({rules:r.rules, ui:r.ui, values:{}, screen:"success"})}</div>` : "");
+      + (afterSaveScreen(r.ui) ? `<div class="pcol"><div class="pcap">After save →</div>${phone({rules:r.rules, ui:r.ui, values:{}, screen:afterSaveScreen(r.ui)})}</div>` : "");
   }, 200);
 }
 function setLine(re, line){ const ta=$("#f-spec"); let t=ta.value; if (re.test(t)) t=t.replace(re, line); else t=t.replace(/\n*$/,"\n")+line+"\n"; ta.value=t; state.manualRules=true; validateNew(); }
@@ -585,7 +588,7 @@ function tDesign(cr){
       <div class="card-b"><div class="phones">
         <div class="pcol"><div class="pcap">Live today</div>${phone({...d.before, values:sample})}</div>
         <div class="pcol"><div class="pcap" style="color:var(--accent)">Proposed</div>${phone({...d.after, values:sample, highlight:added})}</div>
-        ${(d.after.ui||{}).after_save==="success_screen"?`<div class="pcol"><div class="pcap" style="color:var(--accent)">After save →</div>${phone({...d.after, values:sample, screen:"success"})}</div>`:""}
+        ${afterSaveScreen(d.after.ui)?`<div class="pcol"><div class="pcap" style="color:var(--accent)">After save →</div>${phone({...d.after, values:sample, screen:afterSaveScreen(d.after.ui)})}</div>`:""}
       </div></div></div>
     <div class="grid" style="align-content:start">
       <div class="card"><div class="card-h">UX changes <span class="count">${d.changes.length}</span></div><div class="card-b" style="padding-top:6px;padding-bottom:6px">${d.changes.map(changeRow).join("")||'<div class="hint">No visible changes</div>'}</div></div>
@@ -618,20 +621,42 @@ function diffTable(diff){
 function bar5(a,r){ const t=a+r||1, na=Math.round(5*a/t); return `<span class="bar5">${[0,1,2,3,4].map(i=>`<i class="${i<na?'a':i<5&&r?'r':''}"></i>`).join("")}</span>`; }
 function codingLog(cr){
   const log = cr.coding_log||[];
-  const steps = isInc(cr) ? ["Diagnose","Reproduce","Fix","Run checks","Open pull request"] : ["Generate code","Run checks","Open pull request"];
+  const steps = isInc(cr) ? ["Diagnose","Reproduce","Fix","Run checks","Open pull request"]
+    : ["Generate code","Generate test cases","Android developer agent", ...[...new Set(log.map(e=>e.step).filter(x=>x.startsWith("Agent · ")))], "Run checks","Open pull request"];
   return `<div class="card" style="margin-bottom:16px"><div class="card-h">Build pipeline ${cr.status==="coding"?'<span class="chip s-coding">running</span>':""}</div>
     ${steps.map(s=>{ const ev=[...log].reverse().find(e=>e.step===s); let st=ev?ev.status:"pending"; if(st==="warn") st="warn";
-      return `<div class="chk"><div class="dot d-${st==='pending'?'info':st}" style="${st==='pending'?'opacity:.35':''}">${st==='done'?'✓':st==='fail'?'✕':''}</div>
-        <div><div class="nm">${s}</div><div class="dt">${esc(ev&&ev.detail||(st==='pending'?'waiting':''))}</div></div></div>`; }).join("")}
+      return `<div class="chk ${s.startsWith("Agent · ")?"sub":""}"><div class="dot d-${st==='pending'?'info':st}" style="${st==='pending'?'opacity:.35':''}">${st==='done'?'✓':st==='fail'?'✕':st==='warn'?'!':''}</div>
+        <div><div class="nm">${s.replace("Agent · ","")}</div><div class="dt">${esc(ev&&ev.detail||(st==='pending'?'waiting':''))}</div></div></div>`; }).join("")}
     ${log.filter(e=>e.step==="Error").map(e=>`<div class="chk"><div class="dot d-fail">✕</div><div><div class="nm">Error</div><div class="dt">${esc(e.detail)}</div></div></div>`).join("")}</div>`;
+}
+function agentCard(cr){
+  const a = cr.android_agent; if (!a) return "";
+  const p = a.plan || {}, lint = a.lint || [], b = a.build || {};
+  const errs = lint.filter(i=>i.severity==="error");
+  const bst = {pass:["pass","✓ compiled & tests passed"], fail:["fail","✕ build failed"], skipped:["warn","skipped"]}[b.status] || ["info","not run"];
+  return `<div class="card" style="margin-bottom:16px"><div class="card-h"><span>🤖 Android Developer Agent <span class="chip ${a.engine==='claude'?'s-coding':'s-closed'}">${a.engine==='claude'?'✦ Claude':'templates'}</span>
+      ${a.iterations>1?`<span class="chip s-diagnosing">${a.iterations} iterations</span>`:""}</span><a class="hint" style="margin:0" href="#settings">skill ↗</a></div>
+    <div class="card-b">
+      ${a.error?`<div class="banner-err" style="margin:0 0 10px">${esc(a.error)}</div>`:""}
+      <div style="font-size:15px;margin-bottom:10px">${esc(p.summary||"")}</div>
+      ${(p.changes||[]).length?`<table class="t"><tr><th>File</th><th>Change</th><th>Purpose</th></tr>${p.changes.map(c=>`<tr><td><code>${esc(c.path.replace(/^android\//,"").replace("src/main/java/com/mobileheal/","…/").replace("src/test/java/com/mobileheal/","…/test/"))}</code></td><td>${esc(c.action)}</td><td>${esc(c.purpose||"")}</td></tr>`).join("")}</table>`:""}
+      ${(p.notes||[]).length?`<ul class="notes" style="margin-top:10px">${p.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:""}
+      ${p.limits?`<div class="hint">${esc(p.limits)}</div>`:""}
+      <div class="grid g2" style="margin-top:12px;gap:10px">
+        <div class="trbox" style="margin:0"><b>Architecture lint</b> · ${errs.length?`<span class="err">${errs.length} error(s)</span>`:lint.length?`${lint.length} warning(s)`:'<span class="ok">clean</span>'}
+          ${lint.length?`<ul class="notes" style="margin-top:6px;font-size:12.5px">${lint.slice(0,6).map(i=>`<li class="${i.severity==='error'?'err':''}">${esc(i.path.split("/").pop())}: ${esc(i.message)}</li>`).join("")}</ul>`:""}</div>
+        <div class="trbox" style="margin:0"><b>Gradle build & unit tests</b> · <span class="${bst[0]==='pass'?'ok':bst[0]==='fail'?'err':''}">${bst[1]}</span>
+          <div class="hint" style="margin:4px 0 0">${esc(b.detail||"")}</div>
+          ${a.build_output?`<details><summary class="hint" style="cursor:pointer">Output</summary><pre class="out">${esc(a.build_output)}</pre></details>`:""}</div>
+      </div></div></div>`;
 }
 function tCode(cr){
   if (!cr.files && isInc(cr)) return codingLog(cr) + (cr.status==="diagnosing"?`<div class="skel"></div><div class="skel" style="width:70%"></div>`:"");
   if (!cr.files) return cr.status==="design_review" ? `<div class="empty">Code is generated after the design is approved.</div>` : codingLog(cr) + `<div class="skel"></div><div class="skel" style="width:70%"></div>`;
-  return `${["coding","failed","diagnosing"].includes(cr.status)?codingLog(cr):""}
+  return `${["coding","failed","diagnosing"].includes(cr.status)?codingLog(cr):""}${agentCard(cr)}
     <div class="meta" style="margin-bottom:12px">Showing <b>${cr.files.length} changed files</b> with <span class="plus">${cr.stats.additions} additions</span> and <span class="minus">${cr.stats.deletions} deletions</span>${cr.pr&&cr.pr.commit?` · commit <code>${esc(cr.pr.commit)}</code>`:""}</div>
     ${cr.files.map((f,i)=>`<div class="file"><div class="file-h" onclick="this.nextElementSibling.classList.toggle('hide')">
-        <span class="p">${esc(f.path)}</span>${f.status==="added"?'<span class="chip s-pr_open">new</span>':""}
+        <span class="p">${esc(f.path)}</span>${f.by==="android-agent"?'<span class="chip s-coding">🤖 agent</span>':""}${f.status==="added"?'<span class="chip s-pr_open">new</span>':""}
         <span class="plus">+${f.additions}</span><span class="minus">−${f.deletions}</span>${bar5(f.additions,f.deletions)}</div>
       <div class="${i>1&&f.additions>60?'hide':''}">${diffTable(f.diff)}</div></div>`).join("")}`;
 }
@@ -694,7 +719,7 @@ function pvBack(){ state.preview.screen="profile"; renderCR(); }
 function pvSave(){
   const cr=state.cr, side = state.preview.mode==="after"?cr.design.after:cr.design.before;
   const miss = missingOf(side.rules, state.preview.values);
-  if (!miss.length && (side.ui||{}).after_save==="success_screen") { state.preview.screen="success"; renderCR(); return; }
+  if (!miss.length && afterSaveScreen(side.ui)) { state.preview.screen=afterSaveScreen(side.ui); renderCR(); return; }
   renderCR();
   const t=document.getElementById("pv-toast");
   if (t){ t.textContent = miss.length ? `Still missing: ${miss.map(label).join(", ")}` : "✓ Saved — profile complete (preview only)"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
@@ -1139,7 +1164,7 @@ function rnInput(el){ state.run.values[el.dataset.k]=el.value; }
 function rnTapUser(){ rnTap(); renderRunner(); }
 function rnBackUser(){ state.run.screen="profile"; rnLog("tap Back to profile"); renderRunner(); }
 function rnTap(){ const r=state.run, miss=missingOf(r.rules, r.values); r.toast = miss.length ? `Still missing: ${miss.map(label).join(", ")}` : "Saved — profile complete";
-  if (!miss.length && rnUI().after_save==="success_screen") r.screen = "success"; rnLog(`tap ${rnUI().button_label} → ${r.toast}`); }
+  if (!miss.length && afterSaveScreen(rnUI())) r.screen = afterSaveScreen(rnUI()); rnLog(`tap ${rnUI().button_label} → ${r.toast}`); }
 function rnDataset(i){ if(i==="") return; const d=state.run.datasets[+i]; Object.assign(state.run.data, d.values); rnLog(`dataset “${d.name}” applied`); renderRunner(); }
 async function rnSaveDataset(){ const name=prompt("Dataset name","My test data"); if(!name) return;
   const d = await api("/api/datasets",{method:"POST",body:{name, values:state.run.data}}); state.run.datasets.unshift(d); toast("Dataset saved"); renderRunner(); }
@@ -1274,6 +1299,10 @@ async function renderSettings(){
     <div class="card"><div class="card-h"><span><span class="figlogo"></span> Figma</span><span class="chip ${s.figma_token.set?'s-pr_open':'s-closed'}">${s.figma_token.set?'Connected':'Embed only'}</span></div><div class="card-b">
       <div class="field"><label>Personal access token</label>${secret("figma_token","figd_…")}
         <div class="hint">Figma → Settings → Security → Personal access tokens (scope: file content, read-only). Without it, Figma links are still embedded for visual review.</div></div></div></div>
+    <div class="card" style="grid-column:1/-1"><div class="card-h"><span>🤖 Android Developer Agent</span><span id="ag-status" class="hint" style="margin:0"></span></div><div class="card-b">
+      <div class="hint" style="margin:0 0 8px">The agent follows this skill when it turns requirements into Kotlin (Clean Architecture, Hilt, Compose, UDF, tests). Edit it to change how it codes.</div>
+      <textarea id="ag-skill" class="input code" style="min-height:220px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center"><button class="btn" onclick="saveSkill()">Save skill</button><span id="ag-tc" class="hint" style="margin:0"></span></div></div></div>
     <div class="card"><div class="card-h">Delivery policy</div><div class="card-b">
       <div class="field"><label>Your name <span class="hint">(shown in activity, PRs and the audit log)</span></label><input id="s-user_name" class="input" value="${esc(s.user_name)}"></div>
       <div class="field"><label>Merge policy</label><select id="s-merge_policy" class="input">
@@ -1283,7 +1312,18 @@ async function renderSettings(){
       <div>Git: ${state.info&&state.info.git?(state.info.repo?"local repository ✓":"ready (initialised on first PR)"):"not installed"}</div>
       <div>GitHub mirroring: ${s.github?esc(s.github):'off — start the backend with <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> to enable'}</div></div></div>
    </div>`;
+  loadAgentSettings();
 }
+async function loadAgentSettings(){
+  try {
+    const [sk, st] = await Promise.all([api("/api/settings/android-skill"), api("/api/android")]);
+    $("#ag-skill").value = sk.text;
+    $("#ag-status").innerHTML = `engine: <b>${st.engine==="claude"?"✦ Claude":"templates (add an Anthropic key for any requirement)"}</b>`;
+    const t = st.toolchain;
+    $("#ag-tc").innerHTML = t.ready ? `<span class="ok">✓ Gradle build verification ready</span> (${esc(t.gradle)})` : `Build verification off: ${esc(t.reason)}`;
+  } catch(e){}
+}
+async function saveSkill(){ await act(async()=>{ await api("/api/settings/android-skill",{method:"PUT",body:{text:$("#ag-skill").value}}); }, "Skill saved — the agent uses it on the next change"); }
 async function saveSettings(){
   const body = {}; ["anthropic_model","zephyr_base_url","zephyr_project_key","zephyr_cycle_key","user_name","merge_policy"].forEach(k=>body[k]=$("#s-"+k).value);
   ["anthropic_api_key","zephyr_token","figma_token"].forEach(k=>{ const v=$("#s-"+k).value.trim(); if(v) body[k]=v; });

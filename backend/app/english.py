@@ -31,6 +31,8 @@ Rules file format (one per line):
   field_name: required        # a profile field users must fill in (snake_case)
   field_name: optional        # a field shown but not enforced
   ui.KEY = VALUE              # app look & feel; colours must be #RRGGBB
+  screen.ID.title = Title     # a destination screen; navigate to it with ui.after_save = ID
+  screen.ID.message = Text
   # comment
 
 Supported ui keys: {keys}
@@ -95,11 +97,28 @@ def heuristic(english: str, current: str) -> dict:
 
         # Navigation: "on click on 'Save' go to 'Success screen'", "after saving show a success page"
         nav = re.search(r"\b(?:go(?:es)? to|navigate(?:s)? to|take (?:the )?(?:user|them|me) to|redirect(?:s)? to|"
-                        r"open(?:s)?|show(?:s)?|display(?:s)?|land(?:s)? on|move(?:s)? to)\b", low) and "success" in low
+                        r"open(?:s)?|show(?:s)?|display(?:s)?|land(?:s)? on|move(?:s)? to)\s+(?:the\s+|an?\s+)?(.+)$", s, re.I)
+        target = None
+        if nav:
+            rest = nav.group(1)
+            qm = re.match(r"[\"“'‘]([^\"”'’]+)[\"”'’]?", rest.strip())
+            if qm:
+                target = qm.group(1)
+            else:
+                wm = re.match(r"([A-Za-z][\w ]{0,40}?)\s+(?:screen|page|view)\b", rest.strip(), re.I)
+                target = wm.group(1) if wm else None
+        if target:
+            target = re.sub(r"\s*(screen|page|view)\s*$", "", target.strip(), flags=re.I).strip()
         trig = re.search(r"\b(click|tap|press|save|saving|saved|submit)", low)
-        if nav and trig:
-            ui["after_save"] = "success_screen"
-            applied.append("After save → Success screen")
+        if target and trig:
+            if "success" in target.lower():
+                ui["after_save"] = "success_screen"
+                applied.append("After save → Success screen")
+            else:
+                sid = re.sub(r"[^a-z0-9]+", "_", target.lower()).strip("_")[:40]
+                ui["after_save"] = sid
+                ui[f"screen.{sid}.title"] = " ".join(w if w.isupper() else w.capitalize() for w in target.split())
+                applied.append(f"After save → {ui[f'screen.{sid}.title']} screen (screen/{sid})")
             btn = re.search(r"(?:on|when|after)\s+(?:the user\s+)?(?:click(?:ing|s)?|tap(?:ping|s)?|press(?:ing|es)?)\s+(?:on\s+)?(?:the\s+)?[\"“'‘]([^\"”'’]+)[\"”'’]", s, re.I)
             if btn and btn.group(1).strip().lower() not in ("save", "button") and "button_label" not in ui:
                 ui["button_label"] = btn.group(1).strip()
@@ -167,7 +186,8 @@ def heuristic(english: str, current: str) -> dict:
 
     lines = [l for l in current.splitlines() if l.strip().startswith("#")]
     lines += [f"{f}: {c}" for f, c in rules.items()]
-    lines += [f"ui.{k} = {v}" for k, v in ui.items()]
+    lines += [f"ui.{k} = {v}" for k, v in ui.items() if not k.startswith("screen.")]
+    lines += [f"{k} = {v}" for k, v in ui.items() if k.startswith("screen.")]
     text = "\n".join(lines) + "\n"
     parse_spec(text)
     return {"spec_text": text, "summary": "; ".join(applied) or "No changes recognised",

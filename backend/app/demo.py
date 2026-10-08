@@ -45,22 +45,22 @@ SCENARIOS = [
     {"id": "android", "title": "Android app crashes on Save",
      "story": "The Save button normalises the phone number with a `!!` null-assertion. Customers whose rules don't "
               "include a phone number crash the app; the on-device CrashReporter uploads the stack trace.",
-     "kind": "android", "file": "android/app/src/main/java/com/mobileheal/app/ProfileViewModel.kt",
+     "kind": "android", "file": "android/app/src/main/java/com/mobileheal/app/ui/profile/ProfileViewModel.kt",
      "fingerprint_func": "save", "endpoint": "POST /api/crashes",
      "expect": "The fix agent locates the `!!` in ProfileViewModel.kt from the stack trace and makes it null-safe. "
                "It can't run Android code, so the PR asks for device/CI verification."},
 ]
 
-ANDROID_BUG_LINE = '        val phone = _state.value.fields["phone_number"]!!.trim()  // MH-DEMO-BUG'
-ANDROID_FILE = "android/app/src/main/java/com/mobileheal/app/ProfileViewModel.kt"
+ANDROID_BUG_LINE = '        val phone = content.fields["phone_number"]!!.trim()  // MH-DEMO-BUG'
+ANDROID_FILE = "android/app/src/main/java/com/mobileheal/app/ui/profile/ProfileViewModel.kt"
 
 ANDROID_REPORT = {
     "exception": "java.lang.NullPointerException",
     "message": "",
     "stack": ("java.lang.NullPointerException\n"
-              "\tat com.mobileheal.app.ProfileViewModel$save$1.invokeSuspend(ProfileViewModel.kt:{line})\n"
-              "\tat com.mobileheal.app.ProfileViewModel.save(ProfileViewModel.kt:{line})\n"
-              "\tat com.mobileheal.app.MainActivityKt$ProfileScreen$1$2$3.invoke(MainActivity.kt:78)\n"
+              "\tat com.mobileheal.app.ui.profile.ProfileViewModel.save(ProfileViewModel.kt:{line})\n"
+              "\tat com.mobileheal.app.ui.profile.ProfileViewModel.onAction(ProfileViewModel.kt:62)\n"
+              "\tat com.mobileheal.app.ui.profile.ProfileScreenKt$ContentBody$1$3.invoke(ProfileScreen.kt:141)\n"
               "\tat androidx.compose.foundation.ClickablePointerInputNode$pointerInput$3.invoke-k-4lQ0M(Clickable.kt:987)\n"
               "\tat android.os.Handler.handleCallback(Handler.java:958)\n\tat android.os.Looper.loop(Looper.java:294)"),
     "device": "Google Pixel 8 (API 34)", "app_version": "1.0", "screen": "Profile", "demo": True,

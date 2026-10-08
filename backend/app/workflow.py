@@ -25,6 +25,7 @@ from .ai import AI, Settings
 from .gitops import GitError, GitRepo
 from . import testcases as tc
 from . import figma as fg
+from .android_agent import AndroidAgent
 from .rules import RuleParseError, parse_spec
 
 log = logging.getLogger("mobileheal.workflow")
@@ -237,8 +238,31 @@ class Workflow:
                            "deletions": sum(f["deletions"] for f in files)}
             self._log(cr, "Generate test cases", "done", note)
 
+            # Android Developer Agent: requirement → Kotlin (plan → implement → lint → build → repair)
+            self._log(cr, "Android developer agent", "running", "planning…")
+            agent = AndroidAgent(self).run(cr, progress=lambda step, st, detail="": self._log(cr, f"Agent · {step}", st, detail))
+            have = {f["path"] for f in files}
+            for path, content in agent["files"].items():
+                old = self._read(path)
+                if old == content:
+                    continue
+                d = codegen.unified_diff(path, old, content)
+                entry = {"path": path, "status": "added" if old is None else "modified", "content": content,
+                         "diff": d, **codegen.diff_stats(d), "by": "android-agent"}
+                if path in have:
+                    files[:] = [f for f in files if f["path"] != path]
+                files.append(entry)
+            cr["android_agent"] = {k: agent.get(k) for k in ("engine", "plan", "lint", "iterations", "error")}
+            cr["android_agent"]["build"] = {k: v for k, v in (agent.get("build") or {}).items() if k != "output"}
+            cr["android_agent"]["build_output"] = (agent.get("build") or {}).get("output", "")[-4000:]
+            cr["android_agent"]["files"] = sorted(agent["files"])
+            cr["stats"] = {"files": len(files), "additions": sum(f["additions"] for f in files),
+                           "deletions": sum(f["deletions"] for f in files)}
+            self._log(cr, "Android developer agent", "fail" if agent.get("error") else "done",
+                      f"{agent.get('engine')}: {len(agent['files'])} Kotlin file(s)" + (f" · build {agent['build']['status']}" if agent.get("build") else ""))
+
             self._log(cr, "Run checks", "running")
-            cr["checks"] = self._run_checks(cr, files)
+            cr["checks"] = self._run_checks(cr, files) + self._agent_checks(cr)
             fails = sum(1 for c in cr["checks"] if c["status"] == "fail")
             warns = sum(1 for c in cr["checks"] if c["status"] == "warn")
             cr["checks_summary"] = {"fail": fails, "warn": warns,
@@ -263,6 +287,22 @@ class Workflow:
             self._log(cr, "Error", "fail", str(e))
             self._event(cr, "MobileHeal", "error", f"coding failed: {e}")
             self._save(cr)
+
+    def _agent_checks(self, cr: dict) -> List[dict]:
+        a = cr.get("android_agent") or {}
+        if not a:
+            return []
+        lint = a.get("lint") or []
+        errs = [i for i in lint if i["severity"] == "error"]
+        out = [{"name": "Android architecture lint (skill)", "status": "fail" if errs else "warn" if lint else "pass",
+                "detail": ("; ".join(f"{i['path'].split('/')[-1]}: {i['message']}" for i in lint[:4]) if lint
+                           else "Clean Architecture, UDF, previews and test coverage rules satisfied"), "ms": 1}]
+        b = a.get("build") or {}
+        out.append({"name": "Android build & unit tests (Gradle)",
+                    "status": {"pass": "pass", "fail": "fail"}.get(b.get("status"), "warn"),
+                    "detail": b.get("detail", "not run") + (f" · {a.get('iterations')} agent iteration(s)" if a.get("iterations", 0) > 1 else ""),
+                    "ms": b.get("ms", 0), "output": a.get("build_output") or None})
+        return out
 
     def _generate_tests(self, cr: dict) -> str:
         self.tests.delete_generated(cr["id"])

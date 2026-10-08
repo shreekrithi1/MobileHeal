@@ -1,7 +1,8 @@
-package com.mobileheal.app
+package com.mobileheal.app.platform
 
 import android.content.Context
 import android.os.Build
+import com.mobileheal.app.BuildConfig
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request

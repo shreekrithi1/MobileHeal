@@ -33,7 +33,7 @@ UI_KEYS = {
     "banner_text_color": "Alert banner text colour (#RRGGBB)",
     "background_color": "Screen background (#RRGGBB)",
     "banner_message": "Custom alert banner message",
-    "after_save": "What happens after a successful save: stay | success_screen",
+    "after_save": "After a successful save: stay | success_screen | <screen_id> (see screen.<id>.title)",
     "success_title": "Heading on the success screen",
     "success_message": "Message on the success screen",
 }
@@ -68,6 +68,17 @@ def parse_spec(text: str) -> Spec:
         if not stripped or stripped.startswith("#"):
             continue
 
+        if stripped.lower().startswith("screen."):
+            line = re.split(r"\s+#(?:\s|$)", stripped, maxsplit=1)[0].strip()
+            m = re.match(r"screen\.([a-z][a-z0-9_]*)\.(title|message)\s*=\s*(.+)$", line, re.I)
+            if not m:
+                raise RuleParseError(f"line {lineno}: expected 'screen.<id>.title = …' or 'screen.<id>.message = …', got {raw.strip()!r}")
+            key = f"screen.{m.group(1).lower()}.{m.group(2).lower()}"
+            if key in spec.ui:
+                raise RuleParseError(f"line {lineno}: duplicate {key}")
+            spec.ui[key] = m.group(3).strip()
+            continue
+
         if stripped.lower().startswith("ui."):
             line = re.split(r"\s+#(?:\s|$)", stripped, maxsplit=1)[0].strip()
             if "=" not in line:
@@ -78,8 +89,8 @@ def parse_spec(text: str) -> Spec:
                 raise RuleParseError(f"line {lineno}: invalid ui key {key!r}")
             if not value:
                 raise RuleParseError(f"line {lineno}: ui.{key} has no value")
-            if key == "after_save" and value not in AFTER_SAVE:
-                raise RuleParseError(f"line {lineno}: ui.after_save must be one of {', '.join(sorted(AFTER_SAVE))}, got {value!r}")
+            if key == "after_save" and value not in AFTER_SAVE and not FIELD_RE.match(value):
+                raise RuleParseError(f"line {lineno}: ui.after_save must be stay, success_screen or a screen id like order_summary, got {value!r}")
             if key.endswith("_color") and not COLOR_RE.match(value):
                 raise RuleParseError(f"line {lineno}: ui.{key} must be a hex colour like #1E88E5, got {value!r}")
             if key in spec.ui:

@@ -86,6 +86,44 @@ to also push the branch and open and merge real GitHub PRs.
 
 Code generation is template-based from your rules; it doesn't use an AI model.
 
+## Android Developer Agent
+
+Every change request now goes through an **Android Developer Agent** that turns the requirement into Kotlin, following
+the skill in `backend/app/skills/android_senior.md` (editable under **Settings**):
+
+**plan → implement (multi-file) → architecture lint → Gradle build + unit tests → repair loop (up to 2 rounds)**
+
+- **With an Anthropic key**, Claude plans and writes the code for any requirement, using the skill as its system prompt
+  and the project map and key sources as context. Lint and compiler errors are fed back to it until they are fixed.
+- **Without a key**, a template engine writes real code for screens and navigation. For example, *"After saving, take the
+  user to the Order Summary screen"* produces `OrderSummaryScreen.kt` (UiState, `@HiltViewModel`, Route/Screen composables,
+  previews), `OrderSummaryViewModelTest.kt`, and a route in `GeneratedDestinations.kt`. Changes that are purely data-driven
+  (fields, colours) need no code, and the agent says so.
+- **Architecture lint (from the skill):** `:domain` must stay pure Kotlin (no Android, Hilt or `@Inject`), packages must
+  match paths, no exposed `MutableStateFlow`, no `GlobalScope`, `collectAsStateWithLifecycle`, previews for screens, tests
+  for every new ViewModel/UseCase, warnings on `else ->` over sealed types and on `!!`.
+- **Build verification** runs `./gradlew :domain:test :data:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin`
+  in a sandbox copy on the machine running the backend. It needs a Gradle wrapper (open `android/` in Android Studio once)
+  and the Android SDK. Otherwise the check reports *skipped*.
+
+The agent's plan, lint and build results are shown in the **Code** tab, and its files are marked 🤖 in the diff.
+
+### Android architecture
+
+```
+android/
+├── domain/   pure Kotlin: model (Profile, AppRules, AfterSave, LiveEvent), repository interfaces,
+│             use cases (Validate/Load/Save/ResolveNavigation/ObserveLiveUpdates), DomainError + tests
+├── data/     OkHttp API, DTOs + mappers, WebSocket live updates (auto-reconnect), repositories with
+│             error mapping, Hilt DataModule + mapper tests
+└── app/      Hilt app, Navigation Compose (profile → screen/<id>), ProfileViewModel (single StateFlow,
+              typed actions, one-off effects), ProfileScreen with Loading/Success/Empty/Error previews,
+              InfoScreen for rule-defined screens, generated/ (RulesDefaults, GeneratedDestinations) + VM tests
+```
+
+First build: open `android/` in Android Studio (it creates the Gradle wrapper, AGP 8.5 / Gradle 8.7) and run
+`./gradlew test` or press Run.
+
 ## Guided crash demo
 
 Open **Crash demo** (http://localhost:8000/workflow#demo). There are three real bugs, each triggered through the real code path:
@@ -94,7 +132,7 @@ Open **Crash demo** (http://localhost:8000/workflow#demo). There are three real 
 |---|---|---|
 | Customer without a name | `AttributeError` in `greeting.py` (HTTP 500) | Replays the captured input, applies two chained fixes, adds a regression test |
 | Partner report, no fields | `ZeroDivisionError` in `completion.py` | Replays, fixes the division, adds a regression test |
-| Android app crashes on Save | `NullPointerException` at `ProfileViewModel.kt:113` (a `!!`) | Static fix agent: locates the line from the stack trace and makes it null-safe. The PR asks for device/CI verification |
+| Android app crashes on Save | `NullPointerException` in `ui/profile/ProfileViewModel.save()` (a `!!`) | Static fix agent: locates the line from the stack trace and makes it null-safe. The PR asks for device/CI verification |
 
 The page narrates each step live (traffic → crash → incident → diagnosis → reproduction → fix → checks → PR → review →
 deploy → verified) with timings for time to detect, time to fix PR and crash-to-verified-fix. Turn on **Auto-play** for

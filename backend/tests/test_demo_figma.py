@@ -87,7 +87,7 @@ def test_android_scenario(env):
     from app.demo import ANDROID_FILE
     bug_line = next(i for i, l in enumerate((root / ANDROID_FILE).read_text().splitlines(), 1) if "MH-DEMO-BUG" in l)
     assert inc["incident"]["function"] == "save" and inc["incident"]["line"] == bug_line
-    assert inc["attempts"][0]["patched"].startswith('val phone = _state.value.fields["phone_number"].orEmpty().trim()')
+    assert inc["attempts"][0]["patched"].startswith('val phone = content.fields["phone_number"].orEmpty().trim()')
     checks = {ch["name"]: ch["status"] for ch in inc["checks"]}
     assert checks["Static validation"] == "pass" and checks["Android build & tests"] == "warn"
     c.post(f"/api/cr/{inc['id']}/test", json={"passed": True, "notes": "verified on Pixel"})
