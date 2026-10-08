@@ -6,6 +6,7 @@ name: required
 email: required
 zip: required
 phone_number: required
+nationality: required
 ui.button_color = #079455
 ui.button_label = Save changes
 ui.after_save = success_screen
