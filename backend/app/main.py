@@ -66,6 +66,7 @@ class FigmaApplyIn(BaseModel):
 class TranslateIn(BaseModel):
     text: str
     answers: List[Dict[str, Any]] = []
+    finalize: bool = False
 
 
 class SettingsIn(BaseModel):
@@ -582,7 +583,7 @@ def audit(limit: int = 200):
 def translate_requirement(body: TranslateIn):
     live = app.state.agent.read_text()
     try:
-        r = english.translate(body.text, live, app.state.wf.ai, body.answers)
+        r = english.translate(body.text, live, app.state.wf.ai, body.answers, body.finalize)
     except Exception as e:
         raise HTTPException(400, f"Couldn't translate: {e}")
     r["validation"] = validate_requirements(SpecIn(text=r["spec_text"]))

@@ -238,7 +238,9 @@ class Workflow:
             raise WorkflowError(f"Requirements are invalid: {e}")
         base = self._read(codegen.SPEC_PATH) or ""
         if base.strip() == spec_text.strip():
-            raise WorkflowError("No changes — edit the rules before submitting")
+            raise WorkflowError("The agent didn't find anything to change in this requirement. Try wording it like "
+                                "“City is required” or “Make the save button green”, answer the agent's questions, "
+                                "or add a model API key in Settings so an LLM reads it.")
         cr = {"title": title, "description": description.strip(), "author": author, "spec_text": spec_text,
               "base_spec": base, "status": "design_review", "stage": 1, "revision": 1, "tested": False,
               "created_at": now(), "timeline": [], "requirement_text": (requirement_text or "").strip(),

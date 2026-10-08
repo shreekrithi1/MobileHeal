@@ -228,11 +228,21 @@ class AI:
                                    "messages": [{"role": "user", "content": user}]})
                 out = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
             else:
-                tok = {"max_completion_tokens": max_tokens} if self.provider in ("openai", "azure") else {"max_tokens": max_tokens}
+                reasoning = bool(re.match(r"(gpt-5|o\d)", self.model.split("/")[-1]))
+                if self.provider in ("openai", "azure"):
+                    # reasoning models spend completion tokens on hidden reasoning — leave room for the answer
+                    tok = {"max_completion_tokens": max_tokens * 4 if reasoning else max_tokens}
+                    if reasoning:
+                        tok["reasoning_effort"] = "low"
+                else:
+                    tok = {"max_tokens": max_tokens}
                 data = self._post_openai({"model": self.model, **tok, "messages": [
                     {"role": "system", "content": system}, {"role": "user", "content": user}]})
-                msg = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                choice = (data.get("choices") or [{}])[0]
+                msg = (choice.get("message") or {}).get("content") or ""
                 out = msg if isinstance(msg, str) else "".join(x.get("text", "") for x in msg if isinstance(x, dict))
+                if not out.strip():
+                    raise AIError(f"{self.spec['name']} returned an empty answer (finish_reason={choice.get('finish_reason')})")
             self.last_error = None
         except AIError as e:
             self.last_error = str(e)

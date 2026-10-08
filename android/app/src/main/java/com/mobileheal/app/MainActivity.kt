@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
                 .launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        System.out.println("Test " + 1/0)
+        //System.out.println("Test " + 1/0)
         setContent { MaterialTheme { AppNavHost() } }
     }
 }

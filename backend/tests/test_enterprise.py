@@ -227,3 +227,25 @@ def test_repo_api_defaults_and_browse_guard(env):
     client.put("/api/settings", json={"android_repo_url": "file:///etc"})
     assert client.post("/api/repo/sync").status_code == 400
     assert client.get("/api/repo/file", params={"path": "../../../etc/passwd"}).status_code == 400
+
+
+def test_finalize_skips_questions_and_reasoning_models(tmp_path, monkeypatch):
+    from app.english import translate
+    r = translate("Add a nickname field. Make it pop", "name: required\nemail: required\n", None, [], finalize=True)
+    assert r["ready"] and not r["questions"] and any(a.startswith("Skipped:") for a in r["assumptions"])
+    from app.db import Database
+    from app.ai import AI, AIError, Settings
+    st = Settings(Database(str(tmp_path / "r.db")))
+    st.update({"llm_provider": "openai", "llm_model": "gpt-5", "openai_api_key": "sk-test"}, "t")
+    ai, seen = AI(st), {}
+
+    def empty(self, payload):
+        seen.update(payload)
+        return {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]}
+    monkeypatch.setattr(AI, "_post_openai", empty)
+    with pytest.raises(AIError, match="empty answer"):
+        ai.text("s", "u", 1000)
+    assert seen["reasoning_effort"] == "low" and seen["max_completion_tokens"] == 4000
+    # translate falls back to the parser instead of failing
+    out = translate("Make the save button green", "name: required\nemail: required\n", ai)
+    assert out["engine"] == "rules" and "ui.button_color = #079455" in out["spec_text"]

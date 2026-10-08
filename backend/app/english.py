@@ -97,6 +97,29 @@ def _match_field(phrase: str, rules: Dict[str, str]) -> Optional[str]:
     return close[0] if close else f
 
 
+VOCAB = ["mandatory", "required", "optional", "compulsory", "remove", "delete", "button", "banner", "background",
+         "colour", "color", "screen", "field", "label", "collect", "change", "number", "address", "phone", "email",
+         "birth", "success", "message", "title", "navigate", "should", "also", "green", "orange", "purple", "yellow"]
+
+
+def _spellfix(text: str) -> str:
+    """Correct obvious typos in parser keywords (mnadatory → mandatory, alo → also) without touching quoted copy."""
+    import difflib
+    parts = re.split(r"([\"“”'‘’][^\"“”'‘’]*[\"“”'‘’])", text)
+    for i in range(0, len(parts), 2):
+        def fix(m):
+            w = m.group(0)
+            lw = w.lower()
+            if lw in VOCAB or len(lw) < 3:
+                return w
+            if lw == "alo":
+                return "also"
+            c = difflib.get_close_matches(lw, VOCAB, 1, 0.8 if len(lw) >= 5 else 0.9)
+            return c[0] if c else w
+        parts[i] = re.sub(r"[A-Za-z]+", fix, parts[i])
+    return "".join(parts)
+
+
 def heuristic(english: str, current: str) -> dict:
     spec = parse_spec(current)
     rules: Dict[str, str] = {r.field: r.constraint for r in spec.rules}
@@ -108,7 +131,7 @@ def heuristic(english: str, current: str) -> dict:
     last = None  # remembers "button"/"banner" so "label it" works
     parts = re.split(r"(?<=[.!?;])\s+|\n+|;\s*|\s+and also\s+|,?\s+and\s+(?=(?:label|make|set|change|add|remove|rename|collect|use|give|call)\b)", english)
     for sentence in parts:
-        s = sentence.strip().rstrip(".!")
+        s = _spellfix(sentence.strip().rstrip(".!"))
         if not s:
             continue
         s = re.sub(r"^(?:also|please|then)\s+", "", s, flags=re.I)
@@ -188,7 +211,7 @@ def heuristic(english: str, current: str) -> dict:
                     applied.append(f"{f} is not on the screen today — nothing to remove"); hit = True
         if not hit:
             m = (re.search(r"(?:make|set)\s+(?:the\s+)?(.+?)\s+(?:field\s+)?(required|mandatory|compulsory|optional|not required)", low)
-                 or re.search(r"(?:the\s+)?(.+?)\s+(?:field\s+)?(?:should|must|needs to|has to|is|becomes?)\s+(?:be\s+)?(required|mandatory|compulsory|optional|not required)", low))
+                 or re.search(r"(?:the\s+)?(.+?)\s+(?:field\s+)?(?:should|must|needs to|has to|is|are|becomes?)\s+(?:also\s+|now\s+|too\s+)?(?:be\s+)?(?:an?\s+)?(?:also\s+)?(required|mandatory|compulsory|optional|not required)(?:\s+field)?(?:\s+too)?", low))
             if m:
                 f = _snake(m.group(1))
                 c = "optional" if "optional" in m.group(2) or "not" in m.group(2) else "required"
@@ -302,22 +325,26 @@ If something truly can't be built with these rules, say so in a question and off
 """
 
 
-def translate(english: str, current: str, ai=None, answers: Optional[List[dict]] = None) -> dict:
+MAX_ROUNDS = 2   # after this many answered rounds the agent stops asking and states assumptions instead
+
+
+def translate(english: str, current: str, ai=None, answers: Optional[List[dict]] = None, finalize: bool = False) -> dict:
     english = (english or "").strip()
     if not english:
         raise ValueError("Describe the requirement first")
     answers = [a for a in (answers or []) if (a.get("answer") or "").strip()]
     if ai is not None and ai.available:
         try:
-            return _translate_llm(english, current, ai, answers)
+            return _translate_llm(english, current, ai, answers, finalize)
         except Exception as e:      # model unreachable / bad key / bad output → parser fallback
             out = _translate_parser(english, current, answers)
             out["assumptions"] = [f"The model couldn't be reached ({str(e)[:120]}), so the parser fallback was used."] + out["assumptions"]
             return out
-    return _translate_parser(english, current, answers)
+    return _translate_parser(english, current, answers, finalize)
 
 
-def _translate_llm(english: str, current: str, ai, answers: List[dict]) -> dict:
+def _translate_llm(english: str, current: str, ai, answers: List[dict], finalize: bool = False) -> dict:
+    finalize = finalize or len(answers) >= 3 * MAX_ROUNDS
     if True:
         convo = "".join(f"\nQ: {a.get('text') or a.get('question','')}\nA: {a['answer']}" for a in answers)
         user = (f"Current rules file:\n```\n{current}\n```\n\nRequirement:\n{english}\n"
@@ -326,6 +353,9 @@ def _translate_llm(english: str, current: str, ai, answers: List[dict]) -> dict:
                 '"understanding": ["each change restated in plain English for the business user"], '
                 '"assumptions": ["..."], "questions": [{"text": "...", "options": ["...", "..."]}]}')
         system = SYSTEM.format(keys=", ".join(f"{k} ({v})" for k, v in UI_KEYS.items())) + CONVERSE
+        if finalize:
+            user += ("\nThe user wants to proceed now: DO NOT ask any questions. Resolve every open point with the most "
+                     "reasonable choice and list each choice under assumptions. Return an empty questions list.")
         data = ai.json(system, user)
         text = data.get("spec_text", "")
         try:
@@ -341,17 +371,20 @@ def _translate_llm(english: str, current: str, ai, answers: List[dict]) -> dict:
             if q.get("text"):
                 qs.append(_q(q["text"], [str(o) for o in (q.get("options") or [])][:4]))
         asked = {a.get("id") for a in answers}
-        qs = [q for q in qs if q["id"] not in asked]
+        qs = [] if finalize else [q for q in qs if q["id"] not in asked]
         return {"spec_text": text if text.endswith("\n") else text + "\n", "summary": data.get("summary", ""),
                 "understanding": data.get("understanding") or [], "assumptions": data.get("assumptions") or [],
                 "questions": qs, "engine": "claude", "model": ai.model, "answers": answers, "ready": not qs}
 
 
-def _translate_parser(english: str, current: str, answers: List[dict]) -> dict:
+def _translate_parser(english: str, current: str, answers: List[dict], finalize: bool = False) -> dict:
     out = heuristic(_apply_answers(english, answers), current)
     # a free-text reply that doesn't actually settle a required/optional question gets asked again
     asked = {a.get("id") for a in answers
              if not a.get("about") or re.search(r"\b(required|mandatory|must|optional|skip|not required)\b", a["answer"].lower())}
     out["questions"] = [q for q in out["questions"] if q["id"] not in asked]
+    if finalize and out["questions"]:
+        out["assumptions"] = out["assumptions"] + [f"Skipped: {q['text']}" for q in out["questions"]]
+        out["questions"] = []
     out.update(answers=answers, ready=not out["questions"])
     return out

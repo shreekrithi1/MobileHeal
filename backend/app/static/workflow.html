@@ -579,7 +579,7 @@ async function renderNew(prefill){
       <div><div class="label" style="text-align:center">Live preview</div><div id="f-phone" class="phones"></div></div>
     </div>`;
   $("#f-spec").addEventListener("input", () => { state.manualRules = true; validateNew(); });
-  $("#f-eng").addEventListener("input", () => { clearTimeout(state.engT); state.engT = setTimeout(() => { if ($("#f-eng").value.trim().length > 12) translateEng(true); }, 1400); });
+  $("#f-eng").addEventListener("input", () => { clearTimeout(state.engT); state.engT = setTimeout(() => { if ($("#f-eng") && $("#f-eng").value.trim().length > 12) translateEng(true); }, 1400); });
   state.manualRules = false;
   validateNew();
 }
@@ -587,6 +587,7 @@ let vT;
 function validateNew(){
   clearTimeout(vT);
   vT = setTimeout(async () => {
+    if (!$("#f-spec")) return;
     const text = $("#f-spec").value;
     const r = await api("/api/requirements/validate", {method:"POST", body:{text}});
     $("#f-spec").classList.toggle("bad", !r.valid);
@@ -608,9 +609,13 @@ async function submitNew(){
     const eng = $("#f-eng").value.trim();
     if (!eng && !state.manualRules) throw new Error("Describe what you need first");
     if (eng && eng !== state.lastTranslated && !state.manualRules) { b.innerHTML = `<span class="spinner"></span> Understanding your requirement…`; await translateEng(); }
-    if (eng && !state.translation && !state.manualRules) throw new Error("Couldn't turn that into rules — rephrase it or edit the rules under Advanced");
-    if (eng && !state.manualRules && (state.translation.questions||[]).length) { $("#qa-0")&&$("#qa-0").scrollIntoView({block:"center",behavior:"smooth"}); throw new Error("Answer the open questions first so we agree on what to build"); }
-    if (eng && !state.manualRules && !state.agreed) { $("#f-agree")&&$("#f-agree").scrollIntoView({block:"center",behavior:"smooth"}); throw new Error("Confirm “Yes, that's what I want” first"); }
+    if (eng && !state.translation && !state.manualRules) throw new Error(state.trError ? "The agent couldn't read that: " + state.trError : "Couldn't turn that into rules — rephrase it or edit the rules under Advanced");
+    if (eng && !state.manualRules && (state.translation.questions||[]).length) {
+      if (!confirm("The agent still has " + state.translation.questions.length + " open question(s).\n\nOK = continue with the agent's best assumptions\nCancel = answer them first")) {
+        $("#qa-0")&&$("#qa-0").scrollIntoView({block:"center",behavior:"smooth"}); throw new Error("Answer the questions, or click “Skip questions”"); }
+      b.innerHTML = `<span class="spinner"></span> Settling open questions…`; await skipQuestions();
+      if ((state.translation.questions||[]).length) throw new Error("Couldn't settle the open questions — answer them or edit the rules under Advanced"); }
+    if (eng && !state.manualRules) { state.agreed = true; state.translation.agreed = true; }
     b.innerHTML = `<span class="spinner"></span> Generating design…`;
     const title = $("#f-title").value.trim() || shortTitle(eng) || "Rules change";
     const cr = await api("/api/cr", {method:"POST", body:{title, description:$("#f-desc").value || eng, spec_text:$("#f-spec").value,
@@ -1067,6 +1072,7 @@ function translationHtml(t, live=false){
       ${live?qs.map((q,i)=>`<div class="qcard"><div class="qt">${esc(qText(q))}</div>
         ${(q.options||[]).length?`<div class="qopts">${q.options.map((o,j)=>`<button class="btn sm" onclick="answerQ(${i},${j})">${esc(o)}</button>`).join("")}</div>`:""}
         <div style="display:flex;gap:6px"><input class="input" id="qa-${i}" placeholder="…or answer in your own words" onkeydown="if(event.key==='Enter')answerQ(${i})"><button class="btn sm" onclick="answerQ(${i})">Reply</button></div></div>`).join("")
+        + `<div class="agree"><button class="btn sm" id="f-skip" onclick="skipQuestions()">Skip questions — use the agent's best assumptions</button><span class="hint" style="margin:0">You'll still review everything in the UX design.</span></div>`
       :`<ul class="notes">${qs.map(q=>`<li>${esc(qText(q))}</li>`).join("")}</ul>`}`:""}
     ${live&&!qs.length&&und.length?(state.agreed?`<div class="agree"><span class="ok">✓ Agreed — this is what will be built</span><button class="btn sm" onclick="state.agreed=false;renderTr()">Change something</button></div>`
       :`<div class="agree"><button class="btn primary sm" id="f-agree" onclick="state.agreed=true;state.translation.agreed=true;renderTr()">✓ Yes, that's what I want</button><span class="hint" style="margin:0">Not quite? Edit the text above or add a sentence — I'll re-read it.</span></div>`):""}
@@ -1080,14 +1086,17 @@ async function answerQ(i, j){
   state.answers = [...(state.answers||[]), {...q, answer}];
   await translateEng(false, true);
 }
+async function skipQuestions(){ state.finalize = true; await translateEng(false, true); state.finalize = false;
+  if (state.translation && !(state.translation.questions||[]).length) { state.agreed = true; state.translation.agreed = true; renderTr(); toast("Assumptions recorded — you can generate the design now"); } }
 async function translateEng(silent=false, keepAnswers=false){
+  if (!$("#f-eng")) return;
   const text = $("#f-eng").value.trim(); if (!text) { if(!silent) toast("Describe the requirement first"); return; }
   if (silent && text === state.lastTranslated) return;
   if (!keepAnswers && text !== state.lastTranslated) { state.answers = []; }
   state.agreed = false;
   const b = $("#f-tr"); if (b){ b.disabled = true; b.innerHTML = `<span class="spinner"></span> ${state.settings&&state.settings.ai.available?"Agent is reading…":"Agent is reading…"}`; }
   try {
-    const r = await api("/api/requirements/translate", {method:"POST", body:{text, answers: state.answers||[]}});
+    const r = await api("/api/requirements/translate", {method:"POST", body:{text, answers: state.answers||[], finalize: !!state.finalize}});
     if ($("#f-eng").value.trim() !== text) return;           // user kept typing
     state.translation = {summary:r.summary, understanding:r.understanding, assumptions:r.assumptions, questions:r.questions,
                          answers:r.answers, engine:r.engine, model:r.model, ready:r.ready};
@@ -1095,7 +1104,8 @@ async function translateEng(silent=false, keepAnswers=false){
     $("#f-spec").value = r.spec_text; validateNew();
     renderTr();
     const q0 = $("#qa-0"); if (q0 && !silent) q0.scrollIntoView({block:"nearest", behavior:"smooth"});
-  } catch(e){ if(!silent) toast(e.message); }
+    state.trError = null;
+  } catch(e){ state.trError = e.message; if(!silent) toast(e.message); }
   if (b){ b.disabled = false; b.textContent = "Preview what will change ↓"; }
 }
 function shortTitle(t){ t=(t||"").split(/[.!?\n]/)[0].trim(); if (t.length<=70) return t; return t.slice(0, t.lastIndexOf(" ", 68)) + "…"; }
