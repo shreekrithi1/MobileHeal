@@ -3,14 +3,15 @@
 import MobileHealKit
 
 enum RulesDefaults {
-    static let specVersion = "main"
+    static let specVersion = "CR-20"
 
     static let requiredFields: [String] = ["name", "email"]
 
-    static let optionalFields: [String] = []
+    static let optionalFields: [String] = ["date_of_birth"]
 
     static let ui: [String: String] = [
         "after_save": "stay",
+        "banner_color": "#FFF9C4",
         "banner_message": "Changes saved successfully",
         "button_color": "#079455",
         "button_label": "Save changes",
