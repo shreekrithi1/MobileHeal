@@ -5,3 +5,5 @@
 name: required
 email: required
 zip: required
+ui.button_color = #079455
+ui.button_label = Save changes

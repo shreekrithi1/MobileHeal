@@ -3,11 +3,14 @@
 package com.mobileheal.app.generated
 
 object RulesDefaults {
-    const val SPEC_VERSION = "CR-4"
+    const val SPEC_VERSION = "CR-6"
 
     val REQUIRED_FIELDS: List<String> = listOf("name", "email", "zip")
 
     val OPTIONAL_FIELDS: List<String> = listOf()
 
-    val UI: Map<String, String> = mapOf()
+    val UI: Map<String, String> = mapOf(
+        "button_color" to "#079455",
+        "button_label" to "Save changes"
+    )
 }
