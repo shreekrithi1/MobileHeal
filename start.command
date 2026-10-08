@@ -7,6 +7,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PORT="${MOBILEHEAL_PORT:-8000}"
+HOST="${MOBILEHEAL_HOST:-127.0.0.1}"   # localhost only; the Android emulator still reaches it via 10.0.2.2
 MODE="${1:-all}"
 cd "$ROOT"
 
@@ -27,11 +28,22 @@ open_android_studio() {
 
 setup_python() {
   PY=""
-  for c in python3.12 python3.11 python3.10 python3.9 python3; do
-    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then PY="$c"; break; fi
+  for c in python3.13 python3.12 python3.11 python3.10 /opt/homebrew/bin/python3 /usr/local/bin/python3 python3 python3.9; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then PY="$c"; break; fi
   done
-  [ -n "$PY" ] || { warn "Python 3.9+ is required — install it from https://www.python.org/downloads/"; exit 1; }
+  if [ -z "$PY" ]; then
+    for c in python3.9 python3; do
+      if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then PY="$c"; break; fi
+    done
+    [ -n "$PY" ] || { warn "Python 3.10+ is required — install it from https://www.python.org/downloads/"; exit 1; }
+    warn "Using $($PY --version): it works, but security fixes in the web stack need Python 3.10+."
+    warn "Upgrade with:  brew install python@3.12   (then delete backend/.venv and run again)"
+  fi
   cd "$ROOT/backend"
+  if [ -x .venv/bin/python ] && ! .venv/bin/python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' \
+     && "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+    say "Upgrading the virtual environment to $($PY --version)…"; rm -rf .venv
+  fi
   if [ ! -x .venv/bin/python ]; then say "Creating virtual environment with $($PY --version)…"; "$PY" -m venv .venv; fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
@@ -55,7 +67,10 @@ if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
 fi
 
 say "Starting MobileHeal on http://localhost:$PORT …"
-uvicorn app.main:app --host 0.0.0.0 --port "$PORT" &
+if [ "$HOST" != "127.0.0.1" ] && [ -z "${MOBILEHEAL_API_TOKEN:-}" ]; then
+  warn "Listening on $HOST without MOBILEHEAL_API_TOKEN — anyone on your network could control MobileHeal."
+fi
+uvicorn app.main:app --host "$HOST" --port "$PORT" &
 SERVER=$!
 trap 'echo; say "Stopping MobileHeal…"; kill $SERVER 2>/dev/null; wait $SERVER 2>/dev/null; ok "Stopped"' EXIT INT TERM
 

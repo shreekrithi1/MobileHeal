@@ -107,8 +107,31 @@ class Settings:
         out["default_provider"] = DEFAULT_PROVIDER
         return out
 
+    # changing where a credential is sent invalidates that credential (blocks "point the URL at me" key theft)
+    URL_SECRETS = {"jira_base_url": ["jira_api_token"], "jira_email": ["jira_api_token"],
+                   "zephyr_base_url": ["zephyr_token"], "llm_base_url": ["custom_api_key", "azure_api_key"]}
+
+    @staticmethod
+    def _check_url(k: str, v: str):
+        if not v:
+            return
+        from urllib.parse import urlsplit
+        u = urlsplit(v)
+        local = (u.hostname or "") in ("localhost", "127.0.0.1", "::1")
+        if u.scheme not in ("https", "http") or not u.hostname or (u.scheme == "http" and not local):
+            raise ValueError(f"{k} must be an https:// URL" + (" (http is allowed only for localhost)" if k == "llm_base_url" else ""))
+
     def update(self, data: dict, actor: str) -> dict:
         changed = []
+        for k in ("jira_base_url", "zephyr_base_url", "llm_base_url", "notify_webhook_url", "android_repo_url"):
+            if data.get(k):
+                self._check_url(k, str(data[k]).strip())
+        for k, secrets in self.URL_SECRETS.items():
+            if k in data and data[k] is not None and str(data[k]).strip() != self.get(k):
+                for sk in secrets:
+                    if not data.get(sk) and self.db.get_setting("cfg:" + sk, ""):
+                        self.set(sk, "")
+                        changed.append(f"{sk} (cleared: {k} changed)")
         for k, v in data.items():
             if k not in DEFAULTS and k not in SECRET_KEYS:
                 continue
@@ -189,6 +212,8 @@ class AI:
 
     # ---- wires
     def _http(self, url: str, payload: dict, headers: dict) -> dict:
+        if not url.startswith(("https://", "http://localhost", "http://127.0.0.1")):
+            raise AIError("Model endpoint must be https:// (or http://localhost for Ollama)")
         req = urllib.request.Request(url, method="POST", data=json.dumps(payload).encode(),
                                      headers={"content-type": "application/json", **headers})
         name = self.spec["name"]

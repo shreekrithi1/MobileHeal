@@ -258,7 +258,7 @@ def heuristic(english: str, current: str) -> dict:
 
 def _q(text: str, options: List[str], replaces: Optional[str] = None, about: Optional[str] = None) -> dict:
     import hashlib
-    return {"id": hashlib.sha1(text.lower().encode()).hexdigest()[:10], "text": text, "options": options,
+    return {"id": hashlib.sha1(text.lower().encode(), usedforsecurity=False).hexdigest()[:10], "text": text, "options": options,
             "replaces": replaces, "about": about}
 
 

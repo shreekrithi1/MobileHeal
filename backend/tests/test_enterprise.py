@@ -224,8 +224,7 @@ def test_repo_api_defaults_and_browse_guard(env):
     client, _ = env
     st = client.get("/api/repo").json()
     assert st["url"] == "https://github.com/android/nowinandroid" and st["status"] == "not_synced"
-    client.put("/api/settings", json={"android_repo_url": "file:///etc"})
-    assert client.post("/api/repo/sync").status_code == 400
+    assert client.put("/api/settings", json={"android_repo_url": "file:///etc"}).status_code == 400
     assert client.get("/api/repo/file", params={"path": "../../../etc/passwd"}).status_code == 400
 
 

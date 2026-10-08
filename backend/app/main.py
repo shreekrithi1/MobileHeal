@@ -153,6 +153,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MobileHeal", lifespan=lifespan)
+from .security import SecurityMiddleware  # noqa: E402
+app.add_middleware(SecurityMiddleware)
 
 
 def _payload(p: ProfileIn) -> dict:
@@ -485,7 +487,10 @@ def settings_get():
 
 @app.put("/api/settings")
 def settings_put(body: SettingsIn):
-    _settings().update(body.model_dump(), app.state.wf.user)
+    try:
+        _settings().update(body.model_dump(), app.state.wf.user)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return settings_get()
 
 
@@ -888,8 +893,19 @@ def workflow_page():
 
 # ---------------- Dashboard (FR-4.2) ----------------
 @app.get("/")
-def home():
-    return FileResponse(STATIC / "workflow.html")
+def home(request: Request, token: str = ""):
+    resp = FileResponse(STATIC / "workflow.html")
+    expected = os.getenv("MOBILEHEAL_API_TOKEN", "")
+    if expected and token:
+        import hmac
+        if hmac.compare_digest(token, expected):   # /?token=… once → httpOnly cookie for the web app
+            resp.set_cookie("mh_token", token, httponly=True, samesite="strict")
+    return resp
+
+
+@app.get("/api/health")
+def health():
+    return {"ok": True}
 
 
 @app.get("/dashboard")

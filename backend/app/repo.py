@@ -70,8 +70,12 @@ class AndroidRepo:
             raise RepoError("Use an https git URL, e.g. https://github.com/android/nowinandroid")
         return url
 
+    BRANCH_RE = re.compile(r"^(?!-)[A-Za-z0-9._/-]{1,100}$")
+
     def sync_async(self) -> dict:
         self.validate_url(self.url)
+        if self.branch and (not self.BRANCH_RE.match(self.branch) or ".." in self.branch):
+            raise RepoError("Invalid branch name")
         if self._state().get("status") == "syncing" and time.time() - self._state().get("started", 0) < 600:
             return self.status()
         self._save(status="syncing", url=self.url, started=time.time(), error=None)
@@ -87,13 +91,13 @@ class AndroidRepo:
             try:
                 if (d / ".git").exists():
                     ref = self.branch or "HEAD"
-                    self._git(["fetch", "--depth", "1", "origin", ref], d, env)
+                    self._git(["fetch", "--depth", "1", "--", "origin", ref], d, env)
                     self._git(["reset", "--hard", "FETCH_HEAD"], d, env)
                 else:
                     if d.exists():
                         shutil.rmtree(d)
                     d.parent.mkdir(parents=True, exist_ok=True)
-                    args = ["clone", "--depth", "1", "--single-branch"] + (["--branch", self.branch] if self.branch else []) + [url, str(d)]
+                    args = ["clone", "--depth", "1", "--single-branch"] + (["--branch", self.branch] if self.branch else []) + ["--", url, str(d)]
                     self._git(args, d.parent, env)
                 sha = self._git(["rev-parse", "HEAD"], d, env).strip()
                 info = self._git(["log", "-1", "--format=%s%n%cI%n%an"], d, env).splitlines() + ["", "", ""]
@@ -117,8 +121,13 @@ class AndroidRepo:
 
     # ---------------------------------------------------------------- browse
     def _safe(self, rel: str) -> Path:
-        p = (self.dir / (rel or "")).resolve()
-        if not str(p).startswith(str(self.dir.resolve())) or ".git" in p.relative_to(self.dir.resolve()).parts:
+        base = self.dir.resolve()
+        p = (base / (rel or "")).resolve()
+        try:
+            parts = p.relative_to(base).parts
+        except ValueError:
+            raise RepoError("Path outside the repository")
+        if ".git" in parts:
             raise RepoError("Path outside the repository")
         return p
 

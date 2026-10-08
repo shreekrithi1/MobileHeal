@@ -114,6 +114,23 @@ mobileheal/
 Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, default 60), `MOBILEHEAL_SPEC`,
 `MOBILEHEAL_DB`, `MOBILEHEAL_ENV` (development/staging/production).
 
+## Security
+
+MobileHeal can write code, run tests and hold API keys, so it is locked down by default:
+
+- **Listens on localhost only** (`127.0.0.1`). The Android emulator still reaches it via `10.0.2.2`.
+  To use a physical phone: `MOBILEHEAL_HOST=0.0.0.0 MOBILEHEAL_ALLOWED_HOSTS=192.168.1.20 MOBILEHEAL_API_TOKEN=<long-random> ./start.command`,
+  then open the web app once with `http://<ip>:8000/?token=<long-random>`.
+- **Blocks DNS-rebinding and cross-site requests** (Host allow-list, Origin check, JSON-only writes) and sends
+  security headers (CSP, no framing, nosniff, no-referrer).
+- **Secrets** stay in the git-ignored local database, are never returned to the browser, and are **cleared automatically
+  when the URL they are sent to changes** (so a changed Jira/endpoint URL can't capture an existing token).
+  Endpoint URLs must be `https://` (Ollama may use `http://localhost`).
+- **Repository sync** accepts https git URLs only; branch names are validated and file browsing can't leave the clone.
+- **Dependencies**: use Python **3.10+** to get the patched web stack (Starlette ≥ 1.3.1). On Python 3.9 the launcher
+  warns you; upgrade with `brew install python@3.12`, delete `backend/.venv`, run again.
+- **Agent-written code is never merged automatically** — every change needs a human test/approval and passing checks.
+
 ## Troubleshooting
 
 - **`python3: command not found` / too old** — install Python 3.9+ from python.org, then re-run.
