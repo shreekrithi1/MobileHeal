@@ -104,8 +104,16 @@ case "$MODE" in
 esac
 
 setup_python
-if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
-  warn "Port $PORT is already in use — MobileHeal may already be running. Opening it…"
+# An older MobileHeal server still holding the port would keep serving OLD code — stop it and start fresh.
+PIDS="$(lsof -ti tcp:"$PORT" -sTCP:LISTEN 2>/dev/null || true)"
+if [ -n "$PIDS" ] && ps -o command= -p $PIDS 2>/dev/null | grep -qE "app\.main|uvicorn|mobileheal"; then
+  say "Restarting the MobileHeal server already running on port $PORT so it picks up the latest code…"
+  kill $PIDS 2>/dev/null || true
+  for _ in $(seq 1 20); do lsof -ti tcp:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 || break; sleep 0.5; done
+  lsof -ti tcp:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 && { kill -9 $(lsof -ti tcp:"$PORT" -sTCP:LISTEN) 2>/dev/null || true; sleep 1; }
+fi
+if lsof -ti tcp:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  warn "Port $PORT is used by another program (not MobileHeal) — stop it or run with PORT=8001 ./start.command. Opening it…"
   open "http://localhost:$PORT" 2>/dev/null || true
   [ "$MODE" = "--server" ] || { open_android_studio || true; open_xcode || warn "Couldn't open Xcode — run ./start.command --ios later"; }
   exit 0
