@@ -104,6 +104,27 @@ Crashlytics has no public API for reading crashes, so MobileHeal reads Google's 
 Credentials stay in the git-ignored local database and are never sent to the browser. Demo mode simulates two
 Crashlytics issues, so you can try this without a Firebase project.
 
+### Figma two-way sync
+
+Settings → **Design & testing → Figma two-way sync**. Enter the design file (the frame that is the source of truth),
+a Figma token, and the **UX designers** and **portal admins** who may approve design changes.
+
+**MobileHeal → Figma.** When a design is approved in MobileHeal, its tokens are pushed to Figma automatically:
+- **Variables API.** MobileHeal writes a `MobileHeal` variable collection: `ui/*` colours and labels, plus
+  `fields/<name>/required`. This needs Figma Enterprise and a token with `file_variables:write`.
+- **Comment.** Every plan gets a comment on the file listing what changed.
+- **MobileHeal Figma plugin** (`figma-plugin/`). Works on any plan: the designer runs it, and it pulls the approved
+  tokens from MobileHeal and applies them to the variables and the Profile frame (button, banner, required markers).
+
+**Figma → MobileHeal.** When a designer publishes a new version, MobileHeal reads the frame again. MobileHeal finds
+the new version by checking every N minutes, or instantly through a webhook (`FILE_VERSION_UPDATE` →
+`/api/figma/webhook`, verified by passcode; it needs a public https URL). Every token that changed in Figma becomes a
+**From Figma** change request. Further edits update that same request. It waits in UX Design until a **UX designer or
+portal admin** approves it. Nobody else can, not even Autopilot. After approval it joins the normal pipeline: coding,
+PR, reviewer agents, tests, merge, and production. Pushes from MobileHeal never come back as new requests.
+
+Demo mode simulates the Figma file. Use **Simulate a designer edit in Figma** in Settings to try the whole loop.
+
 ### Demo mode works in a separate copy of your project
 
 `./start.command --demo` runs the agents against `.mobileheal/demo-workspace`, a copy of your project, so your own

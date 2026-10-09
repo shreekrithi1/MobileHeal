@@ -186,7 +186,8 @@ class Workflow:
                                                 "updated_at", "tested", "stage", "occurrences", "last_seen")} |
                        {"kind": cr.get("kind", "change")} |
                        {"pr": cr.get("pr"), "stats": cr.get("stats"), "checks_summary": cr.get("checks_summary"),
-                        "review_status": (cr.get("review") or {}).get("status"), "autopilot_paused": cr.get("autopilot_paused")})
+                        "review_status": (cr.get("review") or {}).get("status"), "autopilot_paused": cr.get("autopilot_paused"),
+                        "source": cr.get("source")})
         return out
 
     @property
@@ -232,7 +233,7 @@ class Workflow:
 
     # ------------------------------------------------------------ 1. requirements → 2. design
     def create(self, title: str, description: str, spec_text: str, author: Optional[str] = None,
-               requirement_text: str = "", translation: Optional[dict] = None) -> dict:
+               requirement_text: str = "", translation: Optional[dict] = None, source: Optional[str] = None) -> dict:
         author = author or self.user
         title = title.strip()
         if not title:
@@ -250,14 +251,18 @@ class Workflow:
               "base_spec": base, "status": "design_review", "stage": 1, "revision": 1, "tested": False,
               "created_at": now(), "timeline": [], "requirement_text": (requirement_text or "").strip(),
               "translation": translation}
+        if source:
+            cr["source"] = source        # "figma": a designer's change — needs a UX designer / admin to approve
         cr = self._save(cr)
         self._event(cr, author, "requirements", "submitted requirements")
         cr["design"] = self._design(base, spec_text)
+        human_gate = source == "figma"
         self._event(cr, "MobileHeal", "design",
                     f"generated UX design ({len(cr['design']['changes'])} change(s)) — "
-                    + ("Autopilot is approving it" if self.autopilot else "awaiting approval"))
+                    + ("waiting for a UX designer or admin" if human_gate else
+                       "Autopilot is approving it" if self.autopilot else "awaiting approval"))
         cr = self._save(cr)
-        if self.autopilot:
+        if self.autopilot and not human_gate:
             return self.approve_design(cr["id"], actor="Autopilot")
         return cr
 
@@ -292,12 +297,30 @@ class Workflow:
         cr = self.get(cid)
         if cr["status"] != "design_review":
             raise WorkflowError("Design is not awaiting approval", 409)
+        from .figsync import FigmaSync
+        sync = FigmaSync(self)
+        who = actor or self.user
+        if cr.get("source") == "figma" and (who == "Autopilot" or not sync.can_approve(who)):
+            a = sync.approvers()
+            raise WorkflowError(f"Only a UX designer or portal admin can approve a Figma design change "
+                                f"({', '.join(a['ux_designers'] + a['admins'])}). You are signed in as {who}.", 403)
+        push_figma = sync.configured and cr.get("source") != "figma" and self.settings.get("figma_push_on_approve") != "off"
         cr["status"], cr["stage"] = "coding", 2
         cr["coding_log"] = []
         self._event(cr, actor or self.user, "approve", "approved the UX design")
         self._save(cr)
-        self.spawn(self._run_coding, cid)
+        self.spawn(self._approved_then_code, cid, push_figma)
         return cr
+
+    def _approved_then_code(self, cid: int, push_figma: bool):
+        """Sync the approved design to Figma first (same thread → no lost updates), then generate the code."""
+        if push_figma:
+            try:
+                from .figsync import FigmaSync
+                FigmaSync(self).push(self.get(cid), None, "design approved in MobileHeal")
+            except Exception as e:
+                log.warning("Figma push failed: %s", e)
+        self._run_coding(cid)
 
     def spawn(self, fn, *args):
         t = threading.Thread(target=fn, args=args, daemon=True)

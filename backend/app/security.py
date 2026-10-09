@@ -66,7 +66,9 @@ class SecurityMiddleware:
                 return await self._deny(scope, receive, send, 415, "Send JSON (Content-Type: application/json)")
 
         token = os.getenv("MOBILEHEAL_API_TOKEN", "")
-        if token and path.startswith(("/api/", "/ws/")) and path != "/api/health":
+        # Figma calls the webhook (verified by passcode); the Figma plugin reads public design tokens
+        open_paths = {"/api/health", "/api/figma/webhook"} | ({"/api/figma/tokens"} if method == "GET" else set())
+        if token and path.startswith(("/api/", "/ws/")) and path not in open_paths:
             given = headers.get("x-mobileheal-token", "") or _cookie(headers.get("cookie", ""), "mh_token")
             if not hmac.compare_digest(given, token):
                 return await self._deny(scope, receive, send, 401, "Missing or invalid MobileHeal API token")

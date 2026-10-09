@@ -53,7 +53,8 @@ PROVIDERS: Dict[str, dict] = {
 }
 DEFAULT_PROVIDER = "anthropic"
 SECRET_KEYS = {"gitlab_token", "confluence_api_token", "jira_api_token", "zephyr_token", "github_token", "figma_token",
-               "firebase_service_account", "firebase_access_token", "firebase_oauth_client_secret", "firebase_refresh_token"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
+               "firebase_service_account", "firebase_access_token", "firebase_oauth_client_secret", "firebase_refresh_token",
+               "figma_webhook_passcode"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
 DEFAULTS = {
     "llm_provider": DEFAULT_PROVIDER, "llm_model": "", "llm_base_url": "",
     "anthropic_model": MODELS[0], "user_name": "You",
@@ -75,13 +76,18 @@ DEFAULTS = {
     # Firebase Crashlytics (read through the Crashlytics → BigQuery export)
     "firebase_project_id": "", "firebase_android_package": "", "firebase_ios_bundle": "",
     "firebase_bq_dataset": "firebase_crashlytics", "firebase_auth": "oauth", "firebase_oauth_client_id": "",
-    "firebase_oauth_email": "", "firebase_poll_minutes": "15",    # keep feature/ change/ hotfix/ branches after merge (visible in Android Studio)
+    "firebase_oauth_email": "", "firebase_poll_minutes": "15",
+    # Figma two-way sync + design approvers
+    "figma_sync_url": "", "figma_push_mode": "variables", "figma_poll_minutes": "15", "figma_push_on_approve": "on",
+    "ux_designers": "", "portal_admins": "",    # keep feature/ change/ hotfix/ branches after merge (visible in Android Studio)
 }
 CHOICES = {"delivery_mode": ("manual", "autopilot"), "review_sync": ("on", "off"),
            "merge_policy": ("tests_required", "review_only"), "require_fix_approval": ("on", "off"),
            "firebase_auth": ("oauth", "service_account", "token"), "delete_branch_on_merge": ("on", "off"),
-           "firebase_poll_minutes": ("0", "5", "15", "60", "360")}
-INTERNAL_KEYS = {"firebase_refresh_token", "firebase_oauth_email"}   # written by the sign-in flow only
+           "firebase_poll_minutes": ("0", "5", "15", "60", "360"),
+           "figma_push_mode": ("variables", "comment"), "figma_poll_minutes": ("0", "1", "5", "15", "60"),
+           "figma_push_on_approve": ("on", "off")}
+INTERNAL_KEYS = {"firebase_refresh_token", "firebase_oauth_email", "figma_webhook_passcode"}   # written by the sign-in flow only
 
 
 class Settings:
@@ -166,6 +172,12 @@ class Settings:
         for k, opts in CHOICES.items():
             if data.get(k) is not None and str(data[k]).strip() not in opts:
                 raise ValueError(f"{k} must be one of: {', '.join(opts)}")
+        if data.get("figma_sync_url"):
+            from .figma import FigmaError, parse_url
+            try:
+                parse_url(str(data["figma_sync_url"]))
+            except FigmaError as e:
+                raise ValueError(f"figma_sync_url: {e}")
         if data.get("base_branch") is not None and not re.fullmatch(r"[A-Za-z0-9._/-]{1,100}", str(data["base_branch"]).strip()):
             raise ValueError("base_branch is not a valid branch name")
         if data.get("firebase_service_account") and not str(data["firebase_service_account"]).startswith("•"):

@@ -25,6 +25,7 @@ from .demo import Demo, android_report
 from . import figma as fg
 from . import english, testcases as tc
 from . import firebase
+from . import figsync
 from urllib.parse import quote
 from typing import Any, Dict, List
 from .db import Database
@@ -169,6 +170,28 @@ class ToggleIn(BaseModel):
     state: Optional[str] = None  # START / STOP; omitted = flip
 
 
+def _start_figma_poll():
+    """Background: look for new Figma versions every N minutes (Settings → Design & testing → Figma sync)."""
+    import threading
+    import time as _t
+
+    def loop():
+        last = _t.time()
+        while True:
+            _t.sleep(20)
+            try:
+                mins = int(app.state.wf.settings.get("figma_poll_minutes") or "0")
+                if mins <= 0 or _t.time() - last < mins * 60:
+                    continue
+                last = _t.time()
+                fs = figsync.FigmaSync(app.state.wf)
+                if fs.configured and not fs.demo:
+                    fs.check()
+            except Exception:
+                logging.getLogger("mobileheal").exception("figma poll failed")
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def _start_crashlytics_poll():
     """Background: pull Crashlytics issues every N minutes (Settings → Firebase Crashlytics → Sync interval)."""
     import threading
@@ -210,6 +233,7 @@ async def lifespan(app: FastAPI):
     app.state.wf.loop = asyncio.get_running_loop()
     app.state.wf.start_background()
     _start_crashlytics_poll()
+    _start_figma_poll()
     yield
     await app.state.agent.stop()
 
@@ -660,7 +684,7 @@ def settings_get():
     return {**_settings().public(), "ai": wf.ai.status(), "zephyr_configured": tc.Zephyr(_settings()).configured,
             "github": wf.info()["github"], "connectors": connectors.status(_settings()),
             "demo_isolated": os.getenv("MOBILEHEAL_DEMO") == "1", "ios_present": (PROJECT_ROOT / "ios" / "MobileHeal").is_dir(),
-            "firebase": firebase.Crashlytics(_settings()).status()}
+            "firebase": firebase.Crashlytics(_settings()).status(), "figma_sync": figsync.FigmaSync(wf).status()}
 
 
 @app.put("/api/settings")
@@ -1139,6 +1163,99 @@ def cr_review_simulate_remote(cid: int, body: RemoteCommentIn):
         raise HTTPException(409, "This PR isn't mirrored to a remote")
     add_pr_comment(wf.settings, num, body.author.strip() or "reviewer", body.body.strip(), "commented", [], human=True)
     return wf.review_sync(cid)
+
+
+# ---------------- Figma two-way sync ----------------
+class FigmaEditIn(BaseModel):
+    changes: Dict[str, str] = Field(default_factory=dict)
+    designer: str = Field("maya.designer", max_length=60)
+    label: str = Field("", max_length=120)
+
+
+class WebhookRegIn(BaseModel):
+    endpoint: str = Field(..., max_length=500)
+
+
+def _fs():
+    return figsync.FigmaSync(app.state.wf)
+
+
+@app.get("/api/figma/sync")
+def figma_sync_status():
+    fs = _fs()
+    out = fs.status()
+    if fs.demo:
+        out["demo_file"] = fs.demo_file()
+    return out
+
+
+@app.post("/api/figma/sync/check")
+def figma_sync_check():
+    try:
+        return _fs().check(actor=app.state.wf.user)
+    except (figsync.SyncError, fg.FigmaError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/figma/sync/push")
+def figma_sync_push():
+    fs = _fs()
+    if not fs.configured:
+        raise HTTPException(400, "Connect Figma first — Settings → Design & testing → Figma sync")
+    try:
+        return fs.push(None, None, f"pushed by {app.state.wf.user}")
+    except (figsync.SyncError, fg.FigmaError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/figma/sync/webhook")
+def figma_sync_register_webhook(body: WebhookRegIn):
+    try:
+        return _fs().register_webhook(body.endpoint.rstrip("/") + "/api/figma/webhook")
+    except (figsync.SyncError, fg.FigmaError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/figma/webhook")
+async def figma_webhook(request: Request):
+    """Figma webhook (FILE_VERSION_UPDATE). Verified with the passcode MobileHeal registered."""
+    import hmac as _hmac
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "bad payload")
+    passcode = _settings().get("figma_webhook_passcode") or ""
+    if not passcode or not _hmac.compare_digest(str(body.get("passcode", "")), passcode):
+        raise HTTPException(403, "bad passcode")
+    if body.get("event_type") == "PING":
+        return {"ok": True}
+    fs = _fs()
+    if body.get("file_key") and fs.url and body["file_key"] != fs.key:
+        return {"ignored": "different file"}
+    app.state.wf.spawn(fs.check)
+    return {"ok": True}
+
+
+@app.post("/api/figma/demo/edit")
+def figma_demo_edit(body: FigmaEditIn):
+    """Demo mode: simulate a designer publishing a new version in Figma."""
+    fs = _fs()
+    try:
+        changes = body.changes or {"ui.button_color": "#7C3AED", "ui.button_label": "Save profile"}
+        v = fs.demo_designer_edit(changes, body.designer, body.label)
+        return {**v, "check": fs.check()}
+    except figsync.SyncError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.get("/api/figma/tokens")
+def figma_tokens():
+    """Design tokens for the MobileHeal Figma plugin (read-only, CORS-enabled, no secrets)."""
+    text = app.state.agent.read_text()
+    toks = figsync.tokens_from_spec(text)
+    return JSONResponse({"collection": figsync.COLLECTION, "tokens": toks,
+                         "variables": figsync.variables_payload_items(toks)},
+                        headers={"Access-Control-Allow-Origin": "*"})
 
 
 # ---------------- Firebase Crashlytics ----------------
