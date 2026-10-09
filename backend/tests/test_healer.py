@@ -149,3 +149,10 @@ def test_reject_routes_to_engineer(env):
     r = c.post(f"/api/incidents/{inc['id']}/reject", json={"note": "touches billing"}).json()
     assert r["status"] == "needs_engineer" and "touches billing" in r["error"]
     assert c.get("/api/jira/issues/MH-1").json()["status"] == "To Do"
+
+
+def test_kotlin_get_value_playbook():
+    from app.patcher import propose_kotlin
+    new, why = propose_kotlin('        val phone = content.fields.getValue("phone_number").trim()',
+                              "java.util.NoSuchElementException", "Key phone_number is missing in the map.")
+    assert new.strip() == 'val phone = content.fields["phone_number"].orEmpty().trim()'

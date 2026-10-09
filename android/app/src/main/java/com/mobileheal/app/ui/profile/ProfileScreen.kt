@@ -111,7 +111,9 @@ private fun ContentBody(state: ProfileUiState.Content, onAction: (ProfileAction)
                 Column(Modifier.padding(16.dp)) {
                     Text("Action needed", fontWeight = FontWeight.Bold, color = bannerText)
                     Text(
-                        ui["banner_message"] ?: "Your profile is missing: ${state.missing.joinToString { it.toLabel() }}. " +
+                        // a custom message never hides *which* fields are missing
+                        ui["banner_message"]?.let { "$it Missing: ${state.missing.joinToString { f -> f.toLabel() }}." }
+                            ?: "Your profile is missing: ${state.missing.joinToString { it.toLabel() }}. " +
                             "Please fill in the highlighted fields and tap ${ui["button_label"] ?: "Save"}.",
                         color = bannerText,
                     )

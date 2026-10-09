@@ -177,6 +177,24 @@ KT_STRING_METHODS = {"trim", "lowercase", "uppercase", "length", "isBlank", "isE
                      "substring", "startsWith", "endsWith", "contains", "toInt", "toLong", "trimStart", "trimEnd"}
 
 
+def _kt_get_value(line: str, exc_type: str, msg: str) -> Optional[Patch]:
+    """`map.getValue(key)` throws NoSuchElementException (or NPE on platform maps) when the key is missing."""
+    if not re.search(r"NoSuchElement|NullPointer", exc_type):
+        return None
+    m = re.search(r"([\w\.]+)\.getValue\(([^()]+)\)", line)
+    if not m:
+        return None
+    recv, key = m.group(1), m.group(2)
+    after = line[m.end():]
+    sm = re.match(r"\.(\w+)", after)
+    if sm and sm.group(1) in KT_STRING_METHODS:
+        repl = f"{recv}[{key}].orEmpty()"
+    else:
+        repl = f"{recv}[{key}]"
+    return (line[:m.start()] + repl + after,
+            f"`{recv}` doesn't always contain {key}, so `getValue` threw. Read it with `[{key}]` and default a missing value.")
+
+
 def _kt_npe(line: str, exc_type: str, msg: str) -> Optional[Patch]:
     if "NullPointerException" not in exc_type:
         return None
@@ -218,7 +236,7 @@ def _kt_index(line: str, exc_type: str, msg: str) -> Optional[Patch]:
 
 
 def propose_kotlin(line: str, exc_type: str, msg: str) -> Optional[Patch]:
-    for f in (_kt_npe, _kt_index):
+    for f in (_kt_get_value, _kt_npe, _kt_index):
         r = f(line, exc_type, msg)
         if r and r[0] != line:
             return r

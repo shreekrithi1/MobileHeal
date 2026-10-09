@@ -79,7 +79,9 @@ final class ProfileViewModel {
         guard missing.isEmpty, issues.isEmpty else {
             c.missing = missing
             c.reasons = issues
-            c.banner = "Please complete: " + (missing + issues.keys.sorted()).map(\.titleCased).joined(separator: ", ")
+            // ui.banner_message is the custom *alert* copy; always say which fields are missing
+            c.banner = (c.rules.ui["banner_message"].map { $0 + " " } ?? "")
+                + "Please complete: " + (missing + issues.keys.sorted()).map(\.titleCased).joined(separator: ", ")
             state = .content(c)
             return
         }
@@ -93,7 +95,7 @@ final class ProfileViewModel {
             c.values = outcome.profile.fields
             c.missing = outcome.missing
             c.isSaving = false
-            c.banner = outcome.missing.isEmpty ? (c.rules.ui["banner_message"] ?? "Saved") : nil
+            c.banner = outcome.missing.isEmpty ? "Saved" : nil
             state = .content(c)
             if outcome.missing.isEmpty, case .navigate(let screen) = c.rules.afterSave {
                 destination = screen

@@ -616,7 +616,7 @@ function phone({rules, ui, values, interactive=false, highlight=[], id="", onInp
   const fields = profileFields(rules);
   const errs = errors || miss;
   const banner = miss.length ? `<div class="banner" style="background:${esc(ui.banner_color)};color:${esc(ui.banner_text_color)}">
-      <b>Action needed</b>${esc(ui.banner_message || "Your profile is missing: " + miss.map(label).join(", ") + ". Please fill in the highlighted fields and tap " + ui.button_label + ".")}</div>` : "";
+      <b>Action needed</b>${esc(ui.banner_message ? ui.banner_message + " Missing: " + miss.map(label).join(", ") + "." : "Your profile is missing: " + miss.map(label).join(", ") + ". Please fill in the highlighted fields and tap " + ui.button_label + ".")}</div>` : "";
   const f = fields.map(k => `<div class="pf ${errs.includes(k)?'miss':''} ${highlight.includes(k)?'new':''}" style="background:${esc(ui.background_color)}">
       <span>${esc(label(k))}${rules.find(r=>r.field===k&&r.constraint==='required')?' *':''}</span>
       ${interactive ? `<input data-k="${k}" value="${esc(values[k]||"")}" oninput="${onInput}(this)" inputmode="${k.includes('phone')?'tel':k.includes('email')?'email':'text'}">`
@@ -669,7 +669,7 @@ async function renderNew(prefill){
       </div></div>
       <div><div class="label" style="text-align:center">Live preview</div><div id="f-phone" class="phones"></div></div>
     </div>`;
-  $("#f-spec").addEventListener("input", () => { state.manualRules = true; validateNew(); });
+  $("#f-spec").addEventListener("input", () => { state.manualRules = true; $("#f-submit").disabled = false; validateNew(); });
   $("#f-eng").addEventListener("input", () => { clearTimeout(state.engT); state.engT = setTimeout(() => { if ($("#f-eng") && $("#f-eng").value.trim().length > 12) translateEng(true); }, 1400); });
   state.manualRules = false;
   validateNew();
@@ -706,6 +706,7 @@ async function submitNew(){
         $("#qa-0")&&$("#qa-0").scrollIntoView({block:"center",behavior:"smooth"}); throw new Error("Answer the questions, or click “Skip questions”"); }
       b.innerHTML = `<span class="spinner"></span> Settling open questions…`; await skipQuestions();
       if ((state.translation.questions||[]).length) throw new Error("Couldn't settle the open questions — answer them or edit the rules under Advanced"); }
+    if (eng && !state.manualRules && state.translation.no_change) throw new Error((state.translation.summary || "The live rules already match this requirement") + " — nothing to change. Edit the requirement, or change the rules under Advanced.");
     if (eng && !state.manualRules) { state.agreed = true; state.translation.agreed = true; }
     b.innerHTML = `<span class="spinner"></span> Generating design…`;
     const title = $("#f-title").value.trim() || shortTitle(eng) || "Rules change";
@@ -734,6 +735,7 @@ function stepper(cur, cr){
 const defaultTab = cr => isInc(cr) ? ({detected:"overview", diagnosing:"diagnosis", awaiting_approval:"diagnosis", fixing:"diagnosis", needs_engineer:"diagnosis", pr_open: cr.tested?"pr":"test", merged:"pr", closed:"overview"})[cr.status]||"overview" : ({design_review:"design", coding:"code", failed:"code", pr_open: cr.tested ? "pr" : "test", merged:"pr", closed:"overview"})[cr.status] || "overview";
 
 async function loadCR(id, tab){
+  clearInterval(state.poll);
   try { state.cr = await api(`/api/cr/${id}`); } catch(e){ $("#view").innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
   if (state.preview.crId !== id) {
     const profs = await api("/api/profiles");
@@ -743,8 +745,11 @@ async function loadCR(id, tab){
   state.tab = tab || defaultTab(state.cr);
   if (!isInc(state.cr)) await loadTests(); else state.tests = null;
   renderCR();
+  const alive = () => state.route === "cr" && state.cr && state.cr.id === id;
   if (["coding","diagnosing","fixing"].includes(state.cr.status)) state.poll = setInterval(async () => {
+    if (!alive()) return clearInterval(state.poll);
     const cr = await api(`/api/cr/${id}`);
+    if (!alive()) return;
     if (JSON.stringify(cr.coding_log) !== JSON.stringify(state.cr.coding_log) || cr.status !== state.cr.status) {
       const done = !["coding","diagnosing","fixing"].includes(cr.status); state.cr = cr;
       if (done) { clearInterval(state.poll); state.tab = defaultTab(cr); await refreshList(); await refreshInfo(); if (!isInc(cr)) await loadTests();
@@ -753,8 +758,10 @@ async function loadCR(id, tab){
     }
   }, 700);
   else if (state.cr.status==="pr_open" || state.cr.status==="design_review") state.poll = setInterval(async () => {
+    if (!alive()) return clearInterval(state.poll);
     if ((state.mode||{}).mode !== "autopilot" && !(state.cr.review && state.cr.pr && state.cr.pr.github_number)) return;
     const cr = await api(`/api/cr/${id}`);
+    if (!alive()) return;
     if (cr.status !== state.cr.status || cr.updated_at !== state.cr.updated_at) {
       const moved = cr.status !== state.cr.status; state.cr = cr;
       if (moved) { clearInterval(state.poll); await refreshList(); await refreshInfo(); return loadCR(id, cr.status==="merged" ? "pr" : undefined); }
@@ -1326,10 +1333,13 @@ async function translateEng(silent=false, keepAnswers=false){
     const r = await api("/api/requirements/translate", {method:"POST", body:{text, answers: state.answers||[], finalize: !!state.finalize}});
     if ($("#f-eng").value.trim() !== text) return;           // user kept typing
     state.translation = {summary:r.summary, understanding:r.understanding, assumptions:r.assumptions, questions:r.questions,
-                         answers:r.answers, engine:r.engine, model:r.model, ready:r.ready};
+                         answers:r.answers, engine:r.engine, model:r.model, ready:r.ready, no_change:r.no_change};
     state.lastTranslated = text; state.manualRules = false;
     $("#f-spec").value = r.spec_text; validateNew();
     renderTr();
+    const sb = $("#f-submit"); if (sb) { sb.disabled = !!r.no_change && !(r.questions||[]).length;
+      sb.title = r.no_change ? "Nothing to change — the live rules already match this requirement" : ""; }
+    if (r.no_change && !(r.questions||[]).length && !silent) toast((r.summary || "The live rules already match this") + " — nothing to change");
     const q0 = $("#qa-0"); if (q0 && !silent) q0.scrollIntoView({block:"nearest", behavior:"smooth"});
     state.trError = null;
   } catch(e){ state.trError = e.message; if(!silent) toast(e.message); }
@@ -1518,7 +1528,7 @@ async function ceAutomate(){ ceCollect(); await api(`/api/tests/${state.edit.id}
 /* ---------- interactive runner ---------- */
 function rnUI(){ return {...UI_DEF, ...(state.run.ui||{})}; }
 function rnBannerText(){ const r=state.run, ui=rnUI(), miss=missingOf(r.rules, r.values);
-  return miss.length ? (ui.banner_message || "Your profile is missing: " + miss.map(label).join(", ")) : ""; }
+  return miss.length ? (ui.banner_message ? ui.banner_message + " Missing: " + miss.map(label).join(", ") + "." : "Your profile is missing: " + miss.map(label).join(", ")) : ""; }
 async function openRunner(caseId, queue=[]){
   const c = await api(`/api/tests/${caseId}`); const cr = state.cr;
   const datasets = await api("/api/datasets");

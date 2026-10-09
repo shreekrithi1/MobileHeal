@@ -221,3 +221,16 @@ def test_three_way_spec_merge():
     assert conflicts == []
     _, conflicts = merge_spec(base, ours, "# spec\nname: required\nemail: required # verified\n")
     assert conflicts == ["email"]
+
+
+def test_reviewers_block_a_spec_wipe_and_flag_removed_required_fields():
+    board = rv.ReviewBoard(_WF())
+    base = "name: required\nemail: required\ncity: optional\nzip: optional\n"
+    cr = {"id": 9, "key": "CR-9", "pr": {"commit": "x"}, "checks": [], "base_spec": base, "spec_text": "middle_name: optional\n",
+          "files": [{"path": "backend/requirements.txt", "diff": "@@ -1,4 +1,1 @@\n-name: required\n+middle_name: optional\n"}]}
+    r = board.run(cr)
+    assert r["status"] == "changes_requested"
+    assert any(c["rule"] == "spec-destructive" for c in r["comments"])
+    cr2 = {**cr, "id": 10, "spec_text": "name: required\ncity: optional\nzip: optional\n", "review": None}
+    r2 = board.run(cr2)
+    assert r2["status"] == "approved" and any(c["rule"] == "spec-removed-required" for c in r2["comments"])

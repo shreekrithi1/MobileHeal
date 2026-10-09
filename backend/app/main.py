@@ -803,6 +803,7 @@ def translate_requirement(body: TranslateIn):
     except Exception as e:
         raise HTTPException(400, f"Couldn't translate: {e}")
     r["validation"] = validate_requirements(SpecIn(text=r["spec_text"]))
+    r["no_change"] = r["spec_text"].strip() == live.strip()
     return r
 
 

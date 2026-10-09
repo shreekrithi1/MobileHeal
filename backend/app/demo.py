@@ -139,9 +139,9 @@ class Demo:
             elif sc["kind"] == "ios":
                 if not (self.root / IOS_FILE).exists():
                     continue
-                fixed = IOS_BUG_LINE not in self._read(sc["file"])
+                fixed = IOS_BUG_LINE.strip() not in self._read(sc["file"])
             else:
-                fixed = ANDROID_BUG_LINE not in self._read(sc["file"])
+                fixed = ANDROID_BUG_LINE.strip() not in self._read(sc["file"])
             out.append({**sc, "fixed": fixed, "incidents": related[:5]})
         return out
 
@@ -155,6 +155,11 @@ class Demo:
             p = self.root / fpath
             src = p.read_text(encoding="utf-8")
             new = re.sub(r"^.*MH-DEMO-BUG.*$", lambda m: bug, src, count=1, flags=re.M)
+            if new == src and bug.strip() not in src:
+                # a later change rewrote the demo line and dropped the marker: put the bug back on the phone line
+                pat = (r"^([ \t]*)val phone = .*phone_number.*$" if sc["kind"] == "android"
+                       else r"^([ \t]*)let phone = .*phone_number.*$")
+                new = re.sub(pat, lambda m: m.group(1) + bug.strip(), src, count=1, flags=re.M)
             if new != src:
                 p.write_text(new, encoding="utf-8")
                 changed.append(fpath)

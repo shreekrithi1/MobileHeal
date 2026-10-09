@@ -206,6 +206,34 @@ RULES = {"android-architect": _android_arch, "android-quality": _android_quality
          "ios-architect": _ios_arch, "ios-quality": _ios_quality}
 
 
+def _spec_removals(cr: dict) -> List[dict]:
+    """Guard against destructive rule changes (e.g. a requirement that wipes the spec)."""
+    try:
+        from .rules import parse_spec
+        before, after = parse_spec(cr.get("base_spec") or ""), parse_spec(cr.get("spec_text") or "")
+    except Exception:
+        return []
+    b = {r.field: r.constraint for r in before.rules}
+    a = {r.field: r.constraint for r in after.rules}
+    removed = [f for f in b if f not in a]
+    out = []
+    req_before = [f for f, c in b.items() if c == "required"]
+    req_after = [f for f, c in a.items() if c == "required"]
+    if b and (len(removed) * 2 >= len(b) and len(b) >= 3 or (req_before and not req_after)):
+        out.append(_f("blocker", "backend/requirements.txt", None,
+                      f"This removes {len(removed)} of {len(b)} rules ({', '.join(removed[:6])})"
+                      + (" and leaves no required fields" if req_before and not req_after else "")
+                      + ". That looks accidental — confirm with the requirement owner, then dismiss this review with the reason.",
+                      "spec-destructive"))
+    else:
+        for f in removed:
+            if b[f] == "required":
+                out.append(_f("major", "backend/requirements.txt", None,
+                              f"`{f}` is no longer collected. Existing values stay in the database; make sure reports and "
+                              "integrations that rely on it are updated.", "spec-removed-required"))
+    return out
+
+
 def _spec_notes(cr: dict, platform: str) -> List[dict]:
     """Shared rules-spec changes: remind each platform what changes at runtime."""
     out = []
@@ -289,6 +317,8 @@ class ReviewBoard:
                                        ". Fix them before this can merge.", "ci"))
                 if r["id"].endswith("architect") and any(p == "backend/requirements.txt" for p in paths):
                     findings += _spec_notes(cr, "Android" if plat == "android" else "iOS")
+                if r["id"].endswith("quality") and any(p == "backend/requirements.txt" for p in paths):
+                    findings += _spec_removals(cr)
                 findings += self._llm_findings(r, files)
                 # de-duplicate
                 seen, uniq = set(), []
