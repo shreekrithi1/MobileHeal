@@ -80,6 +80,15 @@ def pr_activity(settings, number: int) -> list:
             for c in p.get("comments", []) if c.get("human")]
 
 
+def set_pr_state(settings, number: int, state: str, by: str = "remote reviewer"):
+    """Demo: someone merges/closes the PR on GitHub/GitLab directly."""
+    prs = _store(settings, "demo_prs")
+    for p in prs:
+        if p["number"] == number:
+            p["state"], p["closed_by"] = state, by
+    settings.db.set_setting("demo_prs", json.dumps(prs))
+
+
 def get_pr(settings, number: int) -> Optional[dict]:
     return next((p for p in _store(settings, "demo_prs") if p["number"] == number), None)
 

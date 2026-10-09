@@ -26,6 +26,7 @@ from . import figma as fg
 from . import english, testcases as tc
 from . import firebase
 from . import figsync
+from .sync import SyncHub
 from urllib.parse import quote
 from typing import Any, Dict, List
 from .db import Database
@@ -170,6 +171,28 @@ class ToggleIn(BaseModel):
     state: Optional[str] = None  # START / STOP; omitted = flip
 
 
+def _start_auto_sync():
+    """Background sync of every platform: in Autopilot (default) or always, every N minutes."""
+    import threading
+    import time as _t
+
+    def loop():
+        last = _t.time()
+        while True:
+            _t.sleep(30)
+            try:
+                s = app.state.wf.settings
+                mode = s.get("auto_sync") or "autopilot"
+                on = mode == "always" or (mode == "autopilot" and app.state.wf.autopilot)
+                if not on or _t.time() - last < int(s.get("sync_interval_minutes") or "10") * 60:
+                    continue
+                last = _t.time()
+                SyncHub(app.state.wf).sync_all(actor="Autopilot sync")
+            except Exception:
+                logging.getLogger("mobileheal").exception("auto sync failed")
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def _start_figma_poll():
     """Background: look for new Figma versions every N minutes (Settings → Design & testing → Figma sync)."""
     import threading
@@ -234,6 +257,7 @@ async def lifespan(app: FastAPI):
     app.state.wf.start_background()
     _start_crashlytics_poll()
     _start_figma_poll()
+    _start_auto_sync()
     yield
     await app.state.agent.stop()
 
@@ -1163,6 +1187,55 @@ def cr_review_simulate_remote(cid: int, body: RemoteCommentIn):
         raise HTTPException(409, "This PR isn't mirrored to a remote")
     add_pr_comment(wf.settings, num, body.author.strip() or "reviewer", body.body.strip(), "commented", [], human=True)
     return wf.review_sync(cid)
+
+
+# ---------------- Sync hub (all platforms, both directions) ----------------
+class DemoRemoteIn(BaseModel):
+    status: Optional[str] = Field(None, max_length=40)
+    comment: Optional[str] = Field(None, max_length=2000)
+    author: str = Field("Priya (PM)", max_length=60)
+    pr_state: Optional[str] = Field(None, pattern="^(merged|closed)$")
+
+
+@app.get("/api/sync")
+def sync_status():
+    hub = SyncHub(app.state.wf)
+    s = _settings()
+    return {"platforms": hub.platforms(), "last": hub.last(), "auto_sync": s.get("auto_sync"),
+            "interval": s.get("sync_interval_minutes"), "mode": s.get("delivery_mode")}
+
+
+@app.post("/api/sync")
+def sync_all():
+    return SyncHub(app.state.wf).sync_all(actor=app.state.wf.user)
+
+
+@app.post("/api/cr/{cid}/sync")
+def sync_cr(cid: int):
+    _wf(app.state.wf.get, cid)
+    return SyncHub(app.state.wf).sync_cr(cid, actor=app.state.wf.user)
+
+
+@app.post("/api/cr/{cid}/sync/demo-remote")
+def sync_demo_remote(cid: int, body: DemoRemoteIn):
+    """Demo mode: act as someone working in Jira / on the remote PR, so Sync has something to pull."""
+    from .demomode import is_on, set_pr_state
+    from .jira import Jira
+    s = _settings()
+    if not is_on(s):
+        raise HTTPException(409, "Only available in demo mode")
+    cr = _wf(app.state.wf.get, cid)
+    j = cr.get("jira") or {}
+    if (body.status or body.comment) and not j.get("key"):
+        raise HTTPException(409, "Sync first so this change has a Jira issue")
+    if body.status or body.comment:
+        Jira(s).mock_external(j["key"], body.status, body.comment, body.author)
+    if body.pr_state:
+        num = (cr.get("pr") or {}).get("github_number")
+        if not num:
+            raise HTTPException(409, "Sync first so the PR is on GitHub/GitLab")
+        set_pr_state(s, num, body.pr_state, body.author)
+    return {"ok": True}
 
 
 # ---------------- Figma two-way sync ----------------

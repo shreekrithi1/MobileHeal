@@ -58,6 +58,18 @@ def _adf(text: str) -> dict:
     return {"type": "doc", "version": 1, "content": content or [{"type": "paragraph", "content": []}]}
 
 
+def _adf_text(node) -> str:
+    """Flatten Atlassian Document Format to plain text."""
+    if node is None:
+        return ""
+    if isinstance(node, str):
+        return node
+    if node.get("type") == "text":
+        return node.get("text", "")
+    sep = "\n" if node.get("type") in ("doc", "paragraph", "bulletList", "listItem", "codeBlock") else ""
+    return sep.join(_adf_text(c) for c in node.get("content") or []).strip()
+
+
 class Jira:
     _lock = threading.Lock()
 
@@ -119,9 +131,9 @@ class Jira:
         return next((i for i in self._mock() if i["key"] == key), None)
 
     # ---------------------------------------------------------------- operations
-    def create(self, summary: str, description: str, labels: List[str], priority: str = "High") -> dict:
+    def create(self, summary: str, description: str, labels: List[str], priority: str = "High", issue_type: str = "Bug") -> dict:
         if self.live:
-            fields = {"project": {"key": self.project}, "summary": summary[:250], "issuetype": {"name": "Bug"},
+            fields = {"project": {"key": self.project}, "summary": summary[:250], "issuetype": {"name": issue_type},
                       "description": _adf(description), "labels": [l.replace(" ", "-") for l in labels]}
             try:
                 r = self._req("POST", "/rest/api/3/issue", {"fields": {**fields, "priority": {"name": priority}}})
@@ -133,7 +145,7 @@ class Jira:
         with self._lock:
             issues = self._mock()
             n = 1 + max([int(i["key"].rsplit("-", 1)[1]) for i in issues if i["key"].startswith(self.project + "-")] or [0])
-            issue = {"key": f"{self.project}-{n}", "summary": summary[:250], "description": description, "type": "Bug",
+            issue = {"key": f"{self.project}-{n}", "summary": summary[:250], "description": description, "type": issue_type,
                      "priority": priority, "labels": labels, "status": "To Do", "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
                      "comments": [], "history": [{"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "to": "To Do"}]}
             issues.append(issue)
@@ -171,6 +183,37 @@ class Jira:
                     i["history"].append({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "to": to})
             self._mock_save(issues)
         return to
+
+    def get(self, key: str) -> Optional[dict]:
+        """Current status + comments (for pulling Jira changes back into MobileHeal)."""
+        if self.live:
+            r = self._req("GET", f"/rest/api/3/issue/{key}?fields=status,comment")
+            f = r.get("fields") or {}
+            st = f.get("status") or {}
+            comments = []
+            for c in ((f.get("comment") or {}).get("comments") or []):
+                comments.append({"id": str(c.get("id")), "author": (c.get("author") or {}).get("displayName", "?"),
+                                 "body": _adf_text(c.get("body")), "ts": c.get("created")})
+            return {"status": st.get("name"), "category": ((st.get("statusCategory") or {}).get("key")), "comments": comments}
+        i = self.mock_issue(key)
+        if not i:
+            return None
+        cat = "done" if i["status"] in ("Done", "Won't Do", "Closed") else "indeterminate" if i["status"] != "To Do" else "new"
+        return {"status": i["status"], "category": cat,
+                "comments": [{"id": str(n), "author": c["author"], "body": c["body"], "ts": c["ts"]} for n, c in enumerate(i["comments"])]}
+
+    def mock_external(self, key: str, status: Optional[str] = None, comment: Optional[str] = None, author: str = "Priya (PM)"):
+        """Demo: someone works the ticket directly in Jira."""
+        with self._lock:
+            issues = self._mock()
+            for i in issues:
+                if i["key"] == key:
+                    if status:
+                        i["status"] = status
+                        i["history"].append({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "to": status})
+                    if comment:
+                        i["comments"].append({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "author": author, "body": comment})
+            self._mock_save(issues)
 
     def ping(self) -> dict:
         from .demomode import is_on

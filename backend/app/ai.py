@@ -79,14 +79,16 @@ DEFAULTS = {
     "firebase_oauth_email": "", "firebase_poll_minutes": "15",
     # Figma two-way sync + design approvers
     "figma_sync_url": "", "figma_push_mode": "variables", "figma_poll_minutes": "15", "figma_push_on_approve": "on",
-    "ux_designers": "", "portal_admins": "",    # keep feature/ change/ hotfix/ branches after merge (visible in Android Studio)
+    "ux_designers": "", "portal_admins": "",
+    "auto_sync": "autopilot", "sync_interval_minutes": "10",   # Sync hub: autopilot | always | off    # keep feature/ change/ hotfix/ branches after merge (visible in Android Studio)
 }
 CHOICES = {"delivery_mode": ("manual", "autopilot"), "review_sync": ("on", "off"),
            "merge_policy": ("tests_required", "review_only"), "require_fix_approval": ("on", "off"),
            "firebase_auth": ("oauth", "service_account", "token"), "delete_branch_on_merge": ("on", "off"),
            "firebase_poll_minutes": ("0", "5", "15", "60", "360"),
            "figma_push_mode": ("variables", "comment"), "figma_poll_minutes": ("0", "1", "5", "15", "60"),
-           "figma_push_on_approve": ("on", "off")}
+           "figma_push_on_approve": ("on", "off"), "auto_sync": ("autopilot", "always", "off"),
+           "sync_interval_minutes": ("2", "5", "10", "30", "60")}
 INTERNAL_KEYS = {"firebase_refresh_token", "firebase_oauth_email", "figma_webhook_passcode"}   # written by the sign-in flow only
 
 

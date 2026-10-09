@@ -252,6 +252,14 @@ pre.out{background:var(--sunk);border-radius:8px;padding:10px;font-size:11.5px;o
 /* PR */
 .md h2{font-size:17px;margin:0 0 8px} .md h3{font-size:14px;margin:16px 0 6px} .md p{margin:0 0 8px} .md ul,.md ol{margin:0 0 8px;padding-left:20px} .md li{margin:2px 0}
 .mergebox{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.syncbtn{flex:none;white-space:nowrap}
+.sync-row{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.sync-row:first-child{border-top:0}
+.sync-step{display:flex;gap:6px;align-items:baseline;font-size:12.5px}
+.sync-step .d{color:var(--muted)}
+.sync-plat{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:14px}
+.sync-plat div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px}
+.sync-plat b{display:block;font-size:13px}
 /* delivery mode + code review */
 .mode{flex:none;white-space:nowrap;display:inline-flex;border:1px solid var(--line);border-radius:9px;padding:2px;background:var(--sunk);gap:2px}
 .mode button{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:7px;color:var(--muted);cursor:pointer}
@@ -432,6 +440,7 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
   </div>
   <button class="btn sm mobile-list" onclick="document.querySelector('.app').classList.toggle('list-open')">List</button>
   <div class="repo" id="repo"></div>
+  <button class="btn sm syncbtn" id="syncbtn" onclick="openSync()" title="Sync Jira, GitHub/GitLab, Figma, Confluence and Crashlytics with the portal">⟳ Sync</button>
   <button class="bell" id="bell" aria-label="Notifications" onclick="toggleNotifs()">🔔</button>
   <a class="avatar" id="avatar" href="#settings" aria-label="Your settings"></a>
 </header>
@@ -788,7 +797,7 @@ function renderCR(){
       <div class="meta" style="margin-bottom:6px">${chip(cr)}${isInc(cr)&&cr.jira&&cr.jira.key?jiraLink(cr.jira):""}<span>${esc(cr.author)} opened ${ago(cr.created_at)}</span>${cr.revision>1?`<span>· rev ${cr.revision}</span>`:""}</div>
       <h1>${esc(cr.title)} <span class="key">${esc(cr.key)}</span></h1>
       <div class="meta">${prLine}</div></div>
-      <div style="display:flex;gap:8px">${headerActions(cr)}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${syncChip(cr)}${headerActions(cr)}</div></div>
     ${stepper(st, cr)}
     ${cr.status==="merged"?mergedBanner(cr):""}
     ${cr.status==="pr_open"&&cr.autopilot_paused&&(state.mode||{}).mode==="autopilot"?`<div class="ap-banner"><span aria-hidden="true">✈︎</span><div style="flex:1"><b>Autopilot paused:</b> ${esc(cr.autopilot_paused)}. <a href="javascript:void 0" onclick="setTab('review')">Open code review →</a></div></div>`:""}
@@ -839,7 +848,7 @@ function headerActions(cr){
 
 /* overview */
 function tOverview(cr){
-  const icon = {requirements:"✎", design:"◧", approve:"✓", pr:"⇄", checks:"✔", test:"▶", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
+  const icon = {sync:"⟳", comment:"💬", jira:"J", promote:"⇢", requirements:"✎", design:"◧", approve:"✓", pr:"⇄", checks:"✔", test:"▶", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
   return `<div class="grid g-side">
     <div class="grid">
       <div class="card"><div class="card-h">Requirement ${cr.requirement_text?'<span class="chip s-closed">plain English</span>':""}</div><div class="card-b">
@@ -850,8 +859,8 @@ function tOverview(cr){
       <div class="card"><div class="card-h">Requested rules <span class="hint" style="margin:0">backend/requirements.txt</span></div>
         <div class="card-b" style="padding:0"><pre class="out" style="margin:0;border-radius:0 0 12px 12px;max-height:none">${esc(cr.spec_text)}</pre></div></div>
     </div>
-    <div class="card"><div class="card-h">Activity</div><div class="card-b"><ul class="tl">${(cr.timeline||[]).map(e=>`
-      <li><div class="av ${e.actor==='MobileHeal'?'bot':''}">${icon[e.kind]||"•"}</div><div><b>${esc(e.actor)}</b> ${esc(e.text)}<div class="when">${ago(e.ts)}</div></div></li>`).join("")}</ul></div></div>
+    <div class="grid" style="align-content:start">${syncCard(cr)}<div class="card"><div class="card-h">Activity</div><div class="card-b"><ul class="tl">${(cr.timeline||[]).map(e=>`
+      <li><div class="av ${e.actor==='MobileHeal'?'bot':''}">${icon[e.kind]||"•"}</div><div><b>${esc(e.actor)}</b> ${esc(e.text)}<div class="when">${ago(e.ts)}</div></div></li>`).join("")}</ul></div></div></div>
   </div>`;
 }
 
@@ -1082,6 +1091,69 @@ function tPR(cr){
     </div></div>`;
 }
 
+/* ---------------- sync hub ---------------- */
+function syncChip(cr){
+  const s = cr.sync, ok = s && s.steps.every(x=>x.ok);
+  return `<button class="btn" onclick="syncCR()" title="${s?`Last synced ${ago(s.at)} by ${esc(s.by)}`:"Sync this change with Jira, GitHub/GitLab, Figma and Confluence"}">⟳ Sync${s?` <span class="hint" style="margin:0">${ok?"✓":"!"} ${ago(s.at)}</span>`:""}</button>`;
+}
+const SYNC_ICON = {push:"→", pull:"←", "?":"·"};
+function syncSteps(steps){ return steps.map(x=>`<div class="sync-step"><span aria-hidden="true">${x.ok?"✓":"✕"}</span><b>${esc(x.platform)}</b><span class="hint" style="margin:0">${SYNC_ICON[x.direction]||""} ${esc(x.direction)}</span><span class="d ${x.ok?"":"err"}">${esc(x.detail)}</span></div>`).join(""); }
+async function syncCR(){
+  const b = event && event.target && event.target.closest("button"); if (b) { b.disabled = true; b.innerHTML = `<span class="spinner"></span> Syncing…`; }
+  try { const r = await api(`/api/cr/${state.cr.id}/sync`,{method:"POST"});
+    const bad = r.steps.filter(x=>!x.ok).length;
+    toast(bad ? `${state.cr.key}: ${bad} platform(s) need attention — see Overview → Sync` : `${state.cr.key} synced with ${[...new Set(r.steps.map(x=>x.platform))].join(", ")}`);
+    await refreshList(); await loadCR(state.cr.id, state.tab);
+  } catch(e){ toast(e.message); if (b) { b.disabled=false; b.textContent="⟳ Sync"; } }
+}
+async function openSync(){
+  let d; try { d = await api("/api/sync"); } catch(e){ return toast(e.message); }
+  const L = d.last || {}, items = (L.items||[]).filter(i=>i.steps && i.steps.length);
+  modal(`<div class="modal-h"><span>⟳ Sync all platforms</span><button class="btn sm" onclick="closeModal()">Close</button></div>
+    <div class="modal-b" style="max-height:70vh">
+      <div class="sync-plat">${d.platforms.map(p=>`<div><b>${p.connected?"🟢":"⚪️"} ${esc(p.name)}</b><span class="hint" style="margin:0">${esc(p.direction)} · ${esc(p.mode)}</span></div>`).join("")}</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <label class="hint" style="margin:0">Automatic sync</label>
+        <select id="sy-auto" class="input" style="width:auto"><option value="autopilot" ${d.auto_sync==="autopilot"?"selected":""}>When Autopilot is on</option><option value="always" ${d.auto_sync==="always"?"selected":""}>Always</option><option value="off" ${d.auto_sync==="off"?"selected":""}>Off — button only</option></select>
+        <select id="sy-int" class="input" style="width:auto">${["2","5","10","30","60"].map(v=>`<option value="${v}" ${d.interval===v?"selected":""}>every ${v} min</option>`).join("")}</select>
+        <span class="hint" style="margin:0">${d.mode==="autopilot"?"✈︎ Autopilot is on":"Manual mode"}</span>
+      </div>
+      ${L.at ? `<div class="hint" style="margin:0 0 6px">Last sync ${ago(L.at)} by ${esc(L.by)} · ${L.summary.items} change(s) · ${L.summary.ok} ok · ${L.summary.failed} failed · ${L.summary.seconds}s</div>
+        ${(L.global||[]).length?`<div class="sync-row"><div><b>Global</b></div><div>${syncSteps(L.global)}</div></div>`:""}
+        ${items.map(i=>`<div class="sync-row"><div><b>${esc(i.key)}</b><div class="hint" style="margin:0">${esc(i.status||"")}</div></div><div>${syncSteps(i.steps)}</div></div>`).join("")}`
+        : `<div class="empty">Not synced yet.</div>`}
+    </div>
+    <div class="modal-f"><span class="hint" style="margin:0;flex:1">Pushes the portal's approved state to every platform, then pulls changes back (Jira status &amp; comments, PR reviews &amp; merges, Figma versions, Crashlytics crashes).</span>
+      <button class="btn primary" id="sy-go" onclick="syncAll()">⟳ Sync everything now</button></div>`, "wide");
+  const save = async () => { try { await api("/api/settings",{method:"PUT",body:{auto_sync:$("#sy-auto").value, sync_interval_minutes:$("#sy-int").value}}); toast("Automatic sync updated"); } catch(e){ toast(e.message); } };
+  $("#sy-auto").onchange = save; $("#sy-int").onchange = save;
+}
+async function syncAll(){
+  const b = $("#sy-go"); if (b) { b.disabled = true; b.innerHTML = `<span class="spinner"></span> Syncing every platform…`; }
+  try { const r = await api("/api/sync",{method:"POST"});
+    toast(`Synced ${r.summary.items} change(s) · ${r.summary.ok} ok${r.summary.failed?` · ${r.summary.failed} failed`:""}`);
+    await refreshList(); if (state.route==="cr" && state.cr) await loadCR(state.cr.id, state.tab); await openSync();
+  } catch(e){ toast(e.message); if (b) { b.disabled=false; b.textContent="⟳ Sync everything now"; } }
+}
+async function demoRemote(body){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/sync/demo-remote`,{method:"POST",body}); }, "Done on the remote platform — press ⟳ Sync to pull it in"); }
+function syncCard(cr){
+  const s = cr.sync, j = cr.jira||{}, pr = cr.pr||{}, demoRemoteOk = state.settings && (state.settings.demo_isolated || state.settings.demo_mode==="on");
+  const links = [j.key?`<a ${j.url?`href="${esc(j.url)}" target="_blank" rel="noopener"`:`href="javascript:void 0"`}>Jira ${esc(j.key)}</a> <span class="hint" style="margin:0">${esc(j.status||"")}</span>`:"",
+    pr.github_url?`<a href="${esc(pr.github_url)}" target="_blank" rel="noopener">${pr.provider==="gitlab"?"GitLab MR":"GitHub PR"} #${esc(String(pr.github_number))}</a>`:"",
+    (cr.figma_pushes||[]).length||cr.source==="figma"?`<span>Figma ${cr.source==="figma"?"(source)":"✓ pushed"}</span>`:"",
+    cr.confluence&&cr.confluence.url?`<a href="${esc(cr.confluence.url)}" target="_blank" rel="noopener">Confluence</a>`:""].filter(Boolean);
+  return `<div class="card"><div class="card-h"><span>Sync</span><button class="btn sm" onclick="syncCR()">⟳ Sync now</button></div><div class="card-b" style="display:grid;gap:8px;font-size:13px">
+    ${links.length?`<div style="display:flex;gap:12px;flex-wrap:wrap">${links.join("")}</div>`:`<div class="hint" style="margin:0">Not on any platform yet — Sync creates the Jira issue and mirrors the PR.</div>`}
+    ${s?`<div class="hint" style="margin:0">Last synced ${ago(s.at)} by ${esc(s.by)}</div>${syncSteps(s.steps)}`:""}
+    ${demoRemoteOk && !isInc(cr) ? `<details><summary class="hint" style="margin:0;cursor:pointer">Simulate someone working in Jira / on ${pr.provider==="gitlab"?"GitLab":"GitHub"} (demo)</summary>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn sm" onclick="demoRemote({comment:'Please also update the help-centre article.'})">Jira: PM comments</button>
+        <button class="btn sm" onclick="demoRemote({status:'Won\'t Do'})">Jira: set Won't Do</button>
+        ${pr.github_number?`<button class="btn sm" onclick="demoRemote({pr_state:'merged',author:'lead.dev'})">Merge on ${pr.provider==="gitlab"?"GitLab":"GitHub"}</button><button class="btn sm" onclick="demoRemote({pr_state:'closed',author:'lead.dev'})">Close on ${pr.provider==="gitlab"?"GitLab":"GitHub"}</button>`:""}
+      </div></details>`:""}
+  </div></div>`;
+}
+
 /* ---------------- code review ---------------- */
 function rvCount(cr){ const r = cr.review; if (!r) return null; const n = r.comments.filter(c => !c.resolved && !(c.source==="agent" && c.severity==="info")).length; return n || null; }
 const PLAT = {android:["🤖","Android"], ios:["📱","iOS"], all:["◎","All platforms"]};
@@ -1164,7 +1236,7 @@ function traceHtml(d){
 }
 function iOverview(cr){
   const d = cr.incident, r = d.request||{};
-  const icon = {jira:"J", analysis:"🧠", approve:"✓", reject:"✕", detect:"!", heal:"✚", pr:"⇄", test:"✓", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
+  const icon = {sync:"⟳", comment:"💬", jira:"J", analysis:"🧠", approve:"✓", reject:"✕", detect:"!", heal:"✚", pr:"⇄", test:"✓", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
   return `<div class="grid g-side">
     <div class="grid" style="align-content:start">
       <div class="card"><div class="card-h"><span>Error</span><span style="display:flex;gap:6px">${cr.crashlytics?`<a class="chip s-diagnosing" href="${esc(cr.crashlytics.url)}" target="_blank" rel="noopener" title="Open the issue in Firebase">🔥 Crashlytics · ${esc(String(cr.crashlytics.events||""))} events ↗</a>`:""}<span class="chip s-${d.source==='android'?'coding':'detected'}">${d.source==='android'?'Android app':d.source==='ios'?'iOS app':'Backend'}</span></span></div>
@@ -1184,7 +1256,7 @@ function iOverview(cr){
         <div class="hint" style="margin-top:10px">First seen ${new Date(cr.first_seen||cr.created_at).toLocaleString()}</div>
         ${r.path?`<div class="hint">Endpoint <code>${esc(r.method)} ${esc(r.path)}</code></div>`:""}
         ${r.device?`<div class="hint">Device ${esc(r.device)} · app ${esc(r.app_version||"?")}</div>`:""}</div></div>
-      <div class="card"><div class="card-h">Activity</div><div class="card-b"><ul class="tl">${(cr.timeline||[]).map(e=>`
+      ${syncCard(cr)}<div class="card"><div class="card-h">Activity</div><div class="card-b"><ul class="tl">${(cr.timeline||[]).map(e=>`
         <li><div class="av ${e.actor==='MobileHeal'?'bot':''}">${icon[e.kind]||"•"}</div><div><b>${esc(e.actor)}</b> ${esc(e.text)}<div class="when">${ago(e.ts)}</div></div></li>`).join("")}</ul></div></div>
     </div></div>`;
 }

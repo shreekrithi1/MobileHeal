@@ -110,6 +110,16 @@ class GitHub:
             r = _call(f"{self.api}/repos/{self.repo}/issues/{number}/comments", "POST", {"body": body}, self._h(), "GitHub")
         return {"id": r.get("id")}
 
+    def pr_state(self, number: int) -> dict:
+        """open | merged | closed (someone may have merged or closed it on GitHub)."""
+        if self.demo:
+            from .demomode import get_pr
+            p = get_pr(self.s, number) or {}
+            return {"state": p.get("state", "open"), "by": p.get("closed_by")}
+        r = _call(f"{self.api}/repos/{self.repo}/pulls/{number}", headers=self._h(), name="GitHub")
+        st = "merged" if r.get("merged") else ("closed" if r.get("state") == "closed" else "open")
+        return {"state": st, "by": ((r.get("merged_by") or {}).get("login") if r.get("merged") else None)}
+
     def list_activity(self, number: int) -> list:
         """Human reviews + conversation + inline comments, normalised."""
         if self.demo:
@@ -197,6 +207,15 @@ class GitLab:
             except ConnectorError:
                 pass
         return {"id": r.get("id")}
+
+    def pr_state(self, iid: int) -> dict:
+        if self.demo:
+            from .demomode import get_pr
+            p = get_pr(self.s, iid) or {}
+            return {"state": p.get("state", "open"), "by": p.get("closed_by")}
+        r = _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests/{iid}", headers=self._h(), name="GitLab")
+        st = {"merged": "merged", "closed": "closed"}.get(r.get("state"), "open")
+        return {"state": st, "by": ((r.get("merged_by") or {}).get("username") if st == "merged" else None)}
 
     def list_activity(self, iid: int) -> list:
         if self.demo:

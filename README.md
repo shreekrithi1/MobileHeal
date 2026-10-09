@@ -104,6 +104,25 @@ Crashlytics has no public API for reading crashes, so MobileHeal reads Google's 
 Credentials stay in the git-ignored local database and are never sent to the browser. Demo mode simulates two
 Crashlytics issues, so you can try this without a Firebase project.
 
+### ⟳ Sync: every platform, both directions
+
+The **⟳ Sync** button in the top bar syncs everything. Each change request also has its own **⟳ Sync** button, and
+its Overview tab has a Sync card with links to Jira, the PR/MR, Figma and Confluence. A sync pushes the portal's
+approved state out to each platform, then pulls changes back:
+
+| Platform | Portal → platform | Platform → portal |
+|---|---|---|
+| Jira | creates a Story (change request) or Bug (incident); comments and transitions at each stage | status changes; *Won't Do* closes the change; new comments appear in the timeline |
+| GitHub / GitLab | pushes the branch, opens the PR/MR if missing, posts reviews, merges when merged here | review comments and approvals; merged remotely → released here if MobileHeal's gates pass (held otherwise); closed remotely → closed here |
+| Figma | pushes approved design tokens | new versions become *From Figma* change requests |
+| Confluence | publishes the change record / postmortem on merge | — |
+| Crashlytics | — | new crash issues become incidents |
+
+**Automatic sync** (in the Sync panel): *When Autopilot is on* (default), *Always*, or *Off* (button only), every
+2 to 60 minutes. One platform failing never blocks the others. Results are shown per change and kept as the
+last sync report. In demo mode, the Sync card can simulate someone commenting in Jira, setting *Won't Do*, or
+merging or closing the PR on GitHub, so you can watch the changes come back.
+
 ### Figma two-way sync
 
 Settings → **Design & testing → Figma two-way sync**. Enter the design file (the frame that is the source of truth),
