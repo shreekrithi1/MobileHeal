@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .agent import AutoHealAgent
@@ -24,6 +24,8 @@ from .features import contact as contact_mod
 from .demo import Demo, android_report
 from . import figma as fg
 from . import english, testcases as tc
+from . import firebase
+from urllib.parse import quote
 from typing import Any, Dict, List
 from .db import Database
 from .ws import ConnectionManager
@@ -167,6 +169,28 @@ class ToggleIn(BaseModel):
     state: Optional[str] = None  # START / STOP; omitted = flip
 
 
+def _start_crashlytics_poll():
+    """Background: pull Crashlytics issues every N minutes (Settings → Firebase Crashlytics → Sync interval)."""
+    import threading
+    import time as _t
+
+    def loop():
+        last = 0.0
+        while True:
+            _t.sleep(30)
+            try:
+                s = app.state.wf.settings
+                mins = int(s.get("firebase_poll_minutes") or "0")
+                if mins <= 0 or _t.time() - last < mins * 60:
+                    continue
+                last = _t.time()
+                if firebase.Crashlytics(s).configured:
+                    firebase.sync(s, app.state.healer, PROJECT_ROOT)
+            except Exception:
+                logging.getLogger("mobileheal").exception("crashlytics poll failed")
+    threading.Thread(target=loop, daemon=True).start()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.db = Database(DB_PATH)
@@ -185,6 +209,7 @@ async def lifespan(app: FastAPI):
     app.state.wf.watchdog = app.state.watchdog
     app.state.wf.loop = asyncio.get_running_loop()
     app.state.wf.start_background()
+    _start_crashlytics_poll()
     yield
     await app.state.agent.stop()
 
@@ -634,7 +659,8 @@ def settings_get():
     wf = app.state.wf
     return {**_settings().public(), "ai": wf.ai.status(), "zephyr_configured": tc.Zephyr(_settings()).configured,
             "github": wf.info()["github"], "connectors": connectors.status(_settings()),
-            "demo_isolated": os.getenv("MOBILEHEAL_DEMO") == "1", "ios_present": (PROJECT_ROOT / "ios" / "MobileHeal").is_dir()}
+            "demo_isolated": os.getenv("MOBILEHEAL_DEMO") == "1", "ios_present": (PROJECT_ROOT / "ios" / "MobileHeal").is_dir(),
+            "firebase": firebase.Crashlytics(_settings()).status()}
 
 
 @app.put("/api/settings")
@@ -663,6 +689,8 @@ def settings_test(name: str):
             return app.state.wf.ai.ping()
         if name == "zephyr":
             return settings_test_zephyr()
+        if name == "firebase":
+            return firebase.Crashlytics(s).test()
     except Exception as e:
         raise HTTPException(400, str(e))
     raise HTTPException(404, "Unknown connector")
@@ -1111,6 +1139,55 @@ def cr_review_simulate_remote(cid: int, body: RemoteCommentIn):
         raise HTTPException(409, "This PR isn't mirrored to a remote")
     add_pr_comment(wf.settings, num, body.author.strip() or "reviewer", body.body.strip(), "commented", [], human=True)
     return wf.review_sync(cid)
+
+
+# ---------------- Firebase Crashlytics ----------------
+@app.post("/api/firebase/sync")
+def firebase_sync():
+    try:
+        return firebase.sync(_settings(), app.state.healer, PROJECT_ROOT)
+    except firebase.FirebaseError as e:
+        raise HTTPException(400, str(e))
+
+
+def _oauth_redirect(request: Request) -> str:
+    host = request.headers.get("host", "localhost:8000")
+    return f"{request.url.scheme}://{host}/api/firebase/oauth/callback"
+
+
+@app.get("/api/firebase/oauth/start")
+def firebase_oauth_start(request: Request):
+    """Google sign-in (SSO) for Crashlytics — redirects to Google's consent screen."""
+    try:
+        return RedirectResponse(firebase.Crashlytics(_settings()).oauth_start(_oauth_redirect(request)), status_code=302)
+    except firebase.FirebaseError as e:
+        return RedirectResponse("/#settings/firebase?error=" + quote(str(e)), status_code=302)
+
+
+@app.get("/api/firebase/oauth/callback")
+def firebase_oauth_callback(code: str = "", state: str = "", error: str = ""):
+    s = _settings()
+    if error or not code:
+        return RedirectResponse("/#settings/firebase?error=" + quote(error or "sign-in cancelled"), status_code=302)
+    try:
+        email = firebase.Crashlytics(s).oauth_finish(code, state)
+    except firebase.FirebaseError as e:
+        return RedirectResponse("/#settings/firebase?error=" + quote(str(e)), status_code=302)
+    s.audit(app.state.wf.user, "firebase.signin", email or "Google account", "Crashlytics connected with Google sign-in")
+    return RedirectResponse("/#settings/firebase?signed_in=1", status_code=302)
+
+
+@app.post("/api/firebase/oauth/signout")
+def firebase_oauth_signout():
+    s = _settings()
+    firebase.Crashlytics(s).sign_out()
+    s.audit(app.state.wf.user, "firebase.signout", "", "Crashlytics Google sign-in removed")
+    return firebase.Crashlytics(s).status()
+
+
+@app.post("/api/cr/{cid}/promote")
+def cr_promote(cid: int):
+    return _wf(app.state.wf.promote, cid)
 
 
 @app.post("/api/cr/{cid}/approve")

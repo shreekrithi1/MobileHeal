@@ -80,6 +80,37 @@ database `backend/mobileheal.db`, which is git-ignored, and are never sent back 
 | **Figma** token | Figma links are embedded | colours, labels and fields extracted from frames |
 | **Team webhook** (Slack/Teams/Chat) | notifications in the 🔔 bell | also posted to the channel |
 | **GitHub** — start with `GITHUB_TOKEN` + `GITHUB_REPO` env vars | local git branches | PRs mirrored to GitHub |
+| **Firebase Crashlytics** (Google sign-in, service account key or access token) | crashes from the MobileHeal SDKs only | Crashlytics issues become incidents too |
+
+### Firebase Crashlytics
+
+Crashlytics has no public API for reading crashes, so MobileHeal reads Google's **Crashlytics → BigQuery export**.
+
+1. In the Firebase console, open **Project settings → Integrations → BigQuery** and turn on **Crashlytics**. Tables
+   appear in the `firebase_crashlytics` dataset after the first export (daily, or near real-time if streaming is on).
+2. In MobileHeal, open **Settings → Firebase Crashlytics** and enter the project ID, the Android package and/or the
+   iOS bundle ID.
+3. Choose how to sign in:
+   - **Google sign-in (single sign-on).** Create an OAuth client (Google Cloud console → APIs & Services →
+     Credentials → *Web application*). Add the redirect URI shown in Settings (`http://localhost:8000/api/firebase/oauth/callback`),
+     paste the client ID and secret, then click **Sign in with Google**. MobileHeal uses OAuth with PKCE and stores
+     only the refresh token. Scopes are BigQuery read-only and Cloud read-only.
+   - **Service account key.** Paste the JSON key of a service account with *BigQuery Data Viewer* and *BigQuery Job User*.
+   - **Personal access token.** Paste the output of `gcloud auth print-access-token`. It expires after about an hour.
+4. Click **Test connection**, then **Sync now**. New issues are also pulled in the background every 15 minutes
+   (configurable). Each issue becomes an incident with a link back to Crashlytics, then follows the normal path:
+   Jira defect → analysis → approval → fix PR. Repeat events are grouped onto the same incident.
+
+Credentials stay in the git-ignored local database and are never sent to the browser. Demo mode simulates two
+Crashlytics issues, so you can try this without a Firebase project.
+
+### Demo mode works in a separate copy of your project
+
+`./start.command --demo` runs the agents against `.mobileheal/demo-workspace`, a copy of your project, so your own
+code is never changed. Android Studio and Xcode open that copy. When a change is merged in demo mode, the merge banner
+shows where it went, and **Copy to my project as a branch** creates `demo/<branch>` in your real project without
+touching your working tree. Merged `feature/`, `change/` and `hotfix/` branches are kept, so you can find them under
+**Git → Branches** (Settings → Delivery & approvals → *Delete branch after merge*).
 
 ## 6. A 5-minute tour
 

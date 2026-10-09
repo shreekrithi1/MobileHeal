@@ -17,22 +17,27 @@ say()  { printf "\033[1;34m▸\033[0m %s\n" "$*"; }
 ok()   { printf "\033[1;32m✓\033[0m %s\n" "$*"; }
 warn() { printf "\033[1;33m!\033[0m %s\n" "$*"; }
 
+# The code agents edit: the demo workspace in demo mode, otherwise this project.
+app_root() { printf "%s" "${MOBILEHEAL_ROOT:-$ROOT}"; }
+
 open_android_studio() {
+  local AR; AR="$(app_root)"
   if [ "$(uname)" = "Darwin" ] && { [ -d "/Applications/Android Studio.app" ] || [ -d "$HOME/Applications/Android Studio.app" ]; }; then
     say "Opening the Android project in Android Studio…"
-    open -a "Android Studio" "$ROOT/android" && ok "Android Studio launched — let Gradle sync, pick an emulator and press ▶ Run"
+    open -a "Android Studio" "$AR/android" && ok "Android Studio launched on $AR/android — let Gradle sync, pick an emulator and press ▶ Run"
   elif command -v studio >/dev/null 2>&1; then
-    studio "$ROOT/android" >/dev/null 2>&1 &
+    studio "$AR/android" >/dev/null 2>&1 &
   else
-    warn "Android Studio not found. Install it from https://developer.android.com/studio, then open: $ROOT/android"
+    warn "Android Studio not found. Install it from https://developer.android.com/studio, then open: $AR/android"
   fi
 }
 
 open_xcode() {
-  [ -d "$ROOT/ios" ] || return 0
+  local AR; AR="$(app_root)"
+  [ -d "$AR/ios" ] || return 0
   [ "$(uname)" = "Darwin" ] || { warn "Xcode needs macOS — skipping the iOS app"; return 0; }
   [ -d "/Applications/Xcode.app" ] || { warn "Xcode not found — install it from the Mac App Store"; return; }
-  cd "$ROOT/ios"
+  cd "$AR/ios"
   if [ ! -d MobileHeal.xcodeproj ]; then
     if command -v xcodegen >/dev/null 2>&1; then say "Generating the Xcode project (XcodeGen)…"; xcodegen --quiet
     elif command -v brew >/dev/null 2>&1; then say "Installing XcodeGen with Homebrew…"; brew install xcodegen >/dev/null && xcodegen --quiet

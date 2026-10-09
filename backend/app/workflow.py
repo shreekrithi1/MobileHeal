@@ -888,7 +888,10 @@ class Workflow:
             try:
                 merged = await asyncio.to_thread(self.git.merge_into_base, cr["pr"]["branch"], files,
                                                  f"Merge {cr['key']}: {cr['title']} (#{cr['pr']['number']})")
-                self.git.delete_branch(cr["pr"]["branch"])
+                if self.settings.get("delete_branch_on_merge") == "on":
+                    self.git.delete_branch(cr["pr"]["branch"])
+                else:
+                    cr["pr"]["kept"] = True      # branch stays for history / Android Studio's Git → Branches
             except GitError as e:
                 cr["pr"]["git_error"] = str(e)
         else:
@@ -971,7 +974,41 @@ class Workflow:
         self._event(cr, self.user, "close", "closed " + ("the incident" if cr.get("kind") == "incident" else "the change request"))
         return self._save(cr)
 
+    # ------------------------------------------------------------ demo workspace → your project
+    @property
+    def home_project(self) -> Optional[Path]:
+        """In demo mode agents work in <project>/.mobileheal/demo-workspace — this is <project>."""
+        if self.root.parent.name == ".mobileheal" and (self.root.parent.parent / ".git").exists():
+            return self.root.parent.parent
+        return None
+
+    def promote(self, cid: int) -> dict:
+        """Copy a merged demo change into your real project as a new branch (your working tree isn't touched)."""
+        cr = self.get(cid)
+        home = self.home_project
+        if home is None:
+            raise WorkflowError("This change already lives in your project", 409)
+        if cr["status"] != "merged":
+            raise WorkflowError("Merge the change first", 409)
+        files = {f["path"]: f["content"] for f in cr.get("files") or [] if f.get("content") is not None}
+        if not files:
+            raise WorkflowError("This change has no files to copy", 409)
+        repo = GitRepo(home)
+        base = repo.resolve_base(self.settings.get("base_branch") or "main")
+        branch = "demo/" + (cr["pr"]["branch"].split("/", 1)[-1])
+        try:
+            sha = repo.commit_branch(branch, files, f"{cr['key']}: {cr['title']} (from the MobileHeal demo workspace)",
+                                     parent=repo.tip(base))
+        except GitError as e:
+            raise WorkflowError(f"Couldn't create the branch in your project: {e}", 409)
+        cr["promoted"] = {"project": str(home), "branch": branch, "base": base, "commit": sha[:10], "ts": now()}
+        self._event(cr, self.user, "promote", f"copied to your project as branch {branch} (from {base})")
+        self._save(cr)
+        return cr["promoted"]
+
     def info(self) -> dict:
+        home = self.home_project
         return {"stages": STAGES, "git": self.git.available, "repo": self.git.is_repo(), "root": str(self.root),
+                "demo_workspace": home is not None, "home_project": str(home) if home else None,
                 "github": self._remote_label(),
                 "log": self.git.log(6), "live_spec": self._read(codegen.SPEC_PATH) or ""}

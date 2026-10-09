@@ -539,7 +539,7 @@ function renderIndex(kind){
     <h2>${inc ? (open.length ? `${open.length} open incident${open.length>1?"s":""}` : "No open incidents") : (open.length ? `${open.length} change${open.length>1?"s":""} in flight` : "Start a change")}</h2>
     <p>${inc ? "Crashes from development and production land here automatically with a Jira defect. Pick one from the list to analyse, approve and ship the fix."
              : "Describe what the business needs in plain English. The agent designs it, writes the Android code and tests, and opens a pull request for you to try."}</p>
-    <div style="display:flex;gap:10px;justify-content:center;margin-top:18px">${inc ? `<a class="btn" href="#demo">Simulate a crash</a>${open[0]?`<a class="btn primary" href="#cr/${open[0].id}">Open ${esc(open[0].key)}</a>`:""}`
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:18px">${inc ? `<a class="btn" href="#demo">Simulate a crash</a><button class="btn" onclick="fbSync()">🔥 Sync Crashlytics</button>${open[0]?`<a class="btn primary" href="#cr/${open[0].id}">Open ${esc(open[0].key)}</a>`:""}`
       : `<a class="btn primary" href="#new">＋ New change request</a>${open[0]?`<a class="btn" href="#cr/${open[0].id}">Continue ${esc(open[0].key)}</a>`:""}`}</div></div>`;
 }
 async function refreshList(){ state.list = await api("/api/cr"); renderList(); }
@@ -805,12 +805,19 @@ function mergedBanner(cr){
   const live = isInc(cr) ? (cr.deployed==="hot-reloaded" ? "the fix is live in the running server" : "restart the backend to load the fix") : "rules are live and were pushed to connected phones";
   return `<div class="banner-ok" style="margin-top:16px;align-items:flex-start"><span style="font-size:20px">⇡</span><div style="flex:1">
     <div>Merged ${ago(cr.merged_at)}${cr.merged_commit?` as <code>${esc(cr.merged_commit)}</code>`:""} into <code>${esc((cr.pr&&cr.pr.base)||"main")}</code> — ${live}.</div>
+    ${cr.pr&&cr.pr.git?`<div class="hint" style="margin:4px 0 0">Branch <code>${esc(cr.pr.branch)}</code> ${cr.pr.kept?"is kept — find it in Android Studio under <b>Git → Branches</b>":"was deleted after the merge"}.</div>`:""}
+    ${state.info&&state.info.demo_workspace?`<div class="banner-err" style="margin:10px 0 4px;background:var(--purple-soft);color:var(--fg);align-items:flex-start"><span aria-hidden="true">🎬</span><div style="flex:1">
+        <b>Demo mode:</b> this was merged into the isolated demo workspace <code>${esc(root)}</code>, not your project <code>${esc(state.info.home_project)}</code>.
+        Open the demo workspace below to see it in Android Studio${cr.promoted?`, or check out <code>${esc(cr.promoted.branch)}</code> in your project (copied ${ago(cr.promoted.ts)})`:", or copy the change into your project as a branch"}.
+        ${cr.promoted?"":`<div style="margin-top:6px"><button class="btn sm" onclick="promoteCR()">Copy to my project as a branch</button></div>`}</div></div>`:""}
     ${andr.length?`<div style="margin-top:6px">App code updated in <code>${esc(root)}</code>:</div><ul class="notes" style="margin:4px 0 6px">${andr.map(f=>`<li><span class="chip s-closed">${f.path.startsWith("ios/")?"iOS":"Android"}</span> <code>${esc(f.path.replace(/^(android|ios)\//,""))}</code></li>`).join("")}</ul>
       <div class="hint" style="margin:0 0 8px">Android Studio and Xcode pick up the files automatically — press <b>▶ Run</b> / <b>⌘R</b> to rebuild on the emulator or simulator.</div>
-      <span style="display:flex;gap:8px;flex-wrap:wrap">${andr.some(f=>f.path.startsWith("android/"))?`<button class="btn sm" onclick="openStudio()">Open in Android Studio</button>`:""}${andr.some(f=>f.path.startsWith("ios/"))?`<button class="btn sm" onclick="openXcode()">Open in Xcode</button>`:""}</span>`
+      <span style="display:flex;gap:8px;flex-wrap:wrap">${andr.some(f=>f.path.startsWith("android/"))?`<button class="btn sm" onclick="openStudio()">Open ${state.info&&state.info.demo_workspace?"demo workspace":"project"} in Android Studio</button>`:""}${andr.some(f=>f.path.startsWith("ios/"))?`<button class="btn sm" onclick="openXcode()">Open in Xcode</button>`:""}</span>`
      :`<div class="hint" style="margin:6px 0 0">No Android source changed — this change is data-driven (rules), so a running app updates live without a rebuild.</div>`}
   </div></div>`;
 }
+async function promoteCR(){ await act(async()=>{ const r = await api(`/api/cr/${state.cr.id}/promote`,{method:"POST"});
+  state.cr = await api(`/api/cr/${state.cr.id}`); renderCR(); toast(`Created branch ${r.branch} in your project — check it out in Android Studio (Git → Branches)`); }); }
 async function openXcode(){ await act(async()=>{ await api("/api/ios/open",{method:"POST"}); }, "Opening the iOS project in Xcode…"); }
 async function openStudio(){ await act(async()=>{ const r = await api("/api/android/open",{method:"POST"}); }, "Opening the project in Android Studio…"); }
 function headerActions(cr){
@@ -1145,7 +1152,7 @@ function iOverview(cr){
   const icon = {jira:"J", analysis:"🧠", approve:"✓", reject:"✕", detect:"!", heal:"✚", pr:"⇄", test:"✓", test_failed:"!", merge:"⇡", deploy:"⚡", rebase:"↻", close:"✕", error:"!"};
   return `<div class="grid g-side">
     <div class="grid" style="align-content:start">
-      <div class="card"><div class="card-h"><span>Error</span><span class="chip s-${d.source==='android'?'coding':'detected'}">${d.source==='android'?'Android app':'Backend'}</span></div>
+      <div class="card"><div class="card-h"><span>Error</span><span style="display:flex;gap:6px">${cr.crashlytics?`<a class="chip s-diagnosing" href="${esc(cr.crashlytics.url)}" target="_blank" rel="noopener" title="Open the issue in Firebase">🔥 Crashlytics · ${esc(String(cr.crashlytics.events||""))} events ↗</a>`:""}<span class="chip s-${d.source==='android'?'coding':'detected'}">${d.source==='android'?'Android app':d.source==='ios'?'iOS app':'Backend'}</span></span></div>
         <div class="card-b"><div class="errbox">${esc(d.exc_type)}: ${esc(d.message)}</div>
         ${d.file?`<div class="hint" style="margin-top:10px">at <code>${esc(d.file)}:${d.line}</code> in <code>${esc(d.function)}()</code></div>`:""}
         ${d.code_line?`<div class="codeline r" style="margin-top:8px">${esc(d.code_line)}</div>`:""}
@@ -1704,7 +1711,7 @@ async function dsDelete(id){ await act(async()=>{ await api(`/api/datasets/${id}
    ===================================================================== */
 const SET_SECTIONS = [
   ["general","General","⚙︎"], ["model","Agent model","✦"], ["source","Source control","⎇"], ["jira","Jira","◆"],
-  ["confluence","Confluence","▤"], ["design","Design & testing","◐"], ["android","Mobile apps","▣"],
+  ["confluence","Confluence","▤"], ["design","Design & testing","◐"], ["android","Mobile apps","▣"], ["firebase","Firebase Crashlytics","🔥"],
   ["data","Data & notifications","🔔"], ["delivery","Delivery & approvals","✓"],
 ];
 function sChip(ok, okText, offText, warn){ return `<span class="chip ${ok?'s-pr_open':warn?'s-diagnosing':'s-closed'}">${ok?okText:offText}</span>`; }
@@ -1718,7 +1725,12 @@ function sTest(name, label){ return `<button class="btn sm" onclick="testConn('$
 
 async function renderSettings(h){
   await loadSettings(); const s = state.settings, cx = s.connectors || {github:{},gitlab:{},confluence:{}};
-  const sec = ((h||"").split("/")[1]) || state.setSec || "general"; state.setSec = sec;
+  const [secRaw, qs] = (((h||"").split("/")[1]) || "").split("?");
+  const sec = secRaw || state.setSec || "general"; state.setSec = sec;
+  const qp = new URLSearchParams(qs||"");
+  if (qp.get("signed_in")) toast("Signed in with Google — Crashlytics is connected"); if (qp.get("error")) toast("Firebase: " + qp.get("error"));
+  if (qs) history.replaceState(null, "", "#settings/" + sec);
+  const fb = s.firebase || {};
   const ai = s.ai || {};
   const tiles = [
     ["model","Agent model", ai.available, ai.available ? esc(ai.model) : "Parser mode"],
@@ -1729,6 +1741,7 @@ async function renderSettings(h){
     ["design","Figma", !!(s.figma_token||{}).set||s.demo_mode==="on", (s.figma_token||{}).set ? "Token saved" : s.demo_mode==="on" ? "Sample frame (demo)" : "Embed only"],
     ["design","Zephyr Scale", !!s.zephyr_configured, s.demo_mode==="on"&&!s.zephyr_token.set ? "Sample cases (demo)" : s.zephyr_configured ? "Project "+esc(s.zephyr_project_key) : "Not connected"],
     ["android","Android repo", null, "…"],
+    ["firebase","Crashlytics", fb.configured, fb.configured ? (fb.demo ? "Sample issues (demo)" : esc(fb.project)) : "Not connected"],
   ];
   const P = {
   general: `<h2>General</h2><p class="sdesc">Your workspace and how every connected system is doing.</p>
@@ -1800,6 +1813,27 @@ async function renderSettings(h){
       `<div class="sgroup-b"><textarea id="ag-skill" class="input code" style="min-height:260px" aria-label="Agent skill"></textarea></div>`,
       `<button class="btn sm" onclick="saveSkill()">Save skill</button><span id="ag-tc" class="hint" style="margin:0"></span>`)}`,
 
+  firebase: `<h2>Firebase Crashlytics</h2><p class="sdesc">Crashes reported to Crashlytics become MobileHeal incidents automatically — Jira defect, analysis, approval and a fix PR — just like crashes from the MobileHeal SDKs. MobileHeal reads Crashlytics' BigQuery export (Firebase has no public crash-read API).</p>
+    ${sGroup("Project", sChip(fb.configured, fb.demo ? "Demo" : "Connected", "Not connected"),
+      sRow("Project ID","Firebase console → Project settings → General.", sInput("firebase_project_id","my-app-1a2b3")) +
+      sRow("Android package","The Android app's application ID.", sInput("firebase_android_package","com.mobileheal.app")) +
+      sRow("iOS bundle ID","The iOS app's bundle identifier.", sInput("firebase_ios_bundle","com.mobileheal.ios")) +
+      sRow("BigQuery dataset","Turn on the export once: Firebase console → Project settings → Integrations → BigQuery → Crashlytics. The dataset is <code>firebase_crashlytics</code> unless you renamed it.", sInput("firebase_bq_dataset","firebase_crashlytics")) +
+      sRow("Sync every","New Crashlytics issues are pulled in the background.", sSelect("firebase_poll_minutes",[["0","Off — sync manually"],["5","5 minutes"],["15","15 minutes"],["60","Hour"],["360","6 hours"]])))}
+    ${sGroup("Sign in", "",
+      sRow("Method","Google sign-in is recommended. Credentials stay in this machine's database and are never sent to the browser.", sSelect("firebase_auth",[["oauth","Google sign-in (single sign-on)"],["service_account","Service account key (JSON)"],["token","Personal access token"]])) +
+      `<div data-fbauth="oauth">` +
+        sRow("OAuth client ID",`Google Cloud console → APIs &amp; Services → Credentials → <b>Create OAuth client ID</b> (Web application). Add this authorized redirect URI: <code>${esc(location.origin)}/api/firebase/oauth/callback</code>`, sInput("firebase_oauth_client_id","1234-abc.apps.googleusercontent.com")) +
+        sRow("Client secret","", sSecret("firebase_oauth_client_secret","GOCSPX-…")) +
+        sRow("Google account","Read-only BigQuery access.", fb.signed_in_as ? `<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="chip s-pr_open">✓ ${esc(fb.signed_in_as)}</span><button class="btn sm" onclick="fbSignOut()">Sign out</button></span>`
+          : `<button class="btn primary sm" onclick="fbSignIn()"><span aria-hidden="true">G</span>&nbsp;Sign in with Google</button>`) + `</div>` +
+      `<div data-fbauth="service_account">` +
+        sRow("Service account key","Paste the JSON key of a service account with <b>BigQuery Data Viewer</b> and <b>BigQuery Job User</b> on the project.",
+          `<textarea id="s-firebase_service_account" data-secret="1" class="input" rows="4" spellcheck="false" placeholder="${(s.firebase_service_account||{}).set ? "Saved · paste a new key to replace it" : '{ "type": "service_account", "client_email": "…", "private_key": "…" }'}"></textarea>`) + `</div>` +
+      `<div data-fbauth="token">` +
+        sRow("Access token","Run <code>gcloud auth print-access-token</code> with an account that can read the export. Tokens expire after about an hour — use Google sign-in for unattended syncing.", sSecret("firebase_access_token","ya29.…")) + `</div>`,
+      sTest("firebase") + `<button class="btn sm" onclick="fbSync()">Sync now</button><span class="hint" id="fb-last" style="margin:0">${fb.last_sync ? `Last sync ${ago(fb.last_sync.ts)} · ${fb.last_sync.issues} issue(s) → ${(fb.last_sync.incidents||[]).join(", ")||"no new incidents"}` : "Not synced yet"}</span>${fb.console?`<a class="btn sm" href="${esc(fb.console)}" target="_blank" rel="noopener">Open Crashlytics ↗</a>`:""}`)}`,
+
   data: `<h2>Data &amp; notifications</h2><p class="sdesc">DataWatchdog checks backend data against the requirements and tells users and the team what to fix.</p>
     ${sGroup("🐶 DataWatchdog", sChip(s.watchdog_enabled!=="off","Watching","Off"),
       sRow("Watch data integrity","Missing mandatory fields, invalid emails/phones/dates and duplicates, every agent cycle.", sToggle("watchdog_enabled", s.watchdog_enabled!=="off")) +
@@ -1810,7 +1844,8 @@ async function renderSettings(h){
   delivery: `<h2>Delivery &amp; approvals</h2><p class="sdesc">Guard-rails for what agents may do on their own.</p>
     ${sGroup("Delivery mode", sChip(s.delivery_mode==="autopilot","✈︎ Autopilot","Manual"),
       sRow("Mode","<b>Manual</b> — people approve the design, each automatic fix, testing and the merge. <b>Autopilot</b> — agents take every requirement, change request and production incident from requirements to deployment; the 2-approval code review still applies.", sSelect("delivery_mode",[["manual","Manual"],["autopilot","Autopilot"]])) +
-      sRow("Base branch","Every PR gets a new branch (<code>feature/</code>, <code>change/</code> or <code>hotfix/</code>) cut from, and merged into, this branch.", sInput("base_branch","main")))}
+      sRow("Base branch","Every PR gets a new branch (<code>feature/</code>, <code>change/</code> or <code>hotfix/</code>) cut from, and merged into, this branch.", sInput("base_branch","main")) +
+      sRow("Delete branch after merge","Off keeps every merged <code>feature/</code>, <code>change/</code> and <code>hotfix/</code> branch so you can inspect it in Android Studio (Git → Branches).", sToggle("delete_branch_on_merge", s.delete_branch_on_merge==="on")))}
     ${sGroup("Code review","",
       sRow("Reviewer agents","Two per platform. Platforms are picked from the files a PR touches; shared rules and API changes go to both.", `<div class="hint" style="margin:0">🤖 Android Architecture · Android Quality &amp; Security<br>📱 iOS SwiftUI · iOS Quality &amp; Security</div>`) +
       sRow("Approvals required","Per impacted platform, from agents or people. Any “changes requested” blocks the merge until it's resolved or dismissed with a reason.", `<span class="hint" style="margin:0">2 per platform</span>`) +
@@ -1830,16 +1865,29 @@ async function renderSettings(h){
   $("#settings-form").addEventListener("input", e => { if (!e.target.closest("#ag-skill")) markDirty(); });
   $("#settings-form").addEventListener("change", e => { if (!e.target.closest("#ag-skill")) markDirty(); });
   if (typeof setCrumbs === "function") setCrumbs([["Settings","#settings"],[ (SET_SECTIONS.find(x=>x[0]===sec)||[0,"General"])[1], "#settings/"+sec]]);
-  renderLLM(s.llm_provider || s.default_provider); loadAgentSettings(); loadRepo();
+  renderLLM(s.llm_provider || s.default_provider); loadAgentSettings(); loadRepo(); fbAuthToggle();
 }
 function markDirty(){ const b=$("#savebar"); if (b) b.hidden=false; }
+function fbAuthToggle(){ const m = ($("#s-firebase_auth")||{}).value || "oauth";
+  document.querySelectorAll("[data-fbauth]").forEach(el => el.hidden = el.dataset.fbauth !== m); }
+document.addEventListener("change", e => { if (e.target && e.target.id === "s-firebase_auth") fbAuthToggle(); });
+async function fbSignIn(){ try { await saveSettings(true); } catch(e){ return toast(e.message); }
+  if (!(state.settings.firebase_oauth_client_id||"").trim()) return toast("Enter the OAuth client ID and secret first");
+  location.href = "/api/firebase/oauth/start"; }
+async function fbSignOut(){ await act(async()=>{ await api("/api/firebase/oauth/signout",{method:"POST"}); await renderSettings("settings/firebase"); }, "Signed out of Google"); }
+async function fbSync(){ const o = $("#fb-last"); if (o) o.innerHTML = `<span class="spinner"></span> Syncing Crashlytics…`;
+  try { try { await saveSettings(true); } catch(e){}
+    const r = await api("/api/firebase/sync",{method:"POST"});
+    toast(`${r.issues} Crashlytics issue(s) → ${r.incidents.length ? r.incidents.join(", ") : "no new incidents"}`);
+    await refreshList(); if (state.route==="settings") await renderSettings("settings/firebase"); else if (state.route==="incidents") route();
+  } catch(e){ toast(e.message); if (o) o.textContent = e.message; } }
 function collectSettings(){
   const body = $("#s-llm_provider") ? llmBody() : {};
   document.querySelectorAll('#settings-form [id^="s-"]').forEach(el => {
     if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) || el.id.startsWith("s-llm")) return;
     const k = el.id.slice(2);
     if (el.dataset.onoff) body[k] = el.checked ? "on" : "off";
-    else if (el.type === "password") { if (el.value.trim()) body[k] = el.value.trim(); }
+    else if (el.type === "password" || el.dataset.secret) { if (el.value.trim()) body[k] = el.value.trim(); }
     else body[k] = el.value;
   });
   return body;
@@ -1852,7 +1900,7 @@ async function saveSettings(quiet=false){
 async function testConn(name){
   const o = $("#t-"+name); o.innerHTML = `<span class="spinner"></span> Testing…`;
   try { await saveSettings(true); const r = await api("/api/settings/test/"+name,{method:"POST"});
-    const d = r.repo ? `${esc(r.repo)} · default branch ${esc(r.default_branch||"?")}${r.can_push===false?" · ⚠ token can't push":""}`
+    const d = r.tables ? `${esc(r.project)} · ${r.tables.length} Crashlytics export table(s) (${esc((r.apps||[]).join(" + "))})` : r.repo ? `${esc(r.repo)} · default branch ${esc(r.default_branch||"?")}${r.can_push===false?" · ⚠ token can't push":""}`
       : r.space ? `Space “${esc(r.space)}”` : r.user ? `${esc(r.user)} · ${esc(r.project||"")}` : r.sample ? `e.g. “${esc(r.sample)}”` : r.model ? `${esc(r.model)} in ${r.ms} ms` : "OK";
     o.innerHTML = `<span class="ok">✓ Connected — ${d}</span>`; $("#savebar").hidden = true;
   } catch(e){ o.innerHTML = `<span class="err">✕ ${esc(e.message)}</span>`; }

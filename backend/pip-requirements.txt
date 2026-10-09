@@ -8,3 +8,4 @@ pytest>=9.0.3; python_version >= "3.10"
 fastapi>=0.110; python_version < "3.10"
 pytest>=8; python_version < "3.10"
 urllib3>=2.8.0; python_version >= "3.10"
+cryptography>=42   # Firebase service-account sign-in (RS256 JWT)

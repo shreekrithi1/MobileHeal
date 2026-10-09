@@ -52,7 +52,8 @@ PROVIDERS: Dict[str, dict] = {
                    "console": "", "needs_base": True, "base_hint": "https://your-gateway/v1"},
 }
 DEFAULT_PROVIDER = "anthropic"
-SECRET_KEYS = {"gitlab_token", "confluence_api_token", "jira_api_token", "zephyr_token", "github_token", "figma_token"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
+SECRET_KEYS = {"gitlab_token", "confluence_api_token", "jira_api_token", "zephyr_token", "github_token", "figma_token",
+               "firebase_service_account", "firebase_access_token", "firebase_oauth_client_secret", "firebase_refresh_token"} | {f"{p}_api_key" for p in PROVIDERS if p != "ollama"}
 DEFAULTS = {
     "llm_provider": DEFAULT_PROVIDER, "llm_model": "", "llm_base_url": "",
     "anthropic_model": MODELS[0], "user_name": "You",
@@ -70,9 +71,17 @@ DEFAULTS = {
     "delivery_mode": "manual",          # manual | autopilot
     "base_branch": "main",              # every PR branch is cut from, and merges into, this branch
     "review_sync": "on",                # pull review comments/approvals from GitHub / GitLab
+    "delete_branch_on_merge": "off",
+    # Firebase Crashlytics (read through the Crashlytics → BigQuery export)
+    "firebase_project_id": "", "firebase_android_package": "", "firebase_ios_bundle": "",
+    "firebase_bq_dataset": "firebase_crashlytics", "firebase_auth": "oauth", "firebase_oauth_client_id": "",
+    "firebase_oauth_email": "", "firebase_poll_minutes": "15",    # keep feature/ change/ hotfix/ branches after merge (visible in Android Studio)
 }
 CHOICES = {"delivery_mode": ("manual", "autopilot"), "review_sync": ("on", "off"),
-           "merge_policy": ("tests_required", "review_only"), "require_fix_approval": ("on", "off")}
+           "merge_policy": ("tests_required", "review_only"), "require_fix_approval": ("on", "off"),
+           "firebase_auth": ("oauth", "service_account", "token"), "delete_branch_on_merge": ("on", "off"),
+           "firebase_poll_minutes": ("0", "5", "15", "60", "360")}
+INTERNAL_KEYS = {"firebase_refresh_token", "firebase_oauth_email"}   # written by the sign-in flow only
 
 
 class Settings:
@@ -129,7 +138,8 @@ class Settings:
     URL_SECRETS = {"jira_base_url": ["jira_api_token"], "jira_email": ["jira_api_token"],
                    "zephyr_base_url": ["zephyr_token"], "llm_base_url": ["custom_api_key", "azure_api_key"],
                    "github_api_url": ["github_token"], "gitlab_base_url": ["gitlab_token"],
-                   "confluence_base_url": ["confluence_api_token"], "confluence_email": ["confluence_api_token"]}
+                   "confluence_base_url": ["confluence_api_token"], "confluence_email": ["confluence_api_token"],
+                   "firebase_oauth_client_id": ["firebase_refresh_token", "firebase_oauth_client_secret"]}
 
     @staticmethod
     def _check_url(k: str, v: str):
@@ -158,8 +168,14 @@ class Settings:
                 raise ValueError(f"{k} must be one of: {', '.join(opts)}")
         if data.get("base_branch") is not None and not re.fullmatch(r"[A-Za-z0-9._/-]{1,100}", str(data["base_branch"]).strip()):
             raise ValueError("base_branch is not a valid branch name")
+        if data.get("firebase_service_account") and not str(data["firebase_service_account"]).startswith("•"):
+            try:
+                sa = json.loads(data["firebase_service_account"])
+                assert sa.get("type") == "service_account" and sa.get("client_email") and sa.get("private_key")
+            except Exception:
+                raise ValueError("firebase_service_account must be the service account's JSON key file contents")
         for k, v in data.items():
-            if k not in DEFAULTS and k not in SECRET_KEYS:
+            if (k not in DEFAULTS and k not in SECRET_KEYS) or k in INTERNAL_KEYS:
                 continue
             if v is None:
                 continue
