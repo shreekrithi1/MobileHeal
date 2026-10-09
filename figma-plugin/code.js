@@ -35,9 +35,59 @@ async function setText(node, text) {
   return true;
 }
 
+// No "Profile" frame yet → draw the screen from the approved design so it is visible in Figma.
+async function createProfileFrame(tokens) {
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+  const text = (chars, size, bold, color) => {
+    const t = figma.createText();
+    t.fontName = { family: "Inter", style: bold ? "Bold" : "Regular" };
+    t.fontSize = size; t.characters = chars;
+    t.fills = [{ type: "SOLID", color: hexToRgb(color || "#101828") }];
+    return t;
+  };
+  const vstack = (name, gap) => {
+    const f = figma.createFrame(); f.name = name; f.layoutMode = "VERTICAL"; f.itemSpacing = gap;
+    f.primaryAxisSizingMode = "AUTO"; f.counterAxisSizingMode = "FIXED"; f.fills = []; return f;
+  };
+  const frame = vstack("Profile", 16);
+  frame.resize(390, 100); frame.paddingTop = frame.paddingBottom = 32; frame.paddingLeft = frame.paddingRight = 24;
+  frame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+  frame.appendChild(text(tokens["ui.app_title"] || "Your profile", 24, true));
+  const banner = figma.createFrame(); banner.name = "Banner"; banner.layoutMode = "HORIZONTAL";
+  banner.paddingTop = banner.paddingBottom = 12; banner.paddingLeft = banner.paddingRight = 16; banner.cornerRadius = 10;
+  banner.primaryAxisSizingMode = "FIXED"; banner.counterAxisSizingMode = "AUTO"; banner.resize(342, 40);
+  banner.fills = [{ type: "SOLID", color: hexToRgb(tokens["ui.banner_color"] || "#ECFDF3") }];
+  banner.appendChild(text(tokens["ui.banner_message"] || "Changes saved successfully", 14, false));
+  frame.appendChild(banner);
+  const fields = Object.keys(tokens).filter((k) => !k.startsWith("ui.") && /^(required|optional)$/.test(tokens[k]));
+  for (const f of fields) {
+    const box = vstack("Input / " + f, 6); box.resize(342, 10);
+    const label = f.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) + (tokens[f] === "required" ? " *" : "");
+    box.appendChild(text(label, 13, true, "#344054"));
+    const field = figma.createFrame(); field.name = "field"; field.resize(342, 44); field.cornerRadius = 8;
+    field.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+    field.strokes = [{ type: "SOLID", color: hexToRgb("#D0D5DD") }];
+    box.appendChild(field); frame.appendChild(box);
+  }
+  const btn = figma.createFrame(); btn.name = "Button / Primary"; btn.layoutMode = "HORIZONTAL";
+  btn.primaryAxisAlignItems = "CENTER"; btn.counterAxisAlignItems = "CENTER"; btn.resize(342, 48); btn.cornerRadius = 12;
+  btn.primaryAxisSizingMode = "FIXED"; btn.counterAxisSizingMode = "FIXED";
+  btn.fills = [{ type: "SOLID", color: hexToRgb(tokens["ui.button_color"] || "#079455") }];
+  btn.appendChild(text(tokens["ui.button_label"] || "Save", 16, true, "#FFFFFF"));
+  frame.appendChild(btn);
+  figma.currentPage.appendChild(frame);
+  figma.viewport.scrollAndZoomIntoView([frame]);
+  return frame;
+}
+
 async function applyFrames(tokens) {
   let frames = figma.currentPage.selection.filter((n) => "findAll" in n);
   if (!frames.length) frames = await profileFrames();
+  if (!frames.length) {
+    await createProfileFrame(tokens);
+    return { frames: 1, changed: 1, created: true };
+  }
   let changed = 0;
   for (const frame of frames) {
     for (const node of frame.findAll((n) => "name" in n)) {
@@ -111,11 +161,12 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type !== "apply") return;
   applying = true;
   try {
-    const n = await applyVariables(msg.data.variables);
-    let text = `Updated ${n} variables in “MobileHeal”.`;
+    let text;
+    try { text = `Updated ${await applyVariables(msg.data.variables)} variables in “MobileHeal”.`; }
+    catch (e) { text = "Variables skipped (" + e.message + ")."; }
     if (!msg.onlyVars) {
       const r = await applyFrames(msg.data.tokens);
-      text += ` ${r.changed} layer change(s) across ${r.frames} frame(s).`;
+      text += r.created ? " Drew a new “Profile” frame from the approved design." : ` ${r.changed} layer change(s) across ${r.frames} frame(s).`;
     }
     figma.notify("MobileHeal design applied");
     figma.ui.postMessage({ text: text });
