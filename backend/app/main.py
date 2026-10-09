@@ -268,6 +268,16 @@ from . import connectors  # noqa: E402
 app.add_middleware(SecurityMiddleware)
 
 
+@app.middleware("http")
+async def _track_mobile_apps(request: Request, call_next):
+    if request.headers.get("x-mobileheal-client"):
+        try:
+            app.state.ws.seen(request.headers)
+        except Exception:
+            pass
+    return await call_next(request)
+
+
 def _payload(p: ProfileIn) -> dict:
     return p.model_dump(exclude_unset=True)
 
@@ -1187,6 +1197,37 @@ def cr_review_simulate_remote(cid: int, body: RemoteCommentIn):
         raise HTTPException(409, "This PR isn't mirrored to a remote")
     add_pr_comment(wf.settings, num, body.author.strip() or "reviewer", body.body.strip(), "commented", [], human=True)
     return wf.review_sync(cid)
+
+
+# ---------------- Connected mobile apps (which build talks to this server) ----------------
+def _server_rules_version() -> str:
+    import re as _re
+    p = PROJECT_ROOT / "android/app/src/main/java/com/mobileheal/app/generated/RulesDefaults.kt"
+    m = _re.search(r'SPEC_VERSION = "([^"]+)"', p.read_text(encoding="utf-8")) if p.exists() else None
+    return m.group(1) if m else ""
+
+
+@app.get("/api/clients")
+def connected_clients():
+    import time as _t
+    here = str(PROJECT_ROOT.resolve())
+    home = app.state.wf.home_project
+    current = _server_rules_version()
+    out = []
+    for c in sorted(app.state.ws.clients.values(), key=lambda c: -c["last_seen"]):
+        age = _t.time() - c["last_seen"]
+        issues = []
+        ws = c.get("workspace")
+        if ws and Path(ws).resolve() != Path(here):
+            same_home = home is not None and Path(ws).resolve() == Path(home).resolve()
+            issues.append(("Built from your project folder, but this server runs the demo workspace" if same_home else
+                           f"Built from {ws}, but this server works on {here}") + " — its code won't match what the portal merges.")
+        if c.get("rules") and current and c["rules"] != current and not issues:
+            issues.append(f"Built with rules {c['rules']}; the code is now at {current}. Live rules still apply — "
+                          "press ▶ Run in Android Studio / ⌘R in Xcode to rebuild with the latest code.")
+        out.append({**c, "connected": c["sockets"] > 0, "seconds_ago": round(age), "issues": issues,
+                    "demo_build": c["app"].split(" ")[0].endswith(".demo")})
+    return {"server_workspace": here, "server_rules": current, "demo_workspace": home is not None, "clients": out}
 
 
 # ---------------- Sync hub (all platforms, both directions) ----------------

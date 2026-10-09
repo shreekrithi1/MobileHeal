@@ -17,9 +17,28 @@ class ConnectionManager:
         self._lock = asyncio.Lock()
         self.last_event: dict[int, dict] = {}
         self.config_event: dict | None = None
+        self.clients: dict[str, dict] = {}     # mobile apps seen on this server (by build), for the portal
+
+    def seen(self, headers, connected: bool | None = None):
+        """Remember which app build talks to this server (sent by the MobileHeal SDKs as X-MobileHeal-* headers)."""
+        from urllib.parse import unquote
+        platform = (headers.get("x-mobileheal-client") or "").lower()[:20]
+        if platform not in ("android", "ios"):
+            return
+        app = (headers.get("x-mobileheal-app") or platform)[:80]
+        ws = unquote(headers.get("x-mobileheal-workspace") or "")[:400]
+        key = f"{platform}|{app}|{ws}"
+        import time as _t
+        c = self.clients.setdefault(key, {"platform": platform, "app": app, "workspace": ws or None, "sockets": 0})
+        c.update(rules=(headers.get("x-mobileheal-rules") or "")[:40] or c.get("rules"), last_seen=_t.time())
+        if connected is True:
+            c["sockets"] += 1
+        elif connected is False:
+            c["sockets"] = max(0, c["sockets"] - 1)
 
     async def connect(self, ws: WebSocket, profile_id: int | None):
         await ws.accept()
+        self.seen(ws.headers, connected=True)
         async with self._lock:
             self._subs.setdefault(profile_id, set()).add(ws)
         if self.config_event:
@@ -29,6 +48,10 @@ class ConnectionManager:
             await ws.send_text(json.dumps(self.last_event[profile_id]))
 
     async def disconnect(self, ws: WebSocket):
+        try:
+            self.seen(ws.headers, connected=False)
+        except Exception:
+            pass
         async with self._lock:
             for s in self._subs.values():
                 s.discard(ws)

@@ -2439,13 +2439,26 @@ async function renderHome(){
           <div class="hint" style="margin:12px 0 0">Requirements → UX design → Android developer agent → pull request → test → merge. Crashes and data issues are detected, analysed and fixed by agents with your approval.</div></div></section>
       </div>
       <div class="grid" style="align-content:start">
+        <section class="card" aria-labelledby="h-apps" id="apps-card"><div class="card-h"><span id="h-apps">Connected apps</span><span class="hint" style="margin:0">which build talks to this server</span></div><div class="card-b" id="apps-body"><span class="hint" style="margin:0">Loading…</span></div></section>
         <section class="card" aria-labelledby="h-sys"><div class="card-h"><span id="h-sys">System status</span></div><div class="card-b" style="padding-top:4px;padding-bottom:4px">
           ${sys.map(([n,ok,t,h])=>`<a class="sysrow" href="${h}" style="color:inherit;text-decoration:none"><span class="dot8 ${ok?"ok":"warn"}"></span>${n}<span class="st">${t}</span></a>`).join("")}</div></section>
         <section class="card" aria-labelledby="h-act"><div class="card-h"><span id="h-act">Recent activity</span><a class="hint" style="margin:0" href="#audit">Audit log →</a></div><div class="card-b" style="padding-top:4px;padding-bottom:4px">
           ${audit.length ? audit.map(a=>`<div class="act-row"><div><b>${esc(a.actor)}</b> ${esc(a.detail || a.action)}${a.target?` <span class="hint" style="margin:0">· ${esc(a.target)}</span>`:""}</div><time>${ago(a.ts+"Z")}</time></div>`).join("") : `<div class="empty">No activity yet.</div>`}</div></section>
       </div>
     </div>`;
-  refreshShell();
+  refreshShell(); renderApps();
+}
+async function renderApps(){
+  const el = document.getElementById("apps-body"); if (!el) return;
+  let d; try { d = await api("/api/clients"); } catch(e){ el.textContent = e.message; return; }
+  const short = p => p ? p.replace(/^\/Users\/[^/]+\//, "~/") : "unknown folder";
+  el.innerHTML = (d.demo_workspace ? `<div class="hint" style="margin:0 0 8px">🎬 This server runs the <b>demo copy</b> (${esc(short(d.server_workspace))}).</div>` : `<div class="hint" style="margin:0 0 8px">Server code: <code>${esc(short(d.server_workspace))}</code>${d.server_rules?` · rules ${esc(d.server_rules)}`:""}</div>`)
+    + (d.clients.length ? d.clients.map(c => `<div style="padding:8px 0;border-top:1px solid var(--line);font-size:13px">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="dot8 ${c.connected?"ok":""}"></span><b>${c.platform==="ios"?"📱 iOS":"🤖 Android"}</b>
+          <span>${esc(c.app)}</span>${c.demo_build?'<span class="chip s-design_review">Demo app</span>':""}<span class="hint" style="margin:0">${c.connected?"live":`seen ${ago(new Date(Date.now()-c.seconds_ago*1000).toISOString())}`}${c.rules?` · rules ${esc(c.rules)}`:""}</span></div>
+        ${c.workspace?`<div class="hint" style="margin:2px 0 0">Built from <code>${esc(short(c.workspace))}</code></div>`:""}
+        ${c.issues.map(i=>`<div class="hint err" style="margin:4px 0 0">⚠️ ${esc(i)}</div>`).join("")}</div>`).join("")
+      : `<div class="hint" style="margin:0">No app has connected yet. Run the app in Android Studio (▶) or Xcode (⌘R).</div>`);
 }
 
 /* ---------- ⌘K command palette ---------- */

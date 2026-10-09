@@ -6,3 +6,8 @@ import javax.inject.Qualifier
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class BaseUrl
+
+/** X-MobileHeal-* identification headers (app id, rules version, source folder) sent with every call. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ClientHeaders

@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:name=".MobileHealApp"
-        android:label="MobileHeal"
+        android:label="${appLabel}"
         android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

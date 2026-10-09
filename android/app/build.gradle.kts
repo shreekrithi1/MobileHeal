@@ -6,6 +6,11 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// The demo workspace (./start.command --demo) builds a separate "MobileHeal (Demo)" app so it never overwrites
+// the app built from your project. Every build also tells the server which folder it was built from.
+val demoBuild = (project.findProperty("mobileheal.demo") as String?) == "true"
+val sourceFolder = rootProject.projectDir.parentFile.absolutePath.replace("\\", "/")
+
 android {
     namespace = "com.mobileheal.app"
     compileSdk = 34
@@ -18,6 +23,10 @@ android {
         // Emulator reaches the host's localhost via 10.0.2.2
         buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000\"")
         buildConfigField("int", "PROFILE_ID", "1")
+        buildConfigField("String", "SOURCE_FOLDER", "\"${sourceFolder.replace("\"", "")}\"")
+        buildConfigField("boolean", "DEMO_BUILD", demoBuild.toString())
+        manifestPlaceholders["appLabel"] = if (demoBuild) "MobileHeal (Demo)" else "MobileHeal"
+        if (demoBuild) applicationIdSuffix = ".demo"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

@@ -15,12 +15,17 @@ import kotlin.concurrent.thread
  * reports the failure to MobileHeal (`POST /api/client-errors`). The report — not the server — starts
  * the auto-heal: MobileHeal links it to the server-side incident (key from the 500 body) and opens the defect.
  */
-class ApiFailureInterceptor(private val baseUrl: String) : Interceptor {
+class ApiFailureInterceptor(
+    private val baseUrl: String,
+    private val clientHeaders: Map<String, String> = emptyMap(),
+) : Interceptor {
     private val reporter = OkHttpClient()
     private val json = "application/json".toMediaType()
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request().newBuilder().header("X-MobileHeal-Client", "android").build()
+        val request = chain.request().newBuilder().header("X-MobileHeal-Client", "android")
+            .apply { clientHeaders.forEach { (k, v) -> header(k, v) } }
+            .build()
         val response = chain.proceed(request)
         val path = request.url.encodedPath
         if (response.code >= 500 && path != REPORT_PATH) {

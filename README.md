@@ -187,6 +187,14 @@ Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, defaul
 
 ## Troubleshooting
 
+**Two Android Studio windows / the app doesn't match the portal.** `./start.command --demo` works on a separate copy
+(`.mobileheal/demo-workspace`), and `./start.command` works on your project. If you've used both, you may have two
+Android Studio windows. The demo copy now builds a separate **MobileHeal (Demo)** app (`com.mobileheal.app.demo`), so it
+no longer replaces your app on the emulator. **Home → Connected apps** shows every app talking to the server: which
+folder it was built from, its rules version, and a warning when it was built from a different folder than the server
+uses, or needs a rebuild (▶ Run) to pick up merged code. Close the window you aren't using, or delete the demo copy
+with `./start.command --demo-reset`.
+
 - **`python3: command not found` / too old** — install Python 3.9+ from python.org, then re-run.
 - **Emulator shows “Offline”** — make sure the server is running and the app uses `10.0.2.2:8000`.
 - **Gradle sync fails** — *File → Sync Project with Gradle Files*; use the JDK bundled with Android Studio

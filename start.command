@@ -83,9 +83,17 @@ prepare_demo() {
         --exclude='android/*/build' --exclude=android/build --exclude=android/.gradle -cf - . | tar -C "$DEMO" -xf -
     (cd "$DEMO" && git init -q -b main 2>/dev/null || git init -q; git add -A && git -c user.name=MobileHeal -c user.email=demo@mobileheal.local commit -qm "Demo workspace")
   fi
+  # the demo copy builds a separate "MobileHeal (Demo)" app (com.mobileheal.app.demo) — it never replaces your app
+  grep -q '^mobileheal.demo=true' "$DEMO/android/gradle.properties" 2>/dev/null || echo 'mobileheal.demo=true' >> "$DEMO/android/gradle.properties"
+  warn "Android Studio will open the DEMO copy ($DEMO/android). Close any other MobileHeal window to avoid mixing them up."
   export MOBILEHEAL_DEMO=1 MOBILEHEAL_ROOT="$DEMO" MOBILEHEAL_SPEC="$DEMO/backend/requirements.txt" MOBILEHEAL_DB="$ROOT/backend/mobileheal-demo.db"
   ok "Demo mode — workspace $DEMO"
 }
+
+if [ "$MODE" != "--demo" ] && [ -d "$ROOT/.mobileheal/demo-workspace" ]; then
+  warn "A demo copy exists in .mobileheal/demo-workspace. This run uses YOUR project — if Android Studio also has the"
+  warn "demo-workspace window open, close it (or remove the copy with ./start.command --demo-reset)."
+fi
 
 case "$MODE" in
   --demo) prepare_demo; MODE="all" ;;
