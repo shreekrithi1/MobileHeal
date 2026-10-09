@@ -42,17 +42,28 @@ class SyncHub:
         from .jira import Jira
         prov = self.wf.remote_provider()
         j = Jira(self.s)
+        fs = FigmaSync(self.wf)
+        from .demomode import is_on
+        demo = is_on(self.s)
+        figma_missing = ("design file URL" if not (self.s.get("figma_sync_url") or "").strip() else "") + \
+                        (" and token" if not self.s.get("figma_token") and not (self.s.get("figma_sync_url") or "").strip() else
+                         "token" if not self.s.get("figma_token") else "")
         out = [
-            {"id": "jira", "name": "Jira", "connected": True, "mode": "live" if j.live else "built-in tracker",
-             "direction": "two-way"},
-            {"id": "git", "name": "GitHub" if isinstance(prov, cx.GitHub) else "GitLab" if prov else "Git (local)",
-             "connected": prov is not None, "mode": self.wf._remote_label() or "local branches only", "direction": "two-way"},
-            {"id": "figma", "name": "Figma", "connected": FigmaSync(self.wf).configured,
-             "mode": "demo file" if FigmaSync(self.wf).demo else (self.s.get("figma_sync_url") or "not connected"), "direction": "two-way"},
+            {"id": "jira", "name": "Jira", "connected": j.live or demo, "mode": "live" if j.live else
+             ("simulated (demo)" if demo else "NOT CONNECTED — issues stay in MobileHeal's built-in tracker"),
+             "direction": "two-way", "setup": "#settings/jira", "missing": "" if j.live or demo else "site URL, email and API token"},
+            {"id": "git", "name": "GitHub" if isinstance(prov, cx.GitHub) else "GitLab" if prov else "GitHub / GitLab",
+             "connected": prov is not None, "mode": self.wf._remote_label() or "NOT CONNECTED — PRs are local git branches only",
+             "direction": "two-way", "setup": "#settings/source", "missing": "" if prov else "provider, repository and token"},
+            {"id": "figma", "name": "Figma", "connected": fs.configured,
+             "mode": "demo file" if fs.demo else (self.s.get("figma_sync_url") if fs.configured else "NOT CONNECTED"),
+             "direction": "two-way", "setup": "#settings/design", "missing": "" if fs.configured else figma_missing.strip()},
             {"id": "confluence", "name": "Confluence", "connected": cx.Confluence(self.s).configured,
-             "mode": "publish on merge", "direction": "portal → Confluence"},
+             "mode": "publish on merge" if cx.Confluence(self.s).configured else "NOT CONNECTED", "direction": "portal → Confluence",
+             "setup": "#settings/confluence", "missing": "" if cx.Confluence(self.s).configured else "site, email, token and space"},
             {"id": "crashlytics", "name": "Crashlytics", "connected": Crashlytics(self.s).configured,
-             "mode": "BigQuery export", "direction": "Crashlytics → portal"},
+             "mode": "BigQuery export" if Crashlytics(self.s).configured else "NOT CONNECTED", "direction": "Crashlytics → portal",
+             "setup": "#settings/firebase", "missing": "" if Crashlytics(self.s).configured else "project, app IDs and sign-in"},
         ]
         return out
 
@@ -125,7 +136,9 @@ class SyncHub:
         if did and any(d.startswith("created") for d in did):
             self.wf._event(cr, "MobileHeal", "jira", f"created {'Jira' if j.get('mode') == 'live' else 'mock Jira'} story {j['key']}")
         self.wf._save(cr)
-        add("Jira", "push", True, ", ".join(did) or "comment posted")
+        from .demomode import is_on
+        where = "" if j.get("mode") == "live" or jira.live or is_on(self.s) else " — in MobileHeal's built-in tracker, NOT your Jira (connect it in Settings → Jira)"
+        add("Jira", "push", True, (", ".join(did) or "comment posted") + where)
 
     def _jira_pull(self, cid, add):
         from .jira import Jira
@@ -171,7 +184,8 @@ class SyncHub:
         if not pr:
             return add(name if prov else "Git", "push", True, "nothing to push yet (no PR)")
         if prov is None:
-            return add("Git", "push", True, f"local branch {pr.get('branch')} (no remote connected)")
+            return add("Git", "push", False, f"not pushed — GitHub/GitLab isn't connected, so {pr.get('branch')} only exists "
+                                             "as a local branch (Settings → Source control)")
         did = []
         if pr.get("git") and not pr.get("github_number") and cr["status"] in ("pr_open", "merged"):
             cx.push_branch(self.wf.root, prov.remote(), pr["branch"], demo=prov.demo)
@@ -252,7 +266,8 @@ class SyncHub:
         cr = self.wf.get(cid)
         fs = FigmaSync(self.wf)
         if not fs.configured:
-            return add("Figma", "push", True, "not connected")
+            return add("Figma", "push", cr.get("kind") == "incident" or cr["status"] == "design_review",
+                       "not pushed — Figma sync isn't connected (Settings → Design & testing → design file URL + token)")
         if cr.get("kind") == "incident" or cr.get("source") == "figma" or cr["status"] in ("design_review", "closed", "failed"):
             return add("Figma", "push", True, "nothing to push")
         if cr.get("figma_pushes"):

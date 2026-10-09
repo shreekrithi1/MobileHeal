@@ -577,7 +577,13 @@ async function refreshHealer(){
   let el = document.getElementById("ah");
   if (!el){ el = document.createElement("label"); el.id="ah"; el.className="ah"; $("#repo").before(el); }
   el.innerHTML = `<span>Auto-heal</span><span class="switch"><input type="checkbox" ${h.autoheal?"checked":""} onchange="toggleAutoheal(this.checked)"><span></span></span>`;
-  renderModeSwitch();
+  renderModeSwitch(); syncBadge();
+}
+async function syncBadge(){
+  try { const d = await api("/api/sync"), off = d.platforms.filter(p=>!p.connected), b = document.getElementById("syncbtn");
+    if (b) { b.innerHTML = off.length ? `⟳ Sync <span class="chip s-failed" style="padding:0 6px">${off.length} off</span>` : "⟳ Sync";
+             b.title = off.length ? `Not connected: ${off.map(p=>p.name).join(", ")} — click to connect` : "Sync every platform with the portal"; }
+  } catch(e){}
 }
 async function loadMode(){ try { state.mode = await api("/api/delivery-mode"); } catch(e){} return state.mode; }
 async function renderModeSwitch(){
@@ -1111,7 +1117,9 @@ async function openSync(){
   const L = d.last || {}, items = (L.items||[]).filter(i=>i.steps && i.steps.length);
   modal(`<div class="modal-h"><span>⟳ Sync all platforms</span><button class="btn sm" onclick="closeModal()">Close</button></div>
     <div class="modal-b" style="max-height:70vh">
-      <div class="sync-plat">${d.platforms.map(p=>`<div><b>${p.connected?"🟢":"⚪️"} ${esc(p.name)}</b><span class="hint" style="margin:0">${esc(p.direction)} · ${esc(p.mode)}</span></div>`).join("")}</div>
+      ${d.platforms.some(p=>!p.connected) ? `<div class="banner-err" style="margin:0 0 12px"><span aria-hidden="true">⚠️</span><div><b>${d.platforms.filter(p=>!p.connected).map(p=>esc(p.name)).join(", ")} ${d.platforms.filter(p=>!p.connected).length>1?"aren't":"isn't"} connected</b>, so Sync can't change anything there yet — changes stay inside MobileHeal. Connect them in Settings (links below), then sync again.</div></div>` : ""}
+      <div class="sync-plat">${d.platforms.map(p=>`<div style="${p.connected?"":"border-color:var(--red);background:var(--red-soft)"}"><b>${p.connected?"🟢":"🔴"} ${esc(p.name)}</b><span class="hint" style="margin:0">${esc(p.direction)} · ${esc(p.mode)}</span>
+        ${p.connected?"":`<div style="margin-top:4px"><span class="hint" style="margin:0">Needs: ${esc(p.missing)}</span> <a href="${p.setup}" onclick="closeModal()">Connect →</a></div>`}</div>`).join("")}</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
         <label class="hint" style="margin:0">Automatic sync</label>
         <select id="sy-auto" class="input" style="width:auto"><option value="autopilot" ${d.auto_sync==="autopilot"?"selected":""}>When Autopilot is on</option><option value="always" ${d.auto_sync==="always"?"selected":""}>Always</option><option value="off" ${d.auto_sync==="off"?"selected":""}>Off — button only</option></select>
