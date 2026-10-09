@@ -753,11 +753,12 @@ async function loadCR(id, tab){
     if (JSON.stringify(cr.coding_log) !== JSON.stringify(state.cr.coding_log) || cr.status !== state.cr.status) {
       const done = !["coding","diagnosing","fixing"].includes(cr.status); state.cr = cr;
       if (done) { clearInterval(state.poll); state.tab = defaultTab(cr); await refreshList(); await refreshInfo(); if (!isInc(cr)) await loadTests();
+        if (cr.status === "pr_open" || cr.status === "awaiting_approval") setTimeout(() => alive() && loadCR(id, state.tab), 300);   // keep watching: reviewers / Autopilot act next
         toast(cr.status==="awaiting_approval" ? "Analysis ready — approve the automatic fix" : cr.status==="pr_open" ? (isInc(cr) ? `Fix PR #${cr.pr.number} is ready for your review` : `PR #${cr.pr.number} opened — try it in the Test tab`) : isInc(cr) ? "Couldn't auto-fix — needs an engineer" : "Coding failed"); }
       renderCR();
     }
   }, 700);
-  else if (state.cr.status==="pr_open" || state.cr.status==="design_review") state.poll = setInterval(async () => {
+  else if (["pr_open","design_review","awaiting_approval","detected"].includes(state.cr.status)) state.poll = setInterval(async () => {
     if (!alive()) return clearInterval(state.poll);
     if ((state.mode||{}).mode !== "autopilot" && !(state.cr.review && state.cr.pr && state.cr.pr.github_number)) return;
     const cr = await api(`/api/cr/${id}`);
