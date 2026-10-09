@@ -67,7 +67,12 @@ DEFAULTS = {
     "android_repo_url": "https://github.com/android/nowinandroid", "android_repo_branch": "",
     "zephyr_base_url": "https://api.zephyrscale.smartbear.com/v2", "zephyr_project_key": "", "zephyr_cycle_key": "",
     "merge_policy": "tests_required",  # tests_required | review_only
+    "delivery_mode": "manual",          # manual | autopilot
+    "base_branch": "main",              # every PR branch is cut from, and merges into, this branch
+    "review_sync": "on",                # pull review comments/approvals from GitHub / GitLab
 }
+CHOICES = {"delivery_mode": ("manual", "autopilot"), "review_sync": ("on", "off"),
+           "merge_policy": ("tests_required", "review_only"), "require_fix_approval": ("on", "off")}
 
 
 class Settings:
@@ -148,6 +153,11 @@ class Settings:
                     if not data.get(sk) and self.db.get_setting("cfg:" + sk, ""):
                         self.set(sk, "")
                         changed.append(f"{sk} (cleared: {k} changed)")
+        for k, opts in CHOICES.items():
+            if data.get(k) is not None and str(data[k]).strip() not in opts:
+                raise ValueError(f"{k} must be one of: {', '.join(opts)}")
+        if data.get("base_branch") is not None and not re.fullmatch(r"[A-Za-z0-9._/-]{1,100}", str(data["base_branch"]).strip()):
+            raise ValueError("base_branch is not a valid branch name")
         for k, v in data.items():
             if k not in DEFAULTS and k not in SECRET_KEYS:
                 continue

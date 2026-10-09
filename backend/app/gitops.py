@@ -85,6 +85,29 @@ class GitRepo:
     def base_branch(self) -> str:
         return self.git("symbolic-ref", "--short", "HEAD", check=False) or "main"
 
+    def resolve_base(self, name: str = "main") -> str:
+        """The branch PRs are cut from: `name` if it exists, else the current branch (fresh repos)."""
+        if name and self.git("rev-parse", "--verify", "-q", f"refs/heads/{name}", check=False):
+            return name
+        return self.base_branch()
+
+    def tip(self, ref: str) -> str:
+        return self.git("rev-parse", ref)
+
+    def compare(self, base: str, branch: str) -> dict:
+        """Commits ahead/behind of `branch` relative to `base`, and the branch's own commits."""
+        out = self.git("rev-list", "--left-right", "--count", f"{base}...{branch}", check=False)
+        behind, ahead = (int(x) for x in out.split()) if out and len(out.split()) == 2 else (0, 0)
+        log = self.git("log", f"{base}..{branch}", "--pretty=format:%h%x1f%s%x1f%an%x1f%cI", "-n", "20", check=False)
+        commits = []
+        for line in log.splitlines():
+            parts = line.split("\x1f")
+            if len(parts) == 4:
+                commits.append({"sha": parts[0], "subject": parts[1], "author": parts[2], "date": parts[3]})
+        mb = self.git("merge-base", base, branch, check=False)
+        return {"base": base, "branch": branch, "ahead": ahead, "behind": behind, "commits": commits,
+                "merge_base": mb[:10] if mb else None, "base_tip": self.git("rev-parse", "--short=10", base, check=False)}
+
     def head(self) -> str:
         return self.git("rev-parse", "HEAD")
 

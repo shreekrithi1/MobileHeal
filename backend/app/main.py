@@ -1,6 +1,7 @@
 """MobileHeal core service: profile CRUD, agent control, WebSocket notifications, dashboard."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -113,6 +114,26 @@ class DatasetIn(BaseModel):
     values: Dict[str, str]
 
 
+class ReviewIn(BaseModel):
+    state: str = Field("commented", pattern="^(approved|changes_requested|commented)$")
+    body: str = Field("", max_length=4000)
+    platform: str = Field("all", pattern="^(all|android|ios)$")
+
+
+class DismissIn(BaseModel):
+    reviewer: str = Field(..., max_length=60)
+    reason: str = Field(..., max_length=1000)
+
+
+class ModeIn(BaseModel):
+    mode: str = Field(..., pattern="^(manual|autopilot)$")
+
+
+class RemoteCommentIn(BaseModel):
+    author: str = Field("alex.reviewer", max_length=60)
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
 class TestIn(BaseModel):
     notes: str = ""
     passed: bool = True
@@ -162,6 +183,8 @@ async def lifespan(app: FastAPI):
     app.state.watchdog = DataWatchdog(app.state.db, app.state.wf.settings.get)
     app.state.agent.watchdog = app.state.watchdog
     app.state.wf.watchdog = app.state.watchdog
+    app.state.wf.loop = asyncio.get_running_loop()
+    app.state.wf.start_background()
     yield
     await app.state.agent.stop()
 
@@ -1026,6 +1049,67 @@ def cr_get(cid: int):
 def cr_revise(cid: int, body: CRIn):
     return _wf(app.state.wf.revise, cid, body.spec_text, body.description, body.title,
                body.requirement_text or None, body.translation)
+
+
+# ---------------- Code review (reviewer agents + humans, GitHub/GitLab sync) and delivery mode ----------------
+@app.get("/api/delivery-mode")
+def delivery_mode():
+    from .review import REVIEWERS, REQUIRED_APPROVALS
+    s = app.state.wf.settings
+    return {"mode": s.get("delivery_mode") or "manual", "base_branch": s.get("base_branch") or "main",
+            "required_approvals": REQUIRED_APPROVALS, "reviewers": REVIEWERS, "review_sync": s.get("review_sync"),
+            "remote": app.state.wf._remote_label()}
+
+
+@app.post("/api/delivery-mode")
+def set_delivery_mode(body: ModeIn):
+    wf = app.state.wf
+    wf.settings.update({"delivery_mode": body.mode}, wf.user)
+    if body.mode == "autopilot":      # pick up PRs that are already open
+        for row in wf.list():
+            if row.get("status") == "pr_open":
+                wf.spawn(wf.autopilot_continue, row["id"])
+    return delivery_mode()
+
+
+@app.post("/api/cr/{cid}/review")
+def cr_review(cid: int, body: ReviewIn):
+    return _wf(app.state.wf.review_action, cid, body.state, body.body, body.platform)
+
+
+@app.post("/api/cr/{cid}/review/dismiss")
+def cr_review_dismiss(cid: int, body: DismissIn):
+    return _wf(app.state.wf.review_dismiss, cid, body.reviewer, body.reason)
+
+
+@app.post("/api/cr/{cid}/review/rerun")
+def cr_review_rerun(cid: int):
+    return _wf(app.state.wf.review_rerun, cid)
+
+
+@app.post("/api/cr/{cid}/review/sync")
+def cr_review_sync(cid: int):
+    return _wf(app.state.wf.review_sync, cid)
+
+
+@app.post("/api/cr/{cid}/review/comments/{comment_id}/resolve")
+def cr_review_resolve(cid: int, comment_id: str):
+    return _wf(app.state.wf.review_resolve, cid, comment_id)
+
+
+@app.post("/api/cr/{cid}/review/simulate-remote")
+def cr_review_simulate_remote(cid: int, body: RemoteCommentIn):
+    """Demo mode only: post a comment on the simulated GitHub/GitLab PR as a remote human reviewer."""
+    from .demomode import add_pr_comment, is_on
+    wf = app.state.wf
+    if not is_on(wf.settings):
+        raise HTTPException(409, "Only available in demo mode")
+    cr = _wf(wf.get, cid)
+    num = (cr.get("pr") or {}).get("github_number")
+    if not num:
+        raise HTTPException(409, "This PR isn't mirrored to a remote")
+    add_pr_comment(wf.settings, num, body.author.strip() or "reviewer", body.body.strip(), "commented", [], human=True)
+    return wf.review_sync(cid)
 
 
 @app.post("/api/cr/{cid}/approve")

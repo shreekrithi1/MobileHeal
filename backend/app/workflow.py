@@ -69,6 +69,10 @@ class Workflow:
         self._tasks: set = set()
         self.healer = None  # set by main
         self.watchdog = None  # set by main
+        self.loop = None  # main event loop (set by main) — autopilot merges run on it
+        from .review import ReviewBoard
+        self.reviews = ReviewBoard(self)
+        self._autopilot_lock = threading.Lock()
 
     # ------------------------------------------------------------ storage
     def _save(self, cr: dict) -> dict:
@@ -181,7 +185,8 @@ class Workflow:
             out.append({k: cr.get(k) for k in ("id", "key", "title", "status", "author", "created_at",
                                                 "updated_at", "tested", "stage", "occurrences", "last_seen")} |
                        {"kind": cr.get("kind", "change")} |
-                       {"pr": cr.get("pr"), "stats": cr.get("stats"), "checks_summary": cr.get("checks_summary")})
+                       {"pr": cr.get("pr"), "stats": cr.get("stats"), "checks_summary": cr.get("checks_summary"),
+                        "review_status": (cr.get("review") or {}).get("status"), "autopilot_paused": cr.get("autopilot_paused")})
         return out
 
     @property
@@ -249,8 +254,12 @@ class Workflow:
         self._event(cr, author, "requirements", "submitted requirements")
         cr["design"] = self._design(base, spec_text)
         self._event(cr, "MobileHeal", "design",
-                    f"generated UX design ({len(cr['design']['changes'])} change(s)) — awaiting approval")
-        return self._save(cr)
+                    f"generated UX design ({len(cr['design']['changes'])} change(s)) — "
+                    + ("Autopilot is approving it" if self.autopilot else "awaiting approval"))
+        cr = self._save(cr)
+        if self.autopilot:
+            return self.approve_design(cr["id"], actor="Autopilot")
+        return cr
 
     def revise(self, cid: int, spec_text: str, description: Optional[str], title: Optional[str],
                requirement_text: Optional[str] = None, translation: Optional[dict] = None, note: Optional[str] = None) -> dict:
@@ -279,13 +288,13 @@ class Workflow:
         return self._save(cr)
 
     # ------------------------------------------------------------ 3. coding (+ checks + PR)
-    def approve_design(self, cid: int) -> dict:
+    def approve_design(self, cid: int, actor: Optional[str] = None) -> dict:
         cr = self.get(cid)
         if cr["status"] != "design_review":
             raise WorkflowError("Design is not awaiting approval", 409)
         cr["status"], cr["stage"] = "coding", 2
         cr["coding_log"] = []
-        self._event(cr, self.user, "approve", "approved the UX design")
+        self._event(cr, actor or self.user, "approve", "approved the UX design")
         self._save(cr)
         self.spawn(self._run_coding, cid)
         return cr
@@ -383,11 +392,11 @@ class Workflow:
             self._log(cr, "Open pull request", "done", f"#{cr['pr']['number']} on {cr['pr']['branch']}")
             cr["status"], cr["stage"] = "pr_open", 4
             self._event(cr, "MobileHeal", "pr",
-                        f"opened PR #{cr['pr']['number']} ({cr['stats']['files']} files, "
-                        f"+{cr['stats']['additions']} −{cr['stats']['deletions']})")
+                        f"opened PR #{cr['pr']['number']}: {cr['pr']['branch']} → {cr['pr']['base']} "
+                        f"({cr['stats']['files']} files, +{cr['stats']['additions']} −{cr['stats']['deletions']})")
             self._event(cr, "MobileHeal", "checks",
                         "checks " + ("failed" if fails else "passed") + f" ({warns} warning(s))")
-            self._save(cr)
+            self.pr_opened(cr)
         except Exception as e:  # surface failures in the UI instead of hanging in "coding"
             log.exception("coding failed")
             cr = self.get(cid)
@@ -592,18 +601,23 @@ class Workflow:
         return "\n".join(lines)
 
     def _open_pr(self, cr: dict, files: List[dict], body: Optional[str] = None, prefix: str = "mobileheal") -> dict:
-        branch = (cr.get("pr") or {}).get("branch") or f"{prefix}/{cr['key'].lower()}-{slug(cr['title'])}"
-        pr = {"number": cr["id"], "branch": branch, "base": "main", "commit": None,
-              "git": False, "github_url": None, "github_error": None}
+        branch = (cr.get("pr") or {}).get("branch") or f"{self.branch_type(cr)}/{cr['key'].lower()}-{slug(cr['title'])}"
+        want = self.settings.get("base_branch") or "main"
+        pr = {"number": cr["id"], "branch": branch, "base": want, "commit": None, "type": self.branch_type(cr),
+              "git": False, "github_url": None, "github_error": None, "created_at": now()}
         cr["pr_body"] = body or self._pr_body(cr)
         if self.git.available:
             try:
-                pr["base"] = self.git.ensure_repo()
-                cr["base_commit"] = self.git.head()
+                self.git.ensure_repo()
+                pr["base"] = self.git.resolve_base(want)
+                cr["base_commit"] = self.git.tip(pr["base"])
+                pr["base_commit"] = cr["base_commit"][:10]
                 msg = (f"{cr['key']}: {'fix ' if cr.get('kind') == 'incident' else ''}{cr['title']}\n\n"
                        f"{cr['description']}\n\nGenerated by MobileHeal workflow.")
-                pr["commit"] = self.git.commit_branch(branch, {f["path"]: f["content"] for f in files}, msg)[:10]
+                pr["commit"] = self.git.commit_branch(branch, {f["path"]: f["content"] for f in files}, msg,
+                                                      parent=cr["base_commit"])[:10]
                 pr["git"] = True
+                pr["compare"] = self.git.compare(pr["base"], branch)
             except GitError as e:
                 pr["git_error"] = str(e)
                 log.warning("git unavailable for PR: %s", e)
@@ -619,6 +633,168 @@ class Workflow:
             except Exception as e:
                 pr["github_error"] = str(e)
         return pr
+
+    @staticmethod
+    def branch_type(cr: dict) -> str:
+        """Branch prefix by origin: production incident → hotfix, plain-English requirement → feature,
+        rules/design change request → change."""
+        if cr.get("kind") == "incident":
+            return "hotfix"
+        return "feature" if (cr.get("requirement_text") or "").strip() else "change"
+
+    # ------------------------------------------------------------ review + autopilot
+    @property
+    def autopilot(self) -> bool:
+        return (self.settings.get("delivery_mode") or "manual") == "autopilot"
+
+    def pr_opened(self, cr: dict):
+        """Called once a PR is open (change requests and incident fixes): reviewer agents review it, then
+        Autopilot takes it from there."""
+        try:
+            self.reviews.run(cr)
+            rv = cr["review"]
+            self._event(cr, "MobileHeal", "review",
+                        f"review {rv['status'].replace('_', ' ')} — " + ", ".join(
+                            f"{'Android' if p == 'android' else 'iOS'} {v['approvals']}/{v['required']}"
+                            for p, v in rv["per_platform"].items()))
+        except Exception as e:
+            log.exception("review failed")
+            cr["review_error"] = str(e)
+        self._save(cr)
+        if self.autopilot:
+            self.spawn(self.autopilot_continue, cr["id"])
+
+    def review_action(self, cid: int, state: str, body: str, platform: str = "all") -> dict:
+        cr = self.get(cid)
+        if cr["status"] != "pr_open":
+            raise WorkflowError("Only open PRs can be reviewed", 409)
+        try:
+            self.reviews.human(cr, self.user, state, body, platform)
+        except ValueError as e:
+            raise WorkflowError(str(e))
+        self._save(cr)
+        if self.autopilot:
+            self.spawn(self.autopilot_continue, cid)
+        return cr
+
+    def review_dismiss(self, cid: int, reviewer: str, reason: str) -> dict:
+        cr = self.get(cid)
+        if cr["status"] != "pr_open":
+            raise WorkflowError("Only open PRs can be reviewed", 409)
+        try:
+            self.reviews.dismiss(cr, reviewer, self.user, reason)
+        except ValueError as e:
+            raise WorkflowError(str(e))
+        self._save(cr)
+        if self.autopilot:
+            self.spawn(self.autopilot_continue, cid)
+        return cr
+
+    def review_resolve(self, cid: int, comment_id: str) -> dict:
+        cr = self.get(cid)
+        try:
+            self.reviews.resolve(cr, comment_id, self.user)
+        except ValueError as e:
+            raise WorkflowError(str(e))
+        return self._save(cr)
+
+    def review_rerun(self, cid: int) -> dict:
+        cr = self.get(cid)
+        if cr["status"] != "pr_open":
+            raise WorkflowError("Only open PRs can be reviewed", 409)
+        self._event(cr, self.user, "review", "re-requested review from the reviewer agents")
+        self.pr_opened(cr)
+        return self.get(cid)
+
+    def review_sync(self, cid: int) -> dict:
+        cr = self.get(cid)
+        res = self.reviews.sync(cr)
+        self._save(cr)
+        if res.get("synced") and self.autopilot and cr["status"] == "pr_open":
+            self.spawn(self.autopilot_continue, cid)
+        return {**res, "review": cr.get("review")}
+
+    def sync_open_reviews(self) -> int:
+        """Background: pull remote review activity for every open PR (GitHub / GitLab)."""
+        if self.settings.get("review_sync") == "off" or self.remote_provider() is None:
+            return 0
+        n = 0
+        for row in self.list():
+            if row.get("status") == "pr_open":
+                try:
+                    n += self.review_sync(row["id"]).get("synced", 0)
+                except Exception:
+                    log.exception("review sync failed")
+        return n
+
+    def start_background(self):
+        interval = float(os.getenv("MOBILEHEAL_REVIEW_SYNC", "60"))
+
+        def loop():
+            while True:
+                time.sleep(interval)
+                try:
+                    self.sync_open_reviews()
+                except Exception:
+                    log.exception("review sync loop")
+        self.spawn(loop)
+
+    def autopilot_continue(self, cid: int):
+        """Autopilot drives an open PR to production: when the reviewers' policy is satisfied and checks pass, it
+        records automated verification, merges and deploys. It stops (and notifies) when a human is needed."""
+        if not self.autopilot:
+            return
+        with self._autopilot_lock:
+            cr = self.get(cid)
+            if cr["status"] != "pr_open":
+                return
+            rv = self.reviews.evaluate(cr) if cr.get("review") else {}
+            if (cr.get("checks_summary") or {}).get("fail"):
+                return self._autopilot_pause(cr, "checks are failing")
+            if rv.get("status") != "approved":
+                blocking = [b for v in (rv.get("per_platform") or {}).values() for b in v["blocking"]]
+                return self._autopilot_pause(cr, ("changes requested by " + ", ".join(sorted(set(blocking))))
+                                             if blocking else "waiting for approvals")
+            if self._stale(cr):
+                n = cr.get("autopilot_rebases", 0)
+                if n >= 2:
+                    return self._autopilot_pause(cr, f"{cr['pr'].get('base', 'main')} keeps moving — update the branch manually")
+                cr["autopilot_rebases"] = n + 1
+                self._event(cr, "Autopilot", "rebase", f"{cr['pr'].get('base', 'main')} moved since this PR was opened — "
+                            "updating the branch and re-running checks and review")
+                self._save(cr)
+                self.update_branch(cid)
+                return
+            try:
+                if not cr.get("tested"):
+                    s = cr.get("checks_summary") or {}
+                    self.mark_tested(cid, f"Autopilot: {s.get('pass', 0)} automated checks passed and "
+                                          f"{sum(v['approvals'] for v in rv['per_platform'].values())} review approvals.",
+                                     True, override=True, actor="Autopilot")
+                if self.loop is not None and self.loop.is_running():
+                    asyncio.run_coroutine_threadsafe(self.merge(cid, actor="Autopilot"), self.loop).result(timeout=600)
+                else:
+                    asyncio.run(self.merge(cid, actor="Autopilot"))
+            except Exception as e:
+                cr = self.get(cid)
+                self._autopilot_pause(cr, f"merge blocked: {e}")
+
+    def _stale(self, cr: dict) -> bool:
+        if cr.get("kind") == "incident":
+            return any(self._read(p) != c for p, c in (cr.get("base_files") or {}).items())
+        return (self._read(codegen.SPEC_PATH) or "") != cr.get("base_spec")
+
+    def _autopilot_pause(self, cr: dict, why: str):
+        if cr.get("autopilot_paused") == why:
+            return
+        cr["autopilot_paused"] = why
+        self._event(cr, "Autopilot", "autopilot", f"paused — {why}. A person needs to act on this PR.")
+        self._save(cr)
+        if self.watchdog is not None:
+            try:
+                self.watchdog.notify("warning", f"{cr['key']}: Autopilot paused", why, f"#cr/{cr['id']}", source="Autopilot")
+            except Exception:
+                pass
 
     def _remote_label(self):
         p = self.remote_provider()
@@ -651,7 +827,9 @@ class Workflow:
             cr["confluence"] = {"error": str(e)[:300]}
 
     # ------------------------------------------------------------ 5. test
-    def mark_tested(self, cid: int, notes: str, passed: bool = True, override: bool = False) -> dict:
+    def mark_tested(self, cid: int, notes: str, passed: bool = True, override: bool = False,
+                    actor: Optional[str] = None) -> dict:
+        actor = actor or self.user
         cr = self.get(cid)
         if cr["status"] != "pr_open":
             raise WorkflowError("Only open PRs can be tested", 409)
@@ -661,25 +839,32 @@ class Workflow:
                 if not override or len(notes.strip()) < 10:
                     raise WorkflowError(f"{gate['passed']}/{gate['total']} test cases passed. Run the remaining tests, "
                                         "or override with a written justification (10+ characters).", 409)
-                cr["override"] = {"by": self.user, "reason": notes.strip(), "ts": now(),
+                cr["override"] = {"by": actor, "reason": notes.strip(), "ts": now(),
                                   "summary": {k: gate[k] for k in ("total", "passed", "failed", "not_run")}}
-                self._event(cr, self.user, "override", f"overrode the test gate: “{notes.strip()}”")
+                self._event(cr, actor, "override", f"overrode the test gate: “{notes.strip()}”")
         cr["tested"] = bool(passed)
         cr["test_notes"] = notes.strip()
         cr["stage"] = 5 if passed else 4
         verb = ("approved the fix" if passed else "requested changes") if cr.get("kind") == "incident" else \
                ("verified in preview" if passed else "reported a problem in preview")
-        self._event(cr, self.user, "test" if passed else "test_failed", verb +
+        self._event(cr, actor, "test" if passed else "test_failed", verb +
                     (f": “{notes.strip()}”" if notes.strip() else ""))
         return self._save(cr)
 
     # ------------------------------------------------------------ 6. merge
-    async def merge(self, cid: int) -> dict:
+    async def merge(self, cid: int, actor: Optional[str] = None) -> dict:
+        actor = actor or self.user
         cr = self.get(cid)
         if cr["status"] != "pr_open":
             raise WorkflowError("PR is not open", 409)
         if cr.get("checks_summary", {}).get("fail"):
             raise WorkflowError("Checks are failing — revise the requirements first", 409)
+        if cr.get("review") is not None and not self.reviews.satisfied(cr):
+            per = cr["review"].get("per_platform") or {}
+            need = "; ".join(f"{'Android' if p == 'android' else 'iOS'}: {v['approvals']}/{v['required']} approvals"
+                             + (f", changes requested by {', '.join(v['blocking'])}" if v["blocking"] else "")
+                             for p, v in per.items() if not v["ok"])
+            raise WorkflowError(f"Code review isn't complete — {need}", 409)
         incident = cr.get("kind") == "incident"
         if not incident and not self.test_gate(cr)["satisfied"]:
             raise WorkflowError("Test cases haven't all passed — run them in the Test tab or record an override", 409)
@@ -725,7 +910,10 @@ class Workflow:
         cr["merged_commit"] = merged[:10] if merged else None
         cr["merged_at"] = now()
         await asyncio.to_thread(self._publish_docs, cr)
-        self._event(cr, self.user, "merge", f"merged PR #{cr['pr']['number']}" + (f" as {cr['merged_commit']}" if merged else ""))
+        cr.pop("autopilot_paused", None)
+        self._event(cr, actor, "merge", f"merged PR #{cr['pr']['number']} ({cr['pr']['branch']} → {cr['pr'].get('base', 'main')})"
+                    + (f" as {cr['merged_commit']}" if merged else "")
+                    + (" — review policy satisfied" if cr.get("review") else ""))
         if incident:
             self._hot_reload(cr)
             self._event(cr, "MobileHeal", "deploy", "fix deployed — patched module reloaded in the running server")
@@ -752,7 +940,22 @@ class Workflow:
             self._event(cr, self.user, "rebase", "re-ran auto-heal against the latest code")
             self._save(cr)
             return self.healer.start(cid, actor=self.user)
+        live = self._read(codegen.SPEC_PATH) or ""
+        if live != cr.get("base_spec"):
+            from .rules import merge_spec
+            try:
+                merged, conflicts = merge_spec(cr.get("base_spec") or "", cr["spec_text"], live)
+            except RuleParseError as e:
+                raise WorkflowError(f"Can't update the branch automatically: {e}", 409)
+            cr["spec_text"] = merged
+            self._event(cr, "MobileHeal", "rebase", "replayed this PR's rule changes onto the latest "
+                        f"{(cr.get('pr') or {}).get('base', 'main')}"
+                        + (f" — conflicts resolved in favour of this PR: {', '.join(conflicts)}" if conflicts else ""))
+            if conflicts:
+                cr["rebase_conflicts"] = conflicts
         cr["status"], cr["stage"], cr["tested"] = "coding", 2, False
+        cr.pop("override", None)
+        cr.pop("autopilot_paused", None)
         self._event(cr, self.user, "rebase", "updated branch with latest rules")
         self._save(cr)
         self.spawn(self._run_coding, cid)

@@ -304,6 +304,10 @@ class Healer:
     def _gate(self, inc, plan: dict) -> bool:
         """Pause after analysis until a human approves the automatic fix. Returns True if paused."""
         inc["analysis"] = {**plan, "ts": self.wf_now()}
+        if self.wf.autopilot and not inc.get("fix_approved"):
+            inc["fix_approved"], inc["approval"] = True, {"by": "Autopilot", "note": "delivery mode: autopilot", "ts": self.wf_now()}
+            self._log(inc, "Approval", "done", "approved by Autopilot")
+            self.wf._event(inc, "Autopilot", "approve", "approved the automatic fix (Autopilot mode)")
         if not self.require_approval or inc.get("fix_approved"):
             if not inc.get("fix_approved"):
                 self._log(inc, "Approval", "done", "auto-approved (approval not required in Settings)")
@@ -429,8 +433,9 @@ class Healer:
             inc["pr"] = self.wf._open_pr(inc, files, body=inc["pr_body"], prefix="fix")
             self._log(inc, "Open pull request", "done", f"#{inc['pr']['number']} on {inc['pr']['branch']}")
             inc["status"], inc["stage"] = "pr_open", 4
-            self.wf._event(inc, "MobileHeal", "pr", f"opened fix PR #{inc['pr']['number']} for review")
-            self.wf._save(inc)
+            self.wf._event(inc, "MobileHeal", "pr", f"opened fix PR #{inc['pr']['number']} for review: "
+                           f"{inc['pr']['branch']} → {inc['pr'].get('base', 'main')}")
+            self.wf.pr_opened(inc)
         except Exception as e:
             log.exception("heal failed")
             inc = self.wf.get(cid)
@@ -562,8 +567,9 @@ class Healer:
         inc["pr"] = self.wf._open_pr(inc, files, body=inc["pr_body"], prefix="fix")
         self._log(inc, "Open pull request", "done", f"#{inc['pr']['number']} on {inc['pr']['branch']}")
         inc["status"], inc["stage"] = "pr_open", 4
-        self.wf._event(inc, "MobileHeal", "pr", f"opened fix PR #{inc['pr']['number']} for review (static fix — verify on device/CI)")
-        self.wf._save(inc)
+        self.wf._event(inc, "MobileHeal", "pr", f"opened fix PR #{inc['pr']['number']} for review (static fix — verify on device/CI): "
+                       f"{inc['pr']['branch']} → {inc['pr'].get('base', 'main')}")
+        self.wf.pr_opened(inc)
 
     def _run_ai_only(self, inc, reason):
         inc["diagnosis"] = {"summary": f"Automatic replay isn't possible: {reason}.",

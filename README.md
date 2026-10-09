@@ -137,6 +137,54 @@ Environment overrides: `MOBILEHEAL_PORT`, `MOBILEHEAL_INTERVAL` (seconds, defaul
 | GET | `/api/config` | current UI config event |
 | WS | `/ws/notifications?profile_id=1` | `{"type":"HEAL_REQUIRED","missing":[...]}` / `HEAL_RESOLVED` |
 
+## Pull requests, code review and Autopilot
+
+**Every PR gets a new branch cut from `main`.** The branch prefix shows where the change came from:
+
+| Origin | Branch | Example |
+|---|---|---|
+| Production incident / crash | `hotfix/` | `hotfix/inc-3-dev-keyerror-in-contact-card` |
+| Plain-English requirement | `feature/` | `feature/cr-7-city-is-required` |
+| Rules / design change request | `change/` | `change/cr-8-green-save-button` |
+
+The **Pull request** tab shows the branch → base, the base commit it was cut from, commits ahead/behind `main`, and
+the merge requirements. The base branch can be changed in Settings → Delivery & approvals.
+
+**Reviewer agents (two per platform).** As soon as a PR opens, the reviewers for each impacted platform review the diff:
+
+| Platform | Reviewer | Looks for |
+|---|---|---|
+| Android | Android Architecture Reviewer | `!!`, `GlobalScope`, `runBlocking`, domain → data/Android imports, debug logs |
+| Android | Android Quality & Security Reviewer | hard-coded secrets, `allowBackup`/clear-text, missing unit tests, a11y, failing CI |
+| iOS | iOS SwiftUI Reviewer | force unwraps, `try!`/`as!`, GCD in SwiftUI, `ObservableObject` vs `@Observable` |
+| iOS | iOS Quality & Security Reviewer | hard-coded secrets, ATS exceptions, screens without `#Preview`, missing XCTests, failing CI |
+
+Platforms are picked from the files a PR touches: `android/**` goes to Android, `ios/**` to iOS, and shared rules or
+API code to both. With a model API key, each reviewer also adds up to 3 LLM findings. LLM findings never block on their own.
+
+**Merge policy: 2 approvals per impacted platform and no open "changes requested".** Agents and people both count.
+People can approve, request changes or comment from the **Code review** tab, or directly on GitHub/GitLab. A person
+can dismiss an agent's review with a written reason, which is recorded in the audit log. New commits dismiss stale approvals.
+
+**GitHub / GitLab sync.** Each reviewer's verdict and findings are posted to the PR (GitHub review) or MR (GitLab note).
+Every minute (or with **Sync**), MobileHeal pulls human reviews, comments and approvals back into the web app.
+A comment starting with `/approve` counts as an approval, and one starting with `Changes requested` blocks the merge.
+In demo mode, a **Simulate a GitHub reviewer** card lets you post as a remote reviewer.
+
+**Manual vs Autopilot** (switch at the top of every page, or in Settings → Delivery & approvals):
+
+| | Manual | Autopilot |
+|---|---|---|
+| UX design approval | a person | agent |
+| Automatic crash-fix approval | a person | agent |
+| Code review (2 per platform) | required | required |
+| Test sign-off | a person (Test tab) | agent records automated verification (checks + approvals) |
+| Merge + deploy | a person clicks Merge | agent merges as soon as the policy is satisfied |
+| Base branch moved | "Update branch" button | agent rebases automatically (3-way rules merge), re-runs checks and review |
+
+Autopilot pauses and notifies (🔔 and your webhook) when a person is needed: changes requested, failing checks, or a
+branch that keeps going stale. Switching to Autopilot also picks up PRs that are already open.
+
 ## Delivery workflow (Requirements → UX Design → Coding → PR → Test → Merge)
 
 Open **http://localhost:8000/workflow**.
@@ -279,7 +327,7 @@ With **Auto-heal** on (toggle in the top bar or on the dashboard), the agent:
    repeats until the crash is gone, up to 4 attempts. If `ANTHROPIC_API_KEY` is set, Claude proposes a fix for crashes
    no pattern covers, and that fix gets the same checks.
 4. **Verifies:** writes a regression test from the captured input and runs the full test suite on the patched code.
-5. **Opens a PR** (`fix/inc-n-…`) with a postmortem in `docs/incidents/`. It **never merges on its own**.
+5. **Opens a PR** on a new `hotfix/inc-n-…` branch cut from `main`, with a postmortem in `docs/incidents/`. In Manual mode it never merges on its own; in Autopilot it merges once the reviewers approve.
 6. You **review and approve** the fix, then **Merge & deploy**: the fix is committed and hot-reloaded into the running server.
 
 Try it: on the dashboard, click **Simulate production crash**. It creates a user with no name and opens

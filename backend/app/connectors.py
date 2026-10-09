@@ -93,6 +93,43 @@ class GitHub:
             return merge_pr(self.s, number)
         _call(f"{self.api}/repos/{self.repo}/pulls/{number}/merge", "PUT", {"merge_method": "squash"}, self._h(), "GitHub")
 
+    # ---- reviews
+    def post_review(self, number: int, body: str, state: str, inline: list, author: str = "") -> dict:
+        """Post a review. GitHub forbids approving your own PR with the same token, so agent verdicts are
+        posted as COMMENT reviews (the verdict is in the body); inline findings become review comments."""
+        if self.demo:
+            from .demomode import add_pr_comment
+            return add_pr_comment(self.s, number, author or "mobileheal", body, state, inline)
+        comments = [{"path": c["path"], "line": int(c["line"]), "side": "RIGHT", "body": c["body"]} for c in inline[:30]]
+        try:
+            r = _call(f"{self.api}/repos/{self.repo}/pulls/{number}/reviews", "POST",
+                      {"event": "COMMENT", "body": body, **({"comments": comments} if comments else {})}, self._h(), "GitHub")
+        except ConnectorError as e:
+            if "422" not in str(e) or not comments:
+                raise
+            r = _call(f"{self.api}/repos/{self.repo}/issues/{number}/comments", "POST", {"body": body}, self._h(), "GitHub")
+        return {"id": r.get("id")}
+
+    def list_activity(self, number: int) -> list:
+        """Human reviews + conversation + inline comments, normalised."""
+        if self.demo:
+            from .demomode import pr_activity
+            return pr_activity(self.s, number)
+        out = []
+        for r in _call(f"{self.api}/repos/{self.repo}/pulls/{number}/reviews?per_page=100", headers=self._h(), name="GitHub"):
+            st = {"APPROVED": "approved", "CHANGES_REQUESTED": "changes_requested"}.get(r.get("state"), "commented")
+            if st == "commented" and not (r.get("body") or "").strip():
+                continue
+            out.append({"id": f"r{r['id']}", "author": (r.get("user") or {}).get("login", "?"), "body": r.get("body") or "",
+                        "state": st, "ts": r.get("submitted_at")})
+        for c in _call(f"{self.api}/repos/{self.repo}/issues/{number}/comments?per_page=100", headers=self._h(), name="GitHub"):
+            out.append({"id": f"c{c['id']}", "author": (c.get("user") or {}).get("login", "?"), "body": c.get("body") or "",
+                        "state": "commented", "ts": c.get("created_at")})
+        for c in _call(f"{self.api}/repos/{self.repo}/pulls/{number}/comments?per_page=100", headers=self._h(), name="GitHub"):
+            out.append({"id": f"l{c['id']}", "author": (c.get("user") or {}).get("login", "?"), "body": c.get("body") or "",
+                        "state": "commented", "ts": c.get("created_at"), "path": c.get("path"), "line": c.get("line")})
+        return out
+
     def remote(self) -> str:
         host = "github.com" if self.api == "https://api.github.com" else urllib.parse.urlsplit(self.api).hostname
         return f"https://x-access-token:{self.token}@{host}/{self.repo}.git"
@@ -144,6 +181,40 @@ class GitLab:
             r = _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests?state=opened&source_branch="
                       + urllib.parse.quote(branch), headers=self._h(), name="GitLab")[0]
         return {"number": r["iid"], "url": r["web_url"]}
+
+    # ---- reviews
+    def post_review(self, iid: int, body: str, state: str, inline: list, author: str = "") -> dict:
+        """Post the review as an MR note (findings reference file:line). Approval via the API is attempted for
+        approved verdicts but GitLab rejects self-approval with the author's token, so that failure is ignored."""
+        if self.demo:
+            from .demomode import add_pr_comment
+            return add_pr_comment(self.s, iid, author or "mobileheal", body, state, inline)
+        r = _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests/{iid}/notes", "POST", {"body": body},
+                  self._h(), "GitLab")
+        if state == "approved" and author == "":
+            try:
+                _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests/{iid}/approve", "POST", {}, self._h(), "GitLab")
+            except ConnectorError:
+                pass
+        return {"id": r.get("id")}
+
+    def list_activity(self, iid: int) -> list:
+        if self.demo:
+            from .demomode import pr_activity
+            return pr_activity(self.s, iid)
+        out = []
+        for n in _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests/{iid}/notes?per_page=100&sort=asc",
+                       headers=self._h(), name="GitLab"):
+            if n.get("system"):
+                continue
+            pos = n.get("position") or {}
+            out.append({"id": f"n{n['id']}", "author": (n.get("author") or {}).get("username", "?"), "body": n.get("body") or "",
+                        "state": "commented", "ts": n.get("created_at"), "path": pos.get("new_path"), "line": pos.get("new_line")})
+        ap = _call(f"{self.base}/api/v4/projects/{self.pid}/merge_requests/{iid}/approvals", headers=self._h(), name="GitLab")
+        for a in ap.get("approved_by") or []:
+            u = (a.get("user") or {}).get("username", "?")
+            out.append({"id": f"a{u}", "author": u, "body": "", "state": "approved", "ts": None})
+        return out
 
     def merge(self, iid: int):
         if self.demo:

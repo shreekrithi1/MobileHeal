@@ -127,3 +127,50 @@ def missing_fields(rules: list, profile: dict) -> list:
         if v is None or (isinstance(v, str) and not v.strip()):
             out.append(r.field)
     return out
+
+
+# ---------------------------------------------------------------- 3-way merge (branch update / rebase)
+def _spec_key(line: str):
+    s = line.strip()
+    if not s or s.startswith("#"):
+        return None
+    if s.lower().startswith(("ui.", "screen.")):
+        return s.split("=", 1)[0].strip().lower()
+    return s.split(":", 1)[0].strip().lower() if ":" in s else s.lower()
+
+
+def _keyed(text: str) -> dict:
+    out = {}
+    for line in text.splitlines():
+        k = _spec_key(line)
+        if k is not None:
+            out[k] = line.strip()
+    return out
+
+
+def merge_spec(base: str, ours: str, theirs: str):
+    """Replay the PR's own edits (base → ours) on top of the latest live spec (theirs), key by key.
+    Returns (merged_text, conflicts) where conflicts lists keys both sides changed differently (ours wins)."""
+    b, o, t = _keyed(base), _keyed(ours), _keyed(theirs)
+    changed = {k: v for k, v in o.items() if b.get(k) != v}
+    removed = [k for k in b if k not in o]
+    conflicts = [k for k in list(changed) + removed
+                 if k in b and t.get(k) != b.get(k) and t.get(k) != o.get(k)]
+    out, done = [], set()
+    for line in theirs.splitlines():
+        k = _spec_key(line)
+        if k is None:
+            out.append(line)
+        elif k in removed:
+            continue
+        elif k in changed:
+            out.append(changed[k])
+            done.add(k)
+        else:
+            out.append(line)
+    for k, v in changed.items():
+        if k not in done:
+            out.append(v)
+    text = "\n".join(out).rstrip("\n") + "\n"
+    parse_spec(text)
+    return text, conflicts

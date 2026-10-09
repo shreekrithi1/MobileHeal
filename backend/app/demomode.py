@@ -60,6 +60,26 @@ def merge_pr(settings, number: int):
     settings.db.set_setting("demo_prs", json.dumps(prs))
 
 
+def add_pr_comment(settings, number: int, author: str, body: str, state: str, inline: list, human: bool = False) -> dict:
+    """Simulated PR/MR conversation (agent reviews and, from the demo PR page, 'remote' human comments)."""
+    prs = _store(settings, "demo_prs")
+    for p in prs:
+        if p["number"] == number:
+            cs = p.setdefault("comments", [])
+            cid = f"d{number}-{len(cs) + 1}"
+            cs.append({"id": cid, "author": author, "body": body, "state": state, "ts": _now(), "human": human,
+                       "inline": [{"path": c.get("path"), "line": c.get("line"), "body": c.get("body")} for c in inline][:30]})
+            settings.db.set_setting("demo_prs", json.dumps(prs))
+            return {"id": cid}
+    raise ValueError("PR not found")
+
+
+def pr_activity(settings, number: int) -> list:
+    p = get_pr(settings, number) or {}
+    return [{"id": c["id"], "author": c["author"], "body": c["body"], "state": c.get("state", "commented"), "ts": c["ts"]}
+            for c in p.get("comments", []) if c.get("human")]
+
+
 def get_pr(settings, number: int) -> Optional[dict]:
     return next((p for p in _store(settings, "demo_prs") if p["number"] == number), None)
 
