@@ -22,8 +22,27 @@ data class AppRules(
 ) {
     val requiredFields: List<String> get() = fields.filter { it.required }.map { it.field }
 
-    /** Fields to show: name and email always, then every field that has a rule. */
-    val displayFields: List<String> get() = (listOf("name", "email") + fields.map { it.field }).distinct()
+    /**
+     * Fields to show in UI with consistent ordering:
+     *  - name and email always first (even if absent from rules)
+     *  - date_of_birth (if present in rules)
+     *  - city (if present in rules)
+     *  - followed by remaining rule-defined fields in their declared order
+     */
+    val displayFields: List<String>
+        get() {
+            val ruleFields = fields.map { it.field }
+            val ordered = linkedSetOf<String>()
+            // Always include primary identifiers first
+            ordered += "name"
+            ordered += "email"
+            // UX-specified ordering preferences
+            if ("date_of_birth" in ruleFields) ordered += "date_of_birth"
+            if ("city" in ruleFields) ordered += "city"
+            // Append the rest in rule order
+            ruleFields.forEach { f -> ordered += f }
+            return ordered.toList()
+        }
 
     val afterSave: AfterSave
         get() = when (val target = ui["after_save"]?.trim().orEmpty()) {
