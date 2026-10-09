@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -1370,6 +1371,40 @@ def figma_tokens():
     return JSONResponse({"collection": figsync.COLLECTION, "tokens": toks,
                          "variables": figsync.variables_payload_items(toks)},
                         headers={"Access-Control-Allow-Origin": "*"})
+
+
+@app.get("/api/figma/team-files")
+def figma_team_files(team: str):
+    try:
+        return {"files": _fs().team_files(team)}
+    except (figsync.SyncError, fg.FigmaError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/figma/plugin/tokens")
+def figma_plugin_tokens():
+    fs = _fs()
+    toks = figsync.tokens_from_spec(app.state.agent.read_text())
+    return JSONResponse({"collection": figsync.COLLECTION, "tokens": toks, "version": fs.tokens_version(),
+                         "variables": figsync.variables_payload_items(toks)}, headers={"Access-Control-Allow-Origin": "*"})
+
+
+@app.post("/api/figma/plugin/edit")
+async def figma_plugin_edit(request: Request):
+    """Live Figma → MobileHeal from the plugin. Only Figma plugin iframes (Origin: null) are accepted; the change
+    still waits for a UX designer / admin before it joins the pipeline."""
+    cors = {"Access-Control-Allow-Origin": "*"}
+    if request.headers.get("origin") != "null":
+        return JSONResponse({"detail": "only the MobileHeal Figma plugin may post here"}, 403, headers=cors)
+    try:
+        body = json.loads((await request.body()).decode() or "{}")
+    except ValueError:
+        return JSONResponse({"detail": "bad payload"}, 400, headers=cors)
+    try:
+        r = _fs().plugin_edit(body.get("tokens") or {}, str(body.get("user") or "a designer"), str(body.get("file") or ""))
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"detail": str(e)[:200]}, 400, headers=cors)
+    return JSONResponse(r, headers=cors)
 
 
 # ---------------- Firebase Crashlytics ----------------

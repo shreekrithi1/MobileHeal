@@ -52,14 +52,17 @@ class SecurityMiddleware:
 
         origin = headers.get("origin")
         method = scope.get("method", "GET")
+        path = scope.get("path", "")
+        # The Figma plugin runs in a sandboxed iframe (Origin: null) and posts text/plain to avoid a CORS preflight.
+        # It can only open a change request that still waits for a UX designer / admin.
+        plugin = scope["type"] == "http" and path == "/api/figma/plugin/edit" and method == "POST" and origin == "null"
         if origin and origin != "null" and (scope["type"] == "websocket" or method in UNSAFE):
             if _host(urlsplit(origin).netloc) not in hosts and "*" not in hosts:
                 return await self._deny(scope, receive, send, 403, "Cross-site request blocked")
-        elif origin == "null" and method in UNSAFE:
+        elif origin == "null" and method in UNSAFE and not plugin:
             return await self._deny(scope, receive, send, 403, "Cross-site request blocked")
 
-        path = scope.get("path", "")
-        if scope["type"] == "http" and method in UNSAFE and path.startswith("/api/"):
+        if scope["type"] == "http" and method in UNSAFE and path.startswith("/api/") and not plugin:
             ctype = headers.get("content-type", "")
             length = headers.get("content-length", "0")
             if length not in ("", "0") and not ctype.startswith("application/json"):
@@ -67,8 +70,8 @@ class SecurityMiddleware:
 
         token = os.getenv("MOBILEHEAL_API_TOKEN", "")
         # Figma calls the webhook (verified by passcode); the Figma plugin reads public design tokens
-        open_paths = {"/api/health", "/api/figma/webhook"} | ({"/api/figma/tokens"} if method == "GET" else set())
-        if token and path.startswith(("/api/", "/ws/")) and path not in open_paths:
+        open_paths = {"/api/health", "/api/figma/webhook"} | ({"/api/figma/tokens", "/api/figma/plugin/tokens"} if method == "GET" else set())
+        if token and path.startswith(("/api/", "/ws/")) and path not in open_paths and not plugin:
             given = headers.get("x-mobileheal-token", "") or _cookie(headers.get("cookie", ""), "mh_token")
             if not hmac.compare_digest(given, token):
                 return await self._deny(scope, receive, send, 401, "Missing or invalid MobileHeal API token")

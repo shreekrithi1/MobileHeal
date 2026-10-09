@@ -1887,9 +1887,11 @@ async function renderSettings(h){
 
   design: `<h2>Design &amp; testing</h2><p class="sdesc">Bring designs into UX review and keep test cases in your test-management tool.</p>
     ${sGroup(`<span class="figlogo"></span> Figma`, sChip(!!(s.figma_token||{}).set,"Token saved","Embed only"),
-      sRow("Personal access token","Figma → Settings → Security. Scopes: <b>file_content:read</b>, <b>file_versions:read</b>, <b>file_comments:write</b> (and <b>file_variables:write</b> on Enterprise for two-way variables).", sSecret("figma_token","figd_…")))}
+      sRow("Personal access token","Figma → Settings → Security. Scopes: <b>file_content:read</b>, <b>file_versions:read</b>, <b>projects:read</b>, <b>file_comments:write</b> (and <b>file_variables:write</b> on Enterprise for two-way variables).", sSecret("figma_token","figd_…")))}
     ${sGroup("🔄 Figma two-way sync", sChip((s.figma_sync||{}).configured, (s.figma_sync||{}).demo ? "Demo file" : "On", "Off"),
-      sRow("Design file","The Figma file / frame that is the source of truth for the app's screens.", sInput("figma_sync_url","https://www.figma.com/design/…/MobileHeal?node-id=1-2")) +
+      sRow("Design file","The Figma file / frame that is the source of truth for the app's screens. Don't know the link? Paste your <b>team</b> link (figma.com/files/team/…) below and pick the file.", sInput("figma_sync_url","https://www.figma.com/design/…/MobileHeal?node-id=1-2") +
+        `<div style="display:flex;gap:6px;margin-top:6px"><input id="fg-team" class="input" placeholder="https://www.figma.com/files/team/1234…"><button class="btn sm" onclick="fgTeam()">Find files</button></div><div id="fg-files"></div>`) +
+      sRow("Live two-way (any plan)","Run the bundled <code>figma-plugin/</code> in Figma (Plugins → Development → Import from manifest) and keep it open: approved designs appear in Figma within seconds, and designer edits arrive here for UX approval. No Enterprise plan needed.", "") +
       sRow("MobileHeal → Figma","When a design is approved here, push the tokens to Figma. <b>Variables</b> writes a “MobileHeal” variable collection (Figma Enterprise); every plan gets a comment on the file, and the bundled <code>figma-plugin/</code> applies the tokens to the frame.",
         `<div style="display:grid;gap:8px">${sSelect("figma_push_mode",[["variables","Variables API + comment"],["comment","Comment only (+ plugin)"]])}<label style="display:flex;gap:8px;align-items:center;font-size:13px">${sToggle("figma_push_on_approve", s.figma_push_on_approve!=="off")} Push automatically on approval</label></div>`) +
       sRow("Figma → MobileHeal","New versions published in Figma become “From Figma” change requests that wait for a UX designer or admin.", sSelect("figma_poll_minutes",[["0","Webhook / manual only"],["1","Check every minute"],["5","Every 5 minutes"],["15","Every 15 minutes"],["60","Every hour"]])) +
@@ -1989,6 +1991,13 @@ async function fgPush(){ await act(async()=>{ try { await saveSettings(true); } 
 async function fgDemoEdit(){ await act(async()=>{ const r = await api("/api/figma/demo/edit",{method:"POST",body:{}});
   await refreshList(); if (r.check && r.check.cr) { toast(`maya.designer published “${r.version.label}” in Figma → ${r.check.cr.key} waits for UX approval`); go(`cr/${r.check.cr.id}/design`); }
   else toast("Figma version published — no differences from the live design"); }); }
+async function fgTeam(){ const box=$("#fg-files"); box.innerHTML=`<span class="spinner"></span> Loading your team's files…`;
+  try { try { await saveSettings(true); } catch(e){}
+    const r = await api("/api/figma/team-files?team="+encodeURIComponent($("#fg-team").value.trim()));
+    box.innerHTML = r.files.length ? r.files.slice(0,30).map(f=>`<div style="display:flex;gap:8px;align-items:center;margin-top:6px">${f.thumbnail?`<img src="${esc(f.thumbnail)}" style="width:48px;height:32px;object-fit:cover;border-radius:4px">`:""}<span style="flex:1">${esc(f.name)} <span class="hint" style="margin:0">${esc(f.project||"")}</span></span><button class="btn sm" onclick="fgUse('${esc(f.url)}')">Use</button></div>`).join("")
+      : "No files in this team yet — create a design file in Figma first.";
+  } catch(e){ box.textContent = e.message; } }
+async function fgUse(url){ const i=$("#s-figma_sync_url"); if (i) i.value=url; await act(async()=>{ await saveSettings(true); toast("Design file connected — Figma sync is on"); renderSettings("settings/design"); }); }
 async function fgHook(){ await act(async()=>{ const r = await api("/api/figma/sync/webhook",{method:"POST",body:{endpoint:$("#fg-hook").value.trim()}}); toast("Figma webhook registered → " + r.endpoint); }); }
 function fbAuthToggle(){ const m = ($("#s-firebase_auth")||{}).value || "oauth";
   document.querySelectorAll("[data-fbauth]").forEach(el => el.hidden = el.dataset.fbauth !== m); }

@@ -1,5 +1,6 @@
 """Two-way Figma sync: Figma edits → approval-gated change requests → pipeline; MobileHeal approvals → Figma."""
 import importlib
+import json
 import os
 import shutil
 import subprocess
@@ -148,3 +149,36 @@ def test_variables_api_payload(monkeypatch):
     assert body["variableCollections"][0]["action"] == "CREATE" and body["variableCollections"][0]["name"] == "MobileHeal"
     assert {v["resolvedType"] for v in body["variables"]} == {"COLOR", "STRING", "BOOLEAN"}
     assert all(mv["modeId"] == "tmp_mode" for mv in body["variableModeValues"])
+
+
+def test_plugin_live_two_way(c):
+    c, _ = c
+    c.put("/api/settings", json={"ux_designers": "Maya Chen", "user_name": "Sam Dev"})
+    t = c.get("/api/figma/plugin/tokens").json()
+    assert t["version"] and t["tokens"]["ui.button_color"] == "#079455"
+    # only a Figma plugin iframe (Origin: null) may post
+    assert c.post("/api/figma/plugin/edit", content='{"tokens":{}}', headers={"Origin": "https://evil.example"}).status_code == 403
+    same = {**t["tokens"]}
+    r = c.post("/api/figma/plugin/edit", content=json.dumps({"tokens": same, "user": "Maya"}), headers={"Origin": "null"}).json()
+    assert r.get("cr", "x") is None, r                                            # in sync → nothing
+    edit = {**same, "ui.button_color": "#7C3AED", "city": "required", "evil key!": "x"}
+    r = c.post("/api/figma/plugin/edit", content=json.dumps({"tokens": edit, "user": "Maya", "file": "MobileHeal"}),
+               headers={"Origin": "null", "Content-Type": "text/plain"}).json()
+    cr = c.get(f"/api/cr/{r['cr']['id']}").json()
+    assert cr["source"] == "figma" and cr["status"] == "design_review" and "ui.button_color = #7C3AED" in cr["spec_text"]
+    assert c.post(f"/api/cr/{cr['id']}/approve").status_code == 403              # still gated
+
+
+def test_team_files(monkeypatch):
+    def fake(url, token, method="GET", body=None):
+        if url.endswith("/teams/1690460374162215504/projects"):
+            return {"projects": [{"id": 7, "name": "Apps"}]}
+        return {"files": [{"key": "K1", "name": "Old", "last_modified": "2026-01-01T00:00:00Z"},
+                          {"key": "K2", "name": "MobileHeal App", "last_modified": "2025-01-01T00:00:00Z"}]}
+    monkeypatch.setattr(figsync, "_req", fake)
+    fs = figsync.FigmaSync.__new__(figsync.FigmaSync)
+    fs.token = "figd_x"
+    files = fs.team_files("https://www.figma.com/files/team/1690460374162215504/recents-and-sharing/recently-viewed?fuid=1")
+    assert files[0]["key"] == "K2" and files[0]["url"].startswith("https://www.figma.com/design/K2/")
+    with pytest.raises(figsync.SyncError):
+        fs.team_files("https://example.com")

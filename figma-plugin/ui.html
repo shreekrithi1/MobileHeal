@@ -2,31 +2,54 @@
 <style>
   body { font: 12px/1.45 Inter, system-ui, sans-serif; margin: 12px; color: #1d2939; }
   h2 { font-size: 13px; margin: 0 0 6px; }
-  input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d0d5dd; border-radius: 6px; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d0d5dd; border-radius: 6px; }
   button { margin-top: 8px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: #175cd3; color: #fff; font-weight: 600; cursor: pointer; }
   button.secondary { background: #f2f4f7; color: #1d2939; }
+  label.live { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-weight: 600; }
   #log { margin-top: 10px; white-space: pre-wrap; color: #475467; }
   .err { color: #b42318; }
 </style>
 <h2>MobileHeal Design Sync</h2>
 <label for="url">MobileHeal server</label>
-<input id="url" value="http://localhost:8000">
-<button id="apply">Apply approved design</button>
-<button id="vars" class="secondary">Update variables only</button>
-<div id="log">Pulls the rules approved in MobileHeal and applies them to the “MobileHeal” variables and to the selected frame (or every frame named “Profile”).</div>
+<input id="url" type="text" value="http://localhost:8000">
+<label class="live"><input id="live" type="checkbox" checked> Live two-way sync</label>
+<button id="apply">Apply approved design now</button>
+<button id="send" class="secondary">Send my edits to MobileHeal</button>
+<div id="log">Live: approved designs from MobileHeal appear here automatically, and your edits to frames named “Profile” go to MobileHeal for UX approval. Keep this plugin open while you work.</div>
 <script>
-  const log = (t, err) => { const l = document.getElementById("log"); l.textContent = t; l.className = err ? "err" : ""; };
-  async function pull(onlyVars) {
-    const base = document.getElementById("url").value.replace(/\/$/, "");
+  const $ = (id) => document.getElementById(id);
+  const base = () => $("url").value.replace(/\/$/, "");
+  const log = (t, err) => { $("log").textContent = t; $("log").className = err ? "err" : ""; };
+  let applied = null, sent = "";
+  async function pull(force) {
     try {
-      const r = await fetch(base + "/api/figma/tokens");
+      const r = await fetch(base() + "/api/figma/plugin/tokens");
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
-      parent.postMessage({ pluginMessage: { type: "apply", data, onlyVars } }, "*");
-      log("Applying " + data.variables.length + " tokens…");
-    } catch (e) { log("Couldn't reach MobileHeal at " + base + " — is it running? (" + e.message + ")", true); }
+      if (!force && data.version === applied) return;
+      applied = data.version;
+      parent.postMessage({ pluginMessage: { type: "apply", data } }, "*");
+      log("Applying the design approved in MobileHeal…");
+    } catch (e) { log("Couldn't reach MobileHeal at " + base() + " — is it running? (" + e.message + ")", true); }
   }
-  document.getElementById("apply").onclick = () => pull(false);
-  document.getElementById("vars").onclick = () => pull(true);
-  onmessage = (e) => { const m = e.data.pluginMessage; if (m) log(m.text, m.error); };
+  async function push(m) {
+    const body = JSON.stringify({ tokens: m.tokens, user: m.user, file: m.file });
+    if (!m.manual && body === sent) return;
+    try {
+      const r = await fetch(base() + "/api/figma/plugin/edit", { method: "POST", headers: { "Content-Type": "text/plain" }, body });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "HTTP " + r.status);
+      sent = body;
+      log(d.cr ? `Sent to MobileHeal → ${d.cr.key} waits for UX approval:\n• ` + d.changes.join("\n• ") : "In sync with MobileHeal — nothing to send.");
+    } catch (e) { log("Couldn't send to MobileHeal: " + e.message, true); }
+  }
+  $("apply").onclick = () => pull(true);
+  $("send").onclick = () => parent.postMessage({ pluginMessage: { type: "read" } }, "*");
+  onmessage = (e) => {
+    const m = e.data.pluginMessage; if (!m) return;
+    if (m.type === "edited") { if ($("live").checked || m.manual) push(m); return; }
+    log(m.text, m.error);
+  };
+  pull(true);
+  setInterval(() => { if ($("live").checked) pull(false); }, 5000);
 </script>

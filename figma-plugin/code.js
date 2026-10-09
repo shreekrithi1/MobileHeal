@@ -2,7 +2,7 @@
 // 1. Variables: collection "MobileHeal" (ui/<key> COLOR|STRING, fields/<name>/required BOOLEAN).
 // 2. Frames: the selected frame(s) or every frame named "Profile": button fill + label, banner fill,
 //    required markers (" *") on "Input / <Field>" labels.
-figma.showUI(__html__, { width: 300, height: 260 });
+figma.showUI(__html__, { width: 320, height: 330 });
 
 function hexToRgb(hex) {
   const h = hex.replace("#", "");
@@ -37,10 +37,7 @@ async function setText(node, text) {
 
 async function applyFrames(tokens) {
   let frames = figma.currentPage.selection.filter((n) => "findAll" in n);
-  if (!frames.length) {
-    await figma.loadAllPagesAsync();
-    frames = figma.root.findAll((n) => n.type === "FRAME" && /profile/i.test(n.name));
-  }
+  if (!frames.length) frames = await profileFrames();
   let changed = 0;
   for (const frame of frames) {
     for (const node of frame.findAll((n) => "name" in n)) {
@@ -65,8 +62,54 @@ async function applyFrames(tokens) {
   return { frames: frames.length, changed };
 }
 
+// ---- Figma → MobileHeal: read the design tokens back out of the frame(s)
+function rgbToHex(c) {
+  const h = (x) => Math.round(x * 255).toString(16).padStart(2, "0").toUpperCase();
+  return "#" + h(c.r) + h(c.g) + h(c.b);
+}
+async function profileFrames() {
+  await figma.loadAllPagesAsync();
+  return figma.root.findAll((n) => n.type === "FRAME" && /profile/i.test(n.name));
+}
+async function readTokens() {
+  const tokens = {};
+  for (const frame of await profileFrames()) {
+    for (const node of frame.findAll((n) => "name" in n)) {
+      const name = node.name.toLowerCase();
+      const fill = "fills" in node && Array.isArray(node.fills) && node.fills.find((f) => f.type === "SOLID");
+      if (/\b(button|btn|cta|primary)\b/.test(name)) {
+        if (fill) tokens["ui.button_color"] = rgbToHex(fill.color);
+        const label = node.findOne && node.findOne((n) => n.type === "TEXT");
+        if (label) tokens["ui.button_label"] = label.characters.trim();
+      } else if (/\b(banner|alert|callout)\b/.test(name) && fill) {
+        tokens["ui.banner_color"] = rgbToHex(fill.color);
+      } else if (/\b(input|field|text ?field)\b/.test(name) && node.findOne) {
+        const label = node.findOne((n) => n.type === "TEXT");
+        if (!label) continue;
+        let field = label.characters.replace(/\*/g, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        field = { phone: "phone_number", mobile: "phone_number", full_name: "name" }[field] || field;
+        if (field) tokens[field] = /\*\s*$/.test(label.characters) ? "required" : "optional";
+      }
+    }
+  }
+  return tokens;
+}
+let applying = false, timer = null;
+figma.on("documentchange", () => {
+  if (applying) return;                       // our own writes are not designer edits
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    figma.ui.postMessage({ type: "edited", tokens: await readTokens(), user: (figma.currentUser || {}).name || "a designer", file: figma.root.name });
+  }, 2500);
+});
+
 figma.ui.onmessage = async (msg) => {
+  if (msg.type === "read") {
+    figma.ui.postMessage({ type: "edited", tokens: await readTokens(), user: (figma.currentUser || {}).name || "a designer", file: figma.root.name, manual: true });
+    return;
+  }
   if (msg.type !== "apply") return;
+  applying = true;
   try {
     const n = await applyVariables(msg.data.variables);
     let text = `Updated ${n} variables in “MobileHeal”.`;
@@ -75,8 +118,9 @@ figma.ui.onmessage = async (msg) => {
       text += ` ${r.changed} layer change(s) across ${r.frames} frame(s).`;
     }
     figma.notify("MobileHeal design applied");
-    figma.ui.postMessage({ text: text + " Publish a version so the team sees it." });
+    figma.ui.postMessage({ text: text });
   } catch (e) {
     figma.ui.postMessage({ text: "Failed: " + e.message, error: true });
   }
+  setTimeout(() => { applying = false; }, 3000);
 };

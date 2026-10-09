@@ -362,6 +362,44 @@ class FigmaSync:
         _req(f"{API}/files/{self.key}/variables", self.token, "POST", body)
         return f"{len(items)} variables in “{COLLECTION}”"
 
+    # ------------------------------------------------------------ Figma → MobileHeal (live, from the plugin)
+    def plugin_edit(self, tokens: Dict[str, str], who: str = "a designer", file_name: str = "") -> dict:
+        """The MobileHeal plugin (any Figma plan) reports the tokens it reads from the frame while the designer edits.
+        Anything that differs from the live rules becomes / updates the gated 'From Figma' change request."""
+        tokens = {str(k)[:60]: str(v)[:200] for k, v in (tokens or {}).items()
+                  if re.fullmatch(r"(ui\.[a-z_]+|[a-z][a-z0-9_]*)", str(k)) and str(v).strip()}
+        live = tokens_from_spec(self.wf.agent.read_text())
+        st = self._state()
+        changed = {k: v for k, v in tokens.items() if live.get(k) != v and (k.startswith("ui.") or v in ("required", "optional"))}
+        st["tokens"] = {**(st.get("tokens") or {}), **tokens}
+        st["checked_at"] = _now()
+        self._save_state(st)
+        if not changed:
+            return {"cr": None, "changes": []}
+        version = {"id": "plugin-" + str(int(time.time())), "user": (who or "a designer")[:60], "label": "", "created_at": _now()}
+        cr = self._upsert_cr(changed, live, version, {"name": file_name or "Figma file", "frame": "Profile"})
+        return {"cr": cr, "changes": describe({k: (live.get(k), v) for k, v in changed.items()})}
+
+    def tokens_version(self) -> str:
+        import hashlib
+        return hashlib.sha1(json.dumps(tokens_from_spec(self.wf.agent.read_text()), sort_keys=True).encode()).hexdigest()[:12]
+
+    # ------------------------------------------------------------ pick the design file from a team link
+    def team_files(self, team: str) -> List[dict]:
+        m = re.search(r"/team/(\d+)", team or "") or re.fullmatch(r"\s*(\d{6,})\s*", team or "")
+        if not m:
+            raise SyncError("Paste your Figma team link (figma.com/files/team/<id>/…) or the team id")
+        if not self.token:
+            raise SyncError("Save your Figma personal access token first (scope: projects:read, file_content:read)")
+        out = []
+        for p in (_req(f"{API}/teams/{m.group(1)}/projects", self.token).get("projects") or [])[:50]:
+            for f in _req(f"{API}/projects/{p['id']}/files", self.token).get("files") or []:
+                out.append({"project": p.get("name"), "name": f.get("name"), "key": f.get("key"),
+                            "url": f"https://www.figma.com/design/{f.get('key')}/{urllib.parse.quote((f.get('name') or 'file').replace(' ', '-'))}",
+                            "modified": f.get("last_modified"), "thumbnail": f.get("thumbnail_url")})
+        out.sort(key=lambda f: (0 if re.search(r"mobile ?heal|profile", f["name"] or "", re.I) else 1, -(len(f["modified"] or ""))))
+        return out
+
     # ------------------------------------------------------------ webhook
     def register_webhook(self, endpoint: str) -> dict:
         if self.demo:
