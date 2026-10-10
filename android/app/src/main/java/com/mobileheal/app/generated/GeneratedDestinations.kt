@@ -2,9 +2,14 @@
 package com.mobileheal.app.generated
 
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.compose.composable
+import com.mobileheal.app.ui.login.LoginRoute
+import com.mobileheal.app.ui.order.OrderRoute
 
 /** Screen ids with a dedicated implementation (route "screen/<id>"). */
-val generatedScreenIds: Set<String> = setOf()
+val generatedScreenIds: Set<String> = setOf("login", "order")
 
-fun NavGraphBuilder.generatedDestinations(onBack: () -> Unit) {
+fun NavGraphBuilder.generatedDestinations(onBack: () -> Unit, onNavigate: (String) -> Unit) {
+    composable("screen/login") { LoginRoute(onLoggedIn = { onNavigate("screen/order") }) }
+    composable("screen/order") { OrderRoute(onNavigate = { id -> onNavigate("screen/$id") }) }
 }

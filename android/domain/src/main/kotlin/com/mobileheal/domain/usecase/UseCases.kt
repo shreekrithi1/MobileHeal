@@ -38,6 +38,12 @@ class ObserveLiveUpdatesUseCase(private val repository: LiveUpdatesRepository) {
     operator fun invoke(profileId: Int): Flow<LiveEvent> = repository.events(profileId)
 }
 
+/** Simple demo authentication use case. Replace with real backend auth when available. */
+class AuthenticateUserUseCase {
+    operator fun invoke(username: String, password: String): Boolean =
+        username.trim() == "test" && password == "test"
+}
+
 /** Runs [block], keeping coroutine cancellation intact and wrapping unknown failures as [DomainError.Unexpected]. */
 suspend inline fun <T> domainResult(crossinline block: suspend () -> T): Result<T> =
     try {

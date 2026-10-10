@@ -1,13 +1,23 @@
-# MobileHeal profile requirements spec (FR-2)
+# MobileHeal profile requirements spec (Restaurant Ordering Demo)
 # Format:  field_name: required | optional
 # Edits are picked up by the Auto-Heal agent within 60 seconds — no restart needed.
-# Try appending:  phone_number: required
 name: required
 email: required
-date_of_birth: optional
-town: optional
+restaurant_name: required
+menu_item: required
+quantity: required
+fulfillment_method: required
+table_number: optional
+special_instructions: optional
+contact_phone: optional
+ui.app_title = Restaurant Ordering (Demo)
+ui.button_label = Place order
 ui.button_color = #079455
-ui.button_label = Save changes
-ui.after_save = stay
-ui.banner_message = Changes saved successfully
-ui.banner_color = #FFF9C4
+ui.button_text_color = #FFFFFF
+ui.banner_message = Demo login: test / test
+ui.banner_color = #212121
+ui.banner_text_color = #FFFFFF
+ui.background_color = #FFFFFF
+ui.after_save = success_screen
+ui.success_title = Order placed
+ui.success_message = Your order has been submitted successfully (demo flow).
