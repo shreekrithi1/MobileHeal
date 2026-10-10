@@ -47,6 +47,11 @@ def slug(s: str) -> str:
     return out or (words[0][:40] if words else "change")
 
 
+class WorkflowStopped(BaseException):
+    """Raised inside a background step whose run was stopped/restarted by a person — ends that thread quietly.
+    BaseException so the steps' own `except Exception` handlers don't turn it into a 'failed' status."""
+
+
 class WorkflowError(Exception):
     def __init__(self, msg: str, code: int = 400):
         super().__init__(msg)
@@ -87,6 +92,14 @@ class Workflow:
                         cr["occurrences"] = cur["occurrences"]
                         cr["last_seen"] = cur.get("last_seen", cr.get("last_seen"))
                         cr["samples"] = cur.get("samples", cr.get("samples"))
+            if cr.get("id") and not cr.pop("_own_run", False):
+                row = self.db._conn.execute("SELECT data FROM change_requests WHERE id=?", (cr["id"],)).fetchone()
+                if row:
+                    stored = json.loads(row["data"])
+                    if stored.get("run", 0) > cr.get("run", 0):
+                        raise WorkflowStopped(cr["id"])     # a newer run (stop / restart) owns this item now
+                    if stored.get("status") in ("stopped", "closed", "reverted") and cr.get("status") != stored["status"]:
+                        raise WorkflowStopped(cr["id"])     # only a person's restart may move it out of these states
             if cr.get("id"):
                 self.db._conn.execute("UPDATE change_requests SET data=? WHERE id=?", (json.dumps(cr), cr["id"]))
             else:
@@ -323,7 +336,12 @@ class Workflow:
         self._run_coding(cid)
 
     def spawn(self, fn, *args):
-        t = threading.Thread(target=fn, args=args, daemon=True)
+        def run():
+            try:
+                fn(*args)
+            except WorkflowStopped:
+                log.info("background step for #%s ended: the workflow was stopped or restarted", args[0] if args else "?")
+        t = threading.Thread(target=run, daemon=True)
         t.start()
         return t
 
@@ -1021,10 +1039,111 @@ class Workflow:
         self.spawn(self._run_coding, cid)
         return cr
 
+    # ------------------------------------------------------------ stop / revert / restart
+    def _new_run(self, cr: dict):
+        cr["run"] = cr.get("run", 0) + 1
+        cr["_own_run"] = True
+
+    def stop(self, cid: int, actor: Optional[str] = None) -> dict:
+        """Halt the workflow wherever it is. Running agents finish their current call and then discard their work."""
+        cr = self.get(cid)
+        if cr["status"] in ("merged", "closed", "stopped", "reverted"):
+            raise WorkflowError(f"Nothing to stop — this is {cr['status']}", 409)
+        self._new_run(cr)
+        cr["stopped_from"], cr["status"] = cr["status"], "stopped"
+        cr.pop("autopilot_paused", None)
+        self._event(cr, actor or self.user, "stop", f"stopped the workflow (it was {cr['stopped_from'].replace('_', ' ')}) — "
+                    "agents and Autopilot won't touch it until it is restarted")
+        return self._save(cr)
+
+    def revert(self, cid: int, actor: Optional[str] = None) -> dict:
+        """Undo a merged change on main (new revert commit) and put the live rules / code back."""
+        cr = self.get(cid)
+        if cr["status"] != "merged":
+            raise WorkflowError("Only merged changes can be reverted", 409)
+        who = actor or self.user
+        sha = cr.get("merged_commit")
+        how = None
+        if sha and self.git.is_repo():
+            try:
+                self.git.base_name = self.settings.get("base_branch") or "main"
+                self.git._on_base()
+                self.git.git("revert", "--no-edit", sha)
+                how = f"git revert of {sha} on {self.git.base_name} → {self.git.head()[:10]}"
+            except GitError as e:
+                self.git.git("revert", "--abort", check=False)
+                log.warning("git revert failed, restoring files directly: %s", e)
+        if how is None:                                   # no git / conflicts: put the pre-merge files back
+            restore = dict(cr.get("base_files") or {})
+            if cr.get("kind") != "incident":
+                restore[codegen.SPEC_PATH] = cr.get("base_spec") or ""
+            for path, content in restore.items():
+                p = self.root / path
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(content, encoding="utf-8")
+            if self.git.is_repo() and restore:
+                try:
+                    self.git.commit_paths(list(restore), f"Revert {cr['key']}: {cr['title']}")
+                except GitError as e:
+                    log.warning("revert commit failed: %s", e)
+            how = f"restored {len(restore)} file(s) to their state before {cr['key']}"
+        if cr.get("kind") == "incident":
+            self._hot_reload(cr)
+        else:
+            text = self._read(codegen.SPEC_PATH) or ""
+            if self.loop is not None and self.loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.agent.apply_text(text), self.loop).result(timeout=60)
+            else:
+                asyncio.run(self.agent.apply_text(text))
+        self._new_run(cr)
+        cr["status"], cr["stage"], cr["reverted_at"] = "reverted", 6, now()
+        cr["reverted_commit"] = how
+        self._event(cr, who, "revert", f"reverted the change — {how}. Live rules and connected phones are back to the "
+                    "previous version")
+        return self._save(cr)
+
+    def restart(self, cid: int, actor: Optional[str] = None) -> dict:
+        """Start the workflow again from the beginning (design for changes, analysis for incidents) on today's main."""
+        cr = self.get(cid)
+        if cr["status"] in ("coding", "diagnosing", "fixing"):
+            raise WorkflowError("It's running — stop it first", 409)
+        if cr["status"] == "merged":
+            raise WorkflowError("This change is live — revert it first, then restart", 409)
+        who = actor or self.user
+        self._new_run(cr)
+        for k in ("pr", "files", "stats", "review", "checks", "checks_summary", "autopilot_paused", "autopilot_fixes",
+                  "autopilot_rebases", "fix_feedback", "override", "error", "stopped_from", "attempts", "coding_log",
+                  "figma_pushes", "android_agent", "ios_agent", "merged_commit", "merged_at"):
+            cr.pop(k, None)
+        cr["tested"] = False
+        cr["restarts"] = cr.get("restarts", 0) + 1
+        if cr.get("kind") == "incident":
+            cr["status"], cr["stage"] = "detected", 0
+            self._event(cr, who, "restart", f"restarted the fix workflow (run {cr['run']})")
+            self._save(cr)
+            self.healer.start(cid, actor=who)
+            return self.get(cid)
+        try:
+            parse_spec(cr["spec_text"])
+        except RuleParseError as e:
+            raise WorkflowError(f"Requirements are invalid: {e}")
+        cr["base_spec"] = self._read(codegen.SPEC_PATH) or ""
+        cr["design"] = self._design(cr["base_spec"], cr["spec_text"])
+        cr["status"], cr["stage"] = "design_review", 1
+        self._event(cr, who, "restart", f"restarted the workflow from requirements (run {cr['run']}) against the latest "
+                    + (self.settings.get("base_branch") or "main"))
+        self._event(cr, "MobileHeal", "design", "regenerated UX design — " + ("Autopilot is approving it" if self.autopilot
+                                                                               and cr.get("source") != "figma" else "awaiting approval"))
+        cr = self._save(cr)
+        if self.autopilot and cr.get("source") != "figma":
+            return self.approve_design(cid, actor="Autopilot")
+        return cr
+
     def close(self, cid: int) -> dict:
         cr = self.get(cid)
         if cr["status"] == "merged":
             raise WorkflowError("Already merged", 409)
+        self._new_run(cr)
         cr["status"] = "closed"
         if cr.get("pr", {}).get("git"):
             self.git.delete_branch(cr["pr"]["branch"])

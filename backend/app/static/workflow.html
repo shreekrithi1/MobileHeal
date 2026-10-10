@@ -117,7 +117,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px
 .chip{display:inline-flex;align-items:center;gap:5px;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap}
 .s-design_review{background:var(--purple-soft);color:var(--purple)} .s-coding{background:var(--blue-soft);color:var(--blue)}
 .s-pr_open{background:var(--green-soft);color:var(--green)} .s-merged{background:var(--purple-soft);color:var(--purple)}
-.s-closed{background:var(--sunk);color:var(--muted)} .s-failed{background:var(--red-soft);color:var(--red)}
+.s-closed{background:var(--sunk);color:var(--muted)} .s-stopped{background:var(--amber-soft);color:var(--amber)} .s-reverted{background:var(--sunk);color:var(--muted)} .s-failed{background:var(--red-soft);color:var(--red)}
 .s-tested{background:var(--green-soft);color:var(--green)}
 
 /* header */
@@ -495,7 +495,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const SMALL = new Set(["of","and","the","or","to","in","on","for","a","an"]);
 const label = k => k.split("_").filter(Boolean).map((w,i) => i && SMALL.has(w) ? w : w[0].toUpperCase() + w.slice(1)).join(" ");
-const STATUS = {design_review:"Design review", coding:"Coding", pr_open:"PR open", merged:"Merged", closed:"Closed", failed:"Failed",
+const STATUS = {stopped:"Stopped", reverted:"Reverted", design_review:"Design review", coding:"Coding", pr_open:"PR open", merged:"Merged", closed:"Closed", failed:"Failed",
   detected:"Detected", diagnosing:"Analyzing", awaiting_approval:"Awaiting approval", fixing:"Auto-fixing", needs_engineer:"Needs engineer"};
 const isInc = cr => cr && cr.kind === "incident";
 const UI_DEF = {after_save:"stay", success_title:"Profile saved", success_message:"Thanks — your details are up to date.", app_title:"MobileHeal", button_label:"Save", button_color:"#6750A4", button_text_color:"#FFFFFF",
@@ -912,8 +912,10 @@ function renderCR(){
       <div class="meta" style="margin-bottom:6px">${chip(cr)}${isInc(cr)&&cr.jira&&cr.jira.key?jiraLink(cr.jira):""}<span>${esc(cr.author)} opened ${ago(cr.created_at)}</span>${cr.revision>1?`<span>· rev ${cr.revision}</span>`:""}</div>
       <h1>${esc(cr.title)} <span class="key">${esc(cr.key)}</span></h1>
       <div class="meta">${prLine}</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${syncChip(cr)}${headerActions(cr)}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${syncChip(cr)}${flowActions(cr)}${headerActions(cr)}</div></div>
     ${stepper(st, cr)}
+    ${cr.status==="stopped"?`<div class="banner-err" style="margin-top:16px;background:var(--amber-soft);color:var(--fg)"><span style="font-size:18px">⏸</span><div style="flex:1"><b>Workflow stopped</b> (it was ${esc((cr.stopped_from||"").replace(/_/g," "))}). Agents and Autopilot leave it alone until you restart it.</div><button class="btn sm primary" onclick="flowAct('restart')">↻ Restart</button></div>`:""}
+    ${cr.status==="reverted"?`<div class="banner-err" style="margin-top:16px;background:var(--sunk);color:var(--fg)"><span style="font-size:18px">↶</span><div style="flex:1"><b>Reverted.</b> ${esc(cr.reverted_commit||"")}. Live rules and phones are back to the previous version.</div><button class="btn sm primary" onclick="flowAct('restart')">↻ Restart from requirements</button></div>`:""}
     ${cr.status==="merged"?mergedBanner(cr):""}
     ${cr.status==="pr_open"&&cr.autopilot_paused&&(state.mode||{}).mode==="autopilot"?`<div class="ap-banner"><span aria-hidden="true">✈︎</span><div style="flex:1"><b>Autopilot paused:</b> ${esc(cr.autopilot_paused)}. <a href="javascript:void 0" onclick="setTab('review')">Open code review →</a></div></div>`:""}
     ${cr.status==="pr_open"&&!cr.autopilot_paused&&(state.mode||{}).mode==="autopilot"?`<div class="ap-banner"><span aria-hidden="true">✈︎</span><div>Autopilot is driving this PR — it merges and deploys as soon as 2 reviewers per platform approve.</div></div>`:""}
@@ -1433,6 +1435,23 @@ async function approve(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}
 async function markTested(passed, override=false, notes=null){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/test`,{method:"POST",body:{notes:notes ?? (($("#t-notes")||{}).value||""),passed,override}}); if(!isInc(state.cr)) await loadTests(); await refreshList(); state.tab=passed?"pr":"test"; renderCR(); }, passed?(isInc(state.cr)?"Fix approved — ready to merge":"Marked as tested — ready to merge"):"Feedback recorded"); }
 async function merge(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/merge`,{method:"POST"}); await refreshList(); await refreshInfo(); renderCR(); }, isInc(state.cr)?"Fix merged and deployed":"Merged — change is live on phones"); }
 async function updateBranch(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/update-branch`,{method:"POST"}); await loadCR(state.cr.id,"code"); }, "Regenerating against latest rules"); }
+function flowActions(cr){
+  const st = cr.status, running = ["design_review","coding","pr_open","detected","diagnosing","awaiting_approval","fixing"].includes(st);
+  const b = [];
+  if (running) b.push(`<button class="btn sm" onclick="flowAct('stop')" title="Halt agents and Autopilot for this item">⏸ Stop</button>`);
+  if (["stopped","failed","closed","needs_engineer","reverted","pr_open","design_review"].includes(st))
+    b.push(`<button class="btn sm" onclick="flowAct('restart')" title="Run the whole workflow again on the latest main">↻ Restart</button>`);
+  if (st === "merged") b.push(`<button class="btn sm danger" onclick="flowAct('revert')" title="Undo this change on main and push the previous version live">↶ Revert</button>`);
+  return b.join("");
+}
+async function flowAct(kind){
+  const cr = state.cr, msg = {stop:"Stop this workflow? Running agents finish their current step and then discard their work.",
+    restart:"Restart the workflow from the beginning on the latest main? The current PR, checks and reviews are discarded.",
+    revert:`Revert ${cr.key}? A revert commit is added to main and the previous rules go live on connected phones.`}[kind];
+  if (!confirm(msg)) return;
+  await act(async()=>{ state.cr = await api(`/api/cr/${cr.id}/${kind}`,{method:"POST"}); await refreshList(); renderCR(); },
+    {stop:"Workflow stopped", restart:"Workflow restarted", revert:"Change reverted"}[kind]);
+}
 async function closeCR(){ if(!confirm("Close this change request?")) return; await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/close`,{method:"POST"}); await refreshList(); renderCR(); }, "Closed"); }
 function editCR(){
   const cr = state.cr; state.editTr = cr.translation || null; state.editTrText = cr.requirement_text || "";

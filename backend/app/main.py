@@ -1542,6 +1542,21 @@ async def cr_update_branch(cid: int):
     return _wf(app.state.wf.update_branch, cid)
 
 
+@app.post("/api/cr/{cid}/stop")
+def cr_stop(cid: int):
+    return _wf(app.state.wf.stop, cid)
+
+
+@app.post("/api/cr/{cid}/revert")
+def cr_revert(cid: int):
+    return _wf(app.state.wf.revert, cid)
+
+
+@app.post("/api/cr/{cid}/restart")
+def cr_restart(cid: int):
+    return _wf(app.state.wf.restart, cid)
+
+
 @app.post("/api/cr/{cid}/close")
 def cr_close(cid: int):
     return _wf(app.state.wf.close, cid)
