@@ -479,8 +479,9 @@ def cr_figma_apply(cid: int, body: FigmaApplyIn):
 # ---------------- Crash demo ----------------
 @app.get("/api/demo")
 def demo_state():
-    from .demo import ios_report
+    from .demo import ios_report, startup_report
     return {"scenarios": app.state.demo.state(), "android_report": android_report(PROJECT_ROOT),
+            "startup_report": startup_report(PROJECT_ROOT),
             "ios_report": ios_report(PROJECT_ROOT),
             "healer": app.state.healer.info()}
 

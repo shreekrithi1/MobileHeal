@@ -2282,6 +2282,13 @@ async function runDemo(id){
       dmMark("crash","done","App crashed — CrashReporter uploads the Swift stack trace", D.data.ios_report.stack.split("\n").slice(0,3).join("\n"));
       const r = await api("/api/crashes",{method:"POST",body:D.data.ios_report}); incKey = r.incident;
       dmLog(`POST /api/crashes (platform: ios) → 201 ${incKey}`);
+    } else if (sc.id === "android_startup") {
+      dmLog("📱 Pixel 8 · user taps the MobileHeal icon…");
+      dmMark("traffic","done","User launches the Android app");
+      dmLog("💥 java.lang.ArithmeticException: divide by zero in MainActivity.onCreate", "err");
+      dmMark("crash","done","App crashed on launch — CrashReporter uploads the report on next start", D.data.startup_report.stack.split("\n").slice(0,4).join("\n"));
+      const r = await api("/api/crashes",{method:"POST",body:D.data.startup_report}); incKey = r.incident;
+      dmLog(`POST /api/crashes → 201 ${incKey}`);
     } else if (sc.kind === "android") {
       dmLog("📱 Pixel 8 · user taps Save on the Profile screen…");
       dmMark("traffic","done","User taps Save in the Android app");

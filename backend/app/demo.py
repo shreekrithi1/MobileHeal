@@ -58,6 +58,14 @@ SCENARIOS = [
      "fingerprint_func": "save", "endpoint": "POST /api/crashes",
      "expect": "The fix agent locates the `!!` in ProfileViewModel.kt from the stack trace and makes it null-safe. "
                "It can't run Android code, so the PR asks for device/CI verification."},
+    {"id": "android_startup", "title": "Android app crashes on launch",
+     "story": "A debug line left in MainActivity.onCreate — `System.out.println(\"Test \" + 1/0)` (line 21) — is "
+              "un-commented and shipped. Every launch divides by zero and the app crashes before the first screen; the "
+              "CrashReporter uploads the stack trace on the next start.",
+     "kind": "android", "file": "android/app/src/main/java/com/mobileheal/app/MainActivity.kt",
+     "fingerprint_func": "onCreate", "endpoint": "POST /api/crashes",
+     "expect": "The fix agent reads MainActivity.kt:21 from the stack trace, sees a division by the literal 0 and "
+               "disables the debug statement. Verify on a device/CI before merging."},
     {"id": "ios", "title": "iPhone app crashes on Save",
      "story": "The iOS Save action force-unwraps the phone number (`!`). Customers without a phone number crash the "
               "app; the CrashReporter uploads the Swift stack trace to MobileHeal.",
@@ -118,6 +126,33 @@ def android_report(root: Path) -> dict:
     return {**ANDROID_REPORT, "stack": ANDROID_REPORT["stack"].replace("{line}", str(line))}
 
 
+STARTUP_FILE = "android/app/src/main/java/com/mobileheal/app/MainActivity.kt"
+STARTUP_COMMENTED = '//System.out.println("Test " + 1/0)'
+STARTUP_BUG = 'System.out.println("Test " + 1/0)  // MH-DEMO-BUG'
+STARTUP_REPORT = {
+    "exception": "java.lang.ArithmeticException", "message": "divide by zero",
+    "stack": ("java.lang.RuntimeException: Unable to start activity ComponentInfo{com.mobileheal.app/com.mobileheal.app.MainActivity}: "
+              "java.lang.ArithmeticException: divide by zero\n"
+              "\tat android.app.ActivityThread.performLaunchActivity(ActivityThread.java:3782)\n"
+              "Caused by: java.lang.ArithmeticException: divide by zero\n"
+              "\tat com.mobileheal.app.MainActivity.onCreate(MainActivity.kt:{line})\n"
+              "\tat android.app.Activity.performCreate(Activity.java:8595)\n"
+              "\tat android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1456)"),
+    "device": "Google Pixel 8 (API 34)", "app_version": "1.0", "screen": "Launch", "demo": True,
+}
+
+
+def startup_report(root: Path) -> dict:
+    line = 21
+    p = Path(root) / STARTUP_FILE
+    if p.exists():
+        for i, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            if "1/0" in l and not l.strip().startswith("//"):
+                line = i
+                break
+    return {**STARTUP_REPORT, "stack": STARTUP_REPORT["stack"].replace("{line}", str(line))}
+
+
 class Demo:
     def __init__(self, workflow):
         self.wf = workflow
@@ -140,6 +175,8 @@ class Demo:
                 if not (self.root / IOS_FILE).exists():
                     continue
                 fixed = IOS_BUG_LINE.strip() not in self._read(sc["file"])
+            elif sc["id"] == "android_startup":
+                fixed = not any("1/0" in l and not l.strip().startswith("//") for l in self._read(sc["file"]).splitlines())
             else:
                 fixed = ANDROID_BUG_LINE.strip() not in self._read(sc["file"])
             out.append({**sc, "fixed": fixed, "incidents": related[:5]})
@@ -150,6 +187,32 @@ class Demo:
         if not sc:
             raise KeyError("unknown scenario")
         changed = []
+        if sc["id"] == "android_startup":
+            p = self.root / STARTUP_FILE
+            src = p.read_text(encoding="utf-8")
+            lines = src.splitlines(keepends=True)
+            for i, l in enumerate(lines):
+                if "1/0" in l and l.strip().startswith("//"):
+                    indent = l[:len(l) - len(l.lstrip())]
+                    lines[i] = indent + STARTUP_BUG + "\n"
+                    break
+            else:
+                if not any("1/0" in l for l in lines):     # line missing entirely: put it back before setContent
+                    for i, l in enumerate(lines):
+                        if "setContent" in l:
+                            lines.insert(i, l[:len(l) - len(l.lstrip())] + STARTUP_BUG + "\n")
+                            break
+            new = "".join(lines)
+            if new != src:
+                p.write_text(new, encoding="utf-8")
+                changed.append(STARTUP_FILE)
+                if self.wf.git.is_repo():
+                    try:
+                        self.wf.git.commit_paths(changed, "Demo reset: un-comment the divide-by-zero debug line")
+                    except Exception:
+                        pass
+            self.wf.settings.audit(actor, "demo.reset", sc["id"], f"restored {len(changed)} file(s)")
+            return {"reset": True, "restored": changed, "removed_tests": []}
         if sc["kind"] in ("android", "ios"):
             fpath, bug = (ANDROID_FILE, ANDROID_BUG_LINE) if sc["kind"] == "android" else (IOS_FILE, IOS_BUG_LINE)
             p = self.root / fpath

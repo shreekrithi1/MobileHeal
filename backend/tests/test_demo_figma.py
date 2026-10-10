@@ -147,3 +147,32 @@ def test_figma_link_without_token_is_embedded(env):
     cr = c.post("/api/cr", json={"title": "X", "spec_text": "name: required\nemail: required\nnickname: optional\n"}).json()
     r = c.post(f"/api/cr/{cr['id']}/figma", json={"url": "https://www.figma.com/file/KEY123/Name"}).json()
     assert r["figma"]["embed"] and r["figma"]["fetched"] is False and r["figma"]["suggestions"] == []
+
+
+def test_android_startup_divide_by_zero_scenario(env):
+    c, root = env
+    from app.demo import STARTUP_FILE
+    sc = next(s for s in c.get("/api/demo").json()["scenarios"] if s["id"] == "android_startup")
+    assert sc["fixed"] is True                                    # ships commented out
+    assert c.post("/api/demo/android_startup/reset").json()["restored"] == [STARTUP_FILE]
+    src = (root / STARTUP_FILE).read_text()
+    assert 'System.out.println("Test " + 1/0)  // MH-DEMO-BUG' in src and "//System.out" not in src
+    rep = c.get("/api/demo").json()["startup_report"]
+    assert "MainActivity.kt:21" in rep["stack"]
+    assert c.post("/api/crashes", json=rep).status_code == 201
+    sc = next(s for s in c.get("/api/demo").json()["scenarios"] if s["id"] == "android_startup")
+    assert sc["fixed"] is False and len(sc["incidents"]) == 1
+    inc = wait(c, sc["incidents"][0]["id"], {"pr_open", "needs_engineer"})
+    assert inc["status"] == "pr_open", inc.get("coding_log")
+    assert inc["incident"]["function"] == "onCreate" and inc["incident"]["line"] == 21
+    assert inc["attempts"][0]["patched"].startswith('// System.out.println("Test " + 1/0)')
+    c.post(f"/api/cr/{inc['id']}/test", json={"passed": True, "notes": "app launches on Pixel"})
+    assert c.post(f"/api/cr/{inc['id']}/merge").status_code == 200
+    assert next(s for s in c.get("/api/demo").json()["scenarios"] if s["id"] == "android_startup")["fixed"] is True
+    assert c.post("/api/demo/android_startup/reset").json()["restored"]
+
+
+def test_kotlin_div_zero_patch():
+    from app.patcher import propose_kotlin
+    new, _ = propose_kotlin('        val pct = done / total', "ArithmeticException", "divide by zero")
+    assert new == '        val pct = (if (total != 0) done / total else 0)'

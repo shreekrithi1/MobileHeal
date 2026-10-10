@@ -235,8 +235,27 @@ def _kt_index(line: str, exc_type: str, msg: str) -> Optional[Patch]:
     return None
 
 
+def _kt_div_zero(line: str, exc_type: str, msg: str) -> Optional[Patch]:
+    """ArithmeticException: divide by zero. A literal `/0` can never succeed — it's leftover debug code, so the
+    statement is disabled. A variable divisor gets a zero guard."""
+    if exc_type != "ArithmeticException" and "by zero" not in msg:
+        return None
+    code = line.split("//", 1)[0]
+    if re.search(r"/\s*0(?![\w.])", code):
+        indent = line[:len(line) - len(line.lstrip())]
+        return (indent + "// " + line.strip().replace("  // MH-DEMO-BUG", "") + "  // disabled by MobileHeal: divides by zero",
+                "This statement divides by the literal 0, so it always throws ArithmeticException. It is debug code — "
+                "disable it.")
+    m = re.search(r"(\w[\w.]*)\s*/\s*(\w[\w.]*)", code)
+    if m:
+        a, b = m.group(1), m.group(2)
+        return (line[:m.start()] + f"(if ({b} != 0) {a} / {b} else 0)" + line[m.end():],
+                f"`{b}` can be 0, so `{a} / {b}` threw ArithmeticException. Guard the division.")
+    return None
+
+
 def propose_kotlin(line: str, exc_type: str, msg: str) -> Optional[Patch]:
-    for f in (_kt_get_value, _kt_npe, _kt_index):
+    for f in (_kt_div_zero, _kt_get_value, _kt_npe, _kt_index):
         r = f(line, exc_type, msg)
         if r and r[0] != line:
             return r
