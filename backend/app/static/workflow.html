@@ -409,6 +409,39 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
 .savebar[hidden]{display:none}
 .savebar .btn{color:var(--fg)} .savebar .btn.primary{color:#fff}
 @media (max-width:900px){.settings{grid-template-columns:1fr}.snav{position:static;grid-auto-flow:column;overflow-x:auto}.srow{grid-template-columns:1fr}.srow-c{justify-content:flex-start}}
+
+/* ---- Crashlytics (live) ---- */
+.cx-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 18px}
+.cx-kpi{padding:14px 16px}.cx-kpi small{color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.cx-kpi b{display:block;font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.cx-kpi .sub{color:var(--faint);font-size:12px}
+.cx-live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--red)}
+.cx-live i{width:8px;height:8px;border-radius:50%;background:var(--red);animation:cxpulse 1.4s infinite}
+@keyframes cxpulse{0%{box-shadow:0 0 0 0 rgba(229,72,77,.55)}70%{box-shadow:0 0 0 8px rgba(229,72,77,0)}100%{box-shadow:0 0 0 0 rgba(229,72,77,0)}}
+.cx-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.cx-list{display:grid;gap:10px}
+.cx-row{padding:0;overflow:hidden;transition:border-color .3s}
+.cx-row.flash{border-color:var(--red)}
+.cx-head{display:grid;grid-template-columns:34px minmax(0,1fr) 130px 92px 92px 150px 128px;gap:12px;align-items:center;padding:12px 16px;cursor:pointer}
+.cx-head:hover{background:var(--sunk)}
+.cx-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:16px;background:var(--red-soft);color:var(--red)}
+.cx-row.resolved .cx-ic{background:var(--green-soft);color:var(--green)} .cx-row.healing .cx-ic{background:var(--blue-soft);color:var(--blue)}
+.cx-t b{display:block;font-family:var(--mono);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cx-t span{color:var(--muted);font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cx-num{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}.cx-num small{display:block;color:var(--faint);font-weight:500;font-size:11px}
+.cx-num.bump{animation:cxbump .6s var(--ease)}
+@keyframes cxbump{0%{color:var(--red);transform:scale(1.12)}100%{transform:none}}
+.cx-spark{width:130px;height:30px}
+.cx-st{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.cx-st small{color:var(--faint);font-size:11.5px}
+.cx-st .chip.open{background:var(--red-soft);color:var(--red)} .cx-st .chip.healing{background:var(--blue-soft);color:var(--blue)}
+.cx-st .chip.resolved{background:var(--green-soft);color:var(--green)} .cx-st .chip.attention{background:var(--amber-soft);color:var(--amber)}
+.cx-prog{height:3px;width:100%;background:var(--sunk);border-radius:2px;overflow:hidden}.cx-prog i{display:block;height:100%;background:var(--blue);transition:width .6s var(--ease)}
+.cx-body{border-top:1px solid var(--line);padding:14px 16px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;background:var(--sunk)}
+.cx-body h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.cx-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.cx-tl{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13px}
+.cx-tl li{display:grid;grid-template-columns:62px 1fr;gap:8px}.cx-tl time{color:var(--faint);font-variant-numeric:tabular-nums;font-size:12px}
+@media (max-width:1100px){.cx-head{grid-template-columns:34px minmax(0,1fr) 90px 128px}.cx-head .cx-spark,.cx-head .cx-hide{display:none}.cx-body{grid-template-columns:1fr}.cx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -424,6 +457,7 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
   <a href="#incidents" data-r="incidents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>Incidents<span class="badge" id="b-inc"></span></a>
   <a href="#data" data-r="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/></svg>Data health<span class="badge" id="b-data"></span></a>
   <a href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Live monitor</a>
+  <a href="#crashes" data-r="crashes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3 1-5 2 1 3 3 3 3"/><path d="M6 14a6 6 0 0 0 12 0"/></svg>Crashlytics<span class="badge" id="b-cx"></span></a>
   <a href="#demo" data-r="demo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></svg>Crash demo</a>
   <div class="rail-label">Configure</div>
   <a href="#settings" data-r="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
@@ -521,18 +555,93 @@ function chip(cr){ if (cr.source==="figma" && cr.status==="design_review") retur
 /* ---------------- routing ---------------- */
 function go(r){ location.hash = r; }
 window.addEventListener("hashchange", route);
-const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", data:"Data health", demo:"Crash demo", settings:"Settings", audit:"Audit log"};
+const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", data:"Data health", demo:"Crash demo", crashes:"Crashlytics", settings:"Settings", audit:"Audit log"};
 function setNav(active){ document.querySelectorAll("#rail a[data-r]").forEach(a => { const on = a.dataset.r === active; a.classList.toggle("on", on); on ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"); }); }
 function setCrumbs(parts){ $("#crumbs").innerHTML = parts.map((p,i)=> i===parts.length-1 ? `<b>${esc(p[0])}</b>` : `<a href="${p[1]}">${esc(p[0])}</a><span aria-hidden="true">›</span>`).join(""); document.title = parts[parts.length-1][0] + " · MobileHeal"; }
+
+/* ================= Crashlytics (mock Firebase, live) ================= */
+const CX = {open:{}, prev:{}, data:null};
+const cxFmt = n => n >= 10000 ? (n/1000).toFixed(1)+"k" : String(n);
+function cxSpark(pts, state){
+  const w=130,h=30,max=Math.max(3,...pts), step=w/(pts.length-1||1);
+  const xy = pts.map((v,i)=>[i*step, h-2-(v/max)*(h-6)]);
+  const line = xy.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  const col = state==="resolved" ? "var(--green)" : state==="healing" ? "var(--blue)" : "var(--red)";
+  return `<svg class="cx-spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${line} L${w} ${h} L0 ${h} Z" fill="${col}" opacity=".12"/><path d="${line}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
+function cxRow(i){
+  const st = i.status, open = CX.open[i.id], prev = CX.prev[i.id] || {}, bump = prev.events !== undefined && prev.events !== i.events;
+  const icon = st.state==="resolved" ? "✓" : st.state==="healing" ? "⚕" : i.fatal ? "💥" : "⏳";
+  const prog = st.state==="healing" ? `<div class="cx-prog"><i style="width:${Math.min(100,((st.stage||0)+1)/6*100)}%"></i></div>` : "";
+  const action = !i.healable ? `<button class="btn sm" onclick="event.stopPropagation();toast(${esc(JSON.stringify(i.not_ours||""))})" title="Not in MobileHeal code">Engineer needed</button>`
+    : st.state==="open" ? `<button class="btn sm primary" onclick="event.stopPropagation();cxHeal('${i.id}')">⚕ Auto-heal</button>`
+    : st.state==="resolved" ? `<button class="btn sm" onclick="event.stopPropagation();cxRepro('${i.id}')" title="Re-introduce the bug to replay the demo">↺ Reproduce</button>`
+    : i.incident ? `<a class="btn sm" href="#cr/${i.incident.id}" onclick="event.stopPropagation()">Open ${esc(i.incident.key)}</a>` : "";
+  const tl = (i.incident ? i.incident.timeline : []).slice().reverse();
+  return `<div class="card cx-row ${st.state} ${bump && st.state!=="resolved" ? "flash" : ""}" id="cx-${i.id}">
+    <div class="cx-head" onclick="CX.open['${i.id}']=!CX.open['${i.id}'];cxPaint()" role="button" aria-expanded="${!!open}">
+      <div class="cx-ic" aria-hidden="true">${icon}</div>
+      <div class="cx-t"><b>${esc(i.title)}</b><span>${esc(i.subtitle)}</span></div>
+      ${cxSpark(i.spark, st.state)}
+      <div class="cx-num ${bump?"bump":""} cx-hide">${cxFmt(i.events)}<small>events</small></div>
+      <div class="cx-num cx-hide">${cxFmt(i.users)}<small>users</small></div>
+      <div class="cx-st"><span class="chip ${st.state}">${esc(st.label)}</span><small>${esc(st.detail)}</small>${prog}</div>
+      <div style="text-align:right">${action}</div>
+    </div>
+    ${open ? `<div class="cx-body">
+      <div><div class="cx-meta"><span class="chip s-detected">${i.platform==="ios"?"iOS":"Android"}</span><span class="chip ${i.fatal?"open":"attention"}" style="background:var(--${i.fatal?"red":"amber"}-soft);color:var(--${i.fatal?"red":"amber"})">${i.fatal?"Fatal":"Non-fatal"}</span>
+        <span class="chip" style="background:var(--panel)">${esc(i.versions.join(", "))}</span><span class="chip" style="background:var(--panel)">${esc(i.os)}</span><code style="font-size:12px">${esc(i.file)}</code></div>
+        <p style="margin:0 0 10px">${esc(i.blurb)}</p>
+        ${i.not_ours ? `<p class="hint" style="margin:0 0 10px">⚠️ ${esc(i.not_ours)}</p>` : ""}
+        <div class="hint" style="margin:0">Devices: ${esc(i.devices.join(" · "))}<br>First seen ${ago(i.first_seen)} · last event ${ago(i.last_seen)}${i.resolved_at?` · resolved ${ago(i.resolved_at)}`:""}</div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${i.incident?`<a class="btn sm" href="#cr/${i.incident.id}">Open incident ${esc(i.incident.key)} →</a>`:""}<a class="btn sm" href="${esc(i.console)}" target="_blank" rel="noopener">View in Firebase ↗</a></div></div>
+      <div><h4>Resolution</h4>${tl.length ? `<ol class="cx-tl">${tl.map(e=>`<li><time>${esc(new Date(e.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}))}</time><span><b>${esc(e.actor)}</b> ${esc(e.text)}</span></li>`).join("")}</ol>`
+        : `<p class="hint" style="margin:0">${i.healable ? (st.state==="resolved" ? "Fixed in code." : "Not sent to auto-heal yet. With Auto-heal on, MobileHeal picks it up within seconds.") : "Auto-heal only patches crashes in your own code."}</p>`}</div>
+    </div>` : ""}
+  </div>`;
+}
+function cxPaint(){
+  const d = CX.data, el = $("#cx-root"); if (!d || !el || state.route!=="crashes") return;
+  const k = d.kpis;
+  el.innerHTML = `<div class="cx-kpis">
+      <div class="card cx-kpi"><small>Crash-free users</small><b style="color:var(--${k.crash_free>=99.5?"green":k.crash_free>=98?"amber":"red"})">${k.crash_free.toFixed(2)}%</b><span class="sub">of ${cxFmt(k.users)} monthly users</span></div>
+      <div class="card cx-kpi"><small>Open issues</small><b>${k.open}</b><span class="sub">crashing right now</span></div>
+      <div class="card cx-kpi"><small>Events · last 3 s</small><b>${k.events_now}</b><span class="sub">live from devices</span></div>
+      <div class="card cx-kpi"><small>Auto-healed</small><b style="color:var(--green)">${k.auto_healed}</b><span class="sub">fixed by MobileHeal</span></div>
+    </div>
+    <div class="cx-list">${d.issues.map(cxRow).join("")}</div>`;
+  d.issues.forEach(i => CX.prev[i.id] = {events:i.events});
+  const t = $("#cx-ah"); if (t) t.checked = d.autoheal;
+  const b = $("#b-cx"); if (b) b.textContent = k.open || "";
+}
+async function cxLoad(){ try { CX.data = await api("/api/crashfeed"); cxPaint(); } catch(e){ const el=$("#cx-root"); if (el && !CX.data) el.innerHTML = `<p class="err">${esc(e.message)}</p>`; } }
+async function renderCrashes(){
+  $("#view").innerHTML = `<div class="wrap">
+    <div class="cx-bar"><div><h1 style="margin:0;display:flex;gap:10px;align-items:center">Crashlytics <span class="cx-live"><i></i>LIVE</span></h1>
+      <p class="sdesc" style="margin:4px 0 0">Firebase Crashlytics issues for MobileHeal (Android &amp; iOS), streaming in real time. Crashes in your code are healed automatically — incident, Jira defect, fix PR, review, tests, merge — and the issue turns resolved when the fix ships.</p></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px">${sToggleRaw("cx-ah", true).replace(/^<span class="switch">/,'<span class="switch" style="display:inline-block">')} Auto-heal</label>
+        <button class="btn sm" onclick="cxReset()" title="Re-introduce every bug and restart the counters">↺ Reset demo</button></div></div>
+    <div id="cx-root"><p class="hint"><span class="spinner"></span> Connecting to Crashlytics…</p></div></div>`;
+  $("#cx-ah").onchange = async e => { CX.data = await api("/api/crashfeed/autoheal",{method:"POST",body:{on:e.target.checked}}); toast(e.target.checked ? "Auto-heal on — crashes in your code are fixed automatically" : "Auto-heal off — use ⚕ Auto-heal per issue"); cxPaint(); };
+  await cxLoad();
+  state.poll = setInterval(cxLoad, 2000);
+}
+function sToggleRaw(id, on){ return `<span class="switch"><input type="checkbox" id="${id}" ${on?"checked":""} role="switch" aria-label="Auto-heal"><span></span></span>`; }
+async function cxHeal(id){ try { CX.data = await api(`/api/crashfeed/${id}/heal`,{method:"POST"}); CX.open[id]=true; cxPaint(); toast("Sent to auto-heal"); } catch(e){ toast(e.message); } }
+async function cxRepro(id){ try { CX.data = await api(`/api/crashfeed/${id}/reproduce`,{method:"POST"}); cxPaint(); toast("Bug re-introduced — the crash is back"); } catch(e){ toast(e.message); } }
+async function cxReset(){ if (!confirm("Re-introduce all demo bugs and restart the Crashlytics counters?")) return;
+  try { CX.data = await api("/api/crashfeed/reset",{method:"POST"}); CX.prev = {}; cxPaint(); toast("Demo reset — crashes are streaming again"); } catch(e){ toast(e.message); } }
+
 async function route(){
   const h = location.hash.slice(1) || "home";
   clearInterval(state.poll);
   document.querySelector('.app').classList.remove('list-open'); $("#shell").classList.remove("rail-open");
-  const page = ["home","tests","settings","audit","demo","data"].find(p => h===p || h.startsWith(p+"/"));
+  const page = ["home","tests","settings","audit","demo","data","crashes"].find(p => h===p || h.startsWith(p+"/"));
   document.querySelector(".app").classList.toggle("full", !!page);
   $("#main").scrollTop = 0;
   if (page) { state.route = page; state.cr = null; setNav(page); setCrumbs([[PAGE_TITLE[page], "#"+page]]);
-    await ({home:renderHome, tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData})[page](h); return; }
+    await ({home:renderHome, tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData, crashes:renderCrashes})[page](h); return; }
   if (h === "delivery" || h === "incidents") {
     state.filter = h==="incidents" ? "incident" : "change"; state.route = h; state.cr = null; setNav(h); setCrumbs([[PAGE_TITLE[h], "#"+h]]);
     renderIndex(h); renderList(); return; }
@@ -2500,7 +2609,7 @@ async function renderApps(){
 
 /* ---------- ⌘K command palette ---------- */
 function paletteItems(){
-  const nav = [["Home","#home","⌂"],["Requirements","#delivery","📝"],["Incidents","#incidents","🛡️"],["Test library","#tests","🧪"],["Data health","#data","🗄️"],["Crash demo","#demo","▶"],["Settings","#settings","⚙"],["Audit log","#audit","🕘"]]
+  const nav = [["Home","#home","⌂"],["Requirements","#delivery","📝"],["Incidents","#incidents","🛡️"],["Test library","#tests","🧪"],["Data health","#data","🗄️"],["Crash demo","#demo","▶"],["Crashlytics","#crashes","🔥"],["Settings","#settings","⚙"],["Audit log","#audit","🕘"]]
     .map(([t,h,i])=>({g:"Go to",t,i,run:()=>go(h.slice(1))}));
   const acts = [
     {g:"Actions",t:"New change request",i:"＋",run:()=>go("new")},

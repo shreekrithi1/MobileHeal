@@ -5,6 +5,7 @@ intentional and get *fixed* whenever someone runs the Crash demo (the fix is mer
 so every copied workspace is put back into the "bug present" state — tests never depend on demo history.
 """
 import importlib
+import os
 import re
 import shutil
 import sys
@@ -13,6 +14,7 @@ from pathlib import Path
 import pytest
 
 PROJECT = Path(__file__).resolve().parents[2]
+os.environ.setdefault("MOBILEHEAL_CRASHFEED", "0")   # no live mock-Crashlytics traffic during tests (tick() is called explicitly)
 _copytree = shutil.copytree
 
 

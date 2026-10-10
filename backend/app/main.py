@@ -250,6 +250,10 @@ async def lifespan(app: FastAPI):
     app.state.healer = Healer(app.state.wf)
     app.state.wf.healer = app.state.healer
     app.state.demo = Demo(app.state.wf)
+    from .crashfeed import CrashFeed
+    app.state.crashfeed = CrashFeed(app.state)
+    if os.getenv("MOBILEHEAL_CRASHFEED", "1") == "1":
+        app.state.crashfeed.start(float(os.getenv("MOBILEHEAL_CRASHFEED_INTERVAL", "3")))
     from .watchdog import DataWatchdog
     app.state.watchdog = DataWatchdog(app.state.db, app.state.wf.settings.get)
     app.state.agent.watchdog = app.state.watchdog
@@ -504,6 +508,44 @@ def report_crash(body: CrashIn):
     else:
         inc = app.state.healer.record(android_capture(data))
     return {"incident": inc["key"], "status": inc["status"]}
+
+
+# ---------------- Mock Firebase Crashlytics (live) ----------------
+class CrashFeedToggle(BaseModel):
+    on: bool
+
+
+@app.get("/api/crashfeed")
+def crashfeed_view():
+    return app.state.crashfeed.view()
+
+
+@app.post("/api/crashfeed/autoheal")
+def crashfeed_autoheal(body: CrashFeedToggle):
+    return app.state.crashfeed.set_autoheal(body.on)
+
+
+@app.post("/api/crashfeed/reset")
+def crashfeed_reset():
+    return app.state.crashfeed.reset(app.state.wf.user)
+
+
+@app.post("/api/crashfeed/{iid}/heal")
+def crashfeed_heal(iid: str):
+    try:
+        return app.state.crashfeed.heal(iid, app.state.wf.user)
+    except KeyError:
+        raise HTTPException(404, "unknown issue")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/crashfeed/{iid}/reproduce")
+def crashfeed_reproduce(iid: str):
+    try:
+        return app.state.crashfeed.reproduce(iid, app.state.wf.user)
+    except KeyError:
+        raise HTTPException(404, "unknown issue")
 
 
 @app.get("/api/healer")
