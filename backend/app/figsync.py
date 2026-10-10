@@ -310,6 +310,9 @@ class FigmaSync:
             _demo_save(self.s, st)
             result.update(variables=f"{len(items)} variables updated (demo)", comment="posted (demo)")
         else:
+            if not self.plugin_live():
+                result["pending_plugin"] = ("queued — open the MobileHeal Design Sync plugin in Figma (Plugins → Development) "
+                                            "and it applies this design within seconds")
             if self.plugin_live():
                 result["variables"] = "applied live by the MobileHeal Figma plugin"
             elif result["mode"] == "variables" and not st0.get("variables_refused"):

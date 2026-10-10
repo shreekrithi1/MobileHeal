@@ -270,9 +270,14 @@ class SyncHub:
                        "not pushed — Figma sync isn't connected (Settings → Design & testing → design file URL + token)")
         if cr.get("kind") == "incident" or cr.get("source") == "figma" or cr["status"] in ("design_review", "closed", "failed"):
             return add("Figma", "push", True, "nothing to push")
-        if cr.get("figma_pushes"):
-            return add("Figma", "push", True, "up to date (design already pushed to Figma)")
-        r = fs.push(cr, None, "synced from MobileHeal")
+        live = fs.demo or fs.plugin_live()
+        if cr.get("figma_pushes") and live:
+            return add("Figma", "push", True, "up to date (the Figma plugin applies the approved design live)")
+        r = fs.push(cr, None, "synced from MobileHeal") if not cr.get("figma_pushes") else {}
+        if not live and not fs.demo:
+            return add("Figma", "push", False, "comment posted, but the design isn't drawn in Figma yet — open the "
+                       "MobileHeal Design Sync plugin in Figma (Plugins → Development); it applies the approved design "
+                       "within seconds and keeps syncing while open")
         add("Figma", "push", bool(r.get("variables") or r.get("comment")),
             r.get("variables") or r.get("comment") or r.get("variables_error") or r.get("comment_error") or "pushed")
 

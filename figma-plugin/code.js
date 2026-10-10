@@ -88,6 +88,20 @@ async function applyFrames(tokens) {
     await createProfileFrame(tokens);
     return { frames: 1, changed: 1, created: true };
   }
+  // Fields added or removed (e.g. City became required, or was dropped): redraw the frame in place.
+  const want = Object.keys(tokens).filter((k) => !k.startsWith("ui.") && /^(required|optional)$/.test(tokens[k])).sort().join(",");
+  let redrawn = 0;
+  for (const frame of frames) {
+    const have = frame.findAll((n) => /^input \/ /i.test(n.name || "")).map((n) => n.name.replace(/^input \/ /i, "").trim().toLowerCase()).sort().join(",");
+    if (have !== want && frame.type === "FRAME") {
+      const x = frame.x, y = frame.y;
+      frame.remove();
+      const f = await createProfileFrame(tokens);
+      f.x = x; f.y = y;
+      redrawn++;
+    }
+  }
+  if (redrawn) return { frames: redrawn, changed: redrawn, redrawn: true };
   let changed = 0;
   for (const frame of frames) {
     for (const node of frame.findAll((n) => "name" in n)) {
@@ -166,7 +180,7 @@ figma.ui.onmessage = async (msg) => {
     catch (e) { text = "Variables skipped (" + e.message + ")."; }
     if (!msg.onlyVars) {
       const r = await applyFrames(msg.data.tokens);
-      text += r.created ? " Drew a new “Profile” frame from the approved design." : ` ${r.changed} layer change(s) across ${r.frames} frame(s).`;
+      text += r.created ? " Drew a new “Profile” frame from the approved design." : r.redrawn ? " Fields changed — redrew the “Profile” frame." : ` ${r.changed} layer change(s) across ${r.frames} frame(s).`;
     }
     figma.notify("MobileHeal design applied");
     figma.ui.postMessage({ text: text });
