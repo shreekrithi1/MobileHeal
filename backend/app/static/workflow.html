@@ -442,6 +442,32 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
 .cx-tl{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13px}
 .cx-tl li{display:grid;grid-template-columns:62px 1fr;gap:8px}.cx-tl time{color:var(--faint);font-variant-numeric:tabular-nums;font-size:12px}
 @media (max-width:1100px){.cx-head{grid-template-columns:34px minmax(0,1fr) 90px 128px}.cx-head .cx-spark,.cx-head .cx-hide{display:none}.cx-body{grid-template-columns:1fr}.cx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---- App Studio ---- */
+.nm-toggle{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin:0 0 16px}
+.nm-toggle button{border:0;background:transparent;padding:8px 14px;border-radius:9px;font-weight:650;color:var(--muted);cursor:pointer}
+.nm-toggle button.on{background:var(--panel);color:var(--fg);box-shadow:var(--shadow)}
+.st-team{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin:16px 0}
+.st-agent{padding:12px;position:relative;transition:transform .2s,border-color .2s}
+.st-agent .av{font-size:22px;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--sunk);margin-bottom:8px}
+.st-agent b{display:block;font-size:13px}.st-agent small{display:block;color:var(--muted);font-size:11.5px;line-height:1.35;margin-top:2px;min-height:30px}
+.st-agent .s{margin-top:8px;font-size:11.5px;font-weight:650;display:flex;gap:6px;align-items:center}
+.st-agent.working{border-color:var(--accent);transform:translateY(-2px)} .st-agent.working .av{background:var(--accent-soft)}
+.st-agent.done .av{background:var(--green-soft)} .st-agent.attention .av{background:var(--amber-soft)}
+.st-agent.em{background:linear-gradient(180deg,var(--accent-soft),var(--panel))}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);display:inline-block}.dot.working{background:var(--accent);animation:cxpulse 1.2s infinite}
+.dot.done{background:var(--green)}.dot.waiting{background:var(--amber)}.dot.attention{background:var(--red)}
+.st-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px}
+.st-feed{max-height:620px;overflow:auto;padding:6px 14px}
+.st-msg{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.st-msg:last-child{border:0}
+.st-msg .av{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--sunk)}
+.st-msg .who{font-size:12.5px;font-weight:700}.st-msg .who span{color:var(--faint);font-weight:500;margin-left:6px}
+.st-msg p{margin:2px 0 0;font-size:13.5px}.st-msg.gate p{color:var(--green)}.st-msg.block p,.st-msg.error p{color:var(--red)}
+.st-msg.merged{background:var(--green-soft);border-radius:10px;padding:10px}
+.st-phone{width:300px;height:600px;border:10px solid #111;border-radius:36px;overflow:hidden;margin:0 auto;background:#fff}
+.st-phone iframe{width:100%;height:100%;border:0}
+.st-tbl{width:100%;border-collapse:collapse;font-size:13px}.st-tbl td,.st-tbl th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+@media (max-width:1100px){.st-team{grid-template-columns:repeat(2,minmax(0,1fr))}.st-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -452,6 +478,7 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
   <a href="#home" data-r="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</a>
   <div class="rail-label">Deliver</div>
   <a href="#delivery" data-r="delivery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l1 2h3v15H5V6h3z"/><path d="M9 12h6M9 16h4"/></svg>Requirements<span class="badge amber" id="b-req"></span></a>
+  <a href="#studio" data-r="studio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2l.9-5.5-4-3.9 5.5-.8z"/></svg>App Studio</a>
   <a href="#tests" data-r="tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg>Test library</a>
   <div class="rail-label">Operate</div>
   <a href="#incidents" data-r="incidents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>Incidents<span class="badge" id="b-inc"></span></a>
@@ -555,7 +582,7 @@ function chip(cr){ if (cr.source==="figma" && cr.status==="design_review") retur
 /* ---------------- routing ---------------- */
 function go(r){ location.hash = r; }
 window.addEventListener("hashchange", route);
-const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", data:"Data health", demo:"Crash demo", crashes:"Crashlytics", settings:"Settings", audit:"Audit log"};
+const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", data:"Data health", demo:"Crash demo", crashes:"Crashlytics", studio:"App Studio", settings:"Settings", audit:"Audit log"};
 function setNav(active){ document.querySelectorAll("#rail a[data-r]").forEach(a => { const on = a.dataset.r === active; a.classList.toggle("on", on); on ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"); }); }
 function setCrumbs(parts){ $("#crumbs").innerHTML = parts.map((p,i)=> i===parts.length-1 ? `<b>${esc(p[0])}</b>` : `<a href="${p[1]}">${esc(p[0])}</a><span aria-hidden="true">›</span>`).join(""); document.title = parts[parts.length-1][0] + " · MobileHeal"; }
 
@@ -637,11 +664,11 @@ async function route(){
   const h = location.hash.slice(1) || "home";
   clearInterval(state.poll);
   document.querySelector('.app').classList.remove('list-open'); $("#shell").classList.remove("rail-open");
-  const page = ["home","tests","settings","audit","demo","data","crashes"].find(p => h===p || h.startsWith(p+"/"));
+  const page = ["home","tests","settings","audit","demo","data","crashes","studio"].find(p => h===p || h.startsWith(p+"/"));
   document.querySelector(".app").classList.toggle("full", !!page);
   $("#main").scrollTop = 0;
   if (page) { state.route = page; state.cr = null; setNav(page); setCrumbs([[PAGE_TITLE[page], "#"+page]]);
-    await ({home:renderHome, tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData, crashes:renderCrashes})[page](h); return; }
+    await ({home:renderHome, tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData, crashes:renderCrashes, studio:renderStudio})[page](h); return; }
   if (h === "delivery" || h === "incidents") {
     state.filter = h==="incidents" ? "incident" : "change"; state.route = h; state.cr = null; setNav(h); setCrumbs([[PAGE_TITLE[h], "#"+h]]);
     renderIndex(h); renderList(); return; }
@@ -756,6 +783,108 @@ function phone({rules, ui, values, interactive=false, highlight=[], id="", onInp
 
 /* ---------------- new CR (Requirements) ---------------- */
 async function renderNew(prefill){
+  if (state.newMode === "app" && !prefill) return renderNewApp();
+  await renderNewChange(prefill);
+  const h = document.querySelector("#view .hdr");
+  if (h) h.insertAdjacentHTML("beforebegin", newModeToggle("change"));
+}
+function newModeToggle(on){ return `<div class="nm-toggle" role="tablist"><button class="${on==="change"?"on":""}" onclick="state.newMode='change';renderNew()">Change this app</button><button class="${on==="app"?"on":""}" onclick="state.newMode='app';renderNew()">✦ Build a new app from an idea</button></div>`; }
+async function renderNewApp(){
+  const st = await api("/api/studio").catch(()=>({agents:[], ai:false}));
+  const ex = ["A booking app for my hair salon: customers pick a service and a time, I see the day's appointments and mark them done.",
+              "An ordering app for a small bakery — menu with prices, customers place pickup orders, staff move orders from New to Ready.",
+              "A gym class app: members book yoga and spin classes, coaches see who is coming and mark attendance."];
+  $("#view").innerHTML = newModeToggle("app") + `
+    <div class="hdr"><div><div class="meta" style="margin-bottom:6px"><span class="chip s-coding">App Studio</span></div>
+      <h1>Describe the business idea</h1><div class="meta">A team of AI agents — led by an Engineering Manager — writes the PRD, designs the screens, builds the backend and a working prototype, tests it end-to-end, reviews security and opens a merge request. The Engineering Manager approves the final merge.</div></div></div>
+    <div class="st-team">${(st.agents||[]).map(a=>`<div class="card st-agent ${a.id==="em"?"em":""}"><div class="av" aria-hidden="true">${a.icon}</div><b>${esc(a.name)}</b><small>${esc(a.role)}</small></div>`).join("")}</div>
+    <div class="card"><div class="card-b">
+      <div class="field"><label for="ap-idea">Business idea</label>
+        <textarea id="ap-idea" class="input big" rows="5" placeholder="Who is it for, what do they do with it, what does success look like?"></textarea>
+        <div class="quick" style="margin-top:8px"><span class="hint" style="margin:0">Try:</span>${ex.map(x=>`<button class="btn sm" onclick="$('#ap-idea').value=this.dataset.t" data-t="${esc(x)}">${esc(x.split(/[:—]/)[0])}</button>`).join("")}</div></div>
+      <div class="field"><label for="ap-name">App name <span style="color:var(--faint);font-weight:400">(optional)</span></label><input id="ap-name" class="input" placeholder="The Product Manager will name it if you don't"></div>
+      <p class="hint" style="margin:0">${st.ai?"✦ Agents use your model for the PRD and data model.":"Parser mode: agents use built-in domain playbooks (bookings, restaurants, shops, gyms, events, projects, vets…). Add a model key in Settings for any idea."}</p>
+    </div><div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;background:var(--sunk);border-radius:0 0 12px 12px">
+      <button class="btn primary" onclick="apCreate(this)">Assemble the team →</button></div></div>`;
+}
+async function apCreate(b){ b.disabled = true; b.innerHTML = `<span class="spinner"></span> Assembling…`;
+  try { const p = await api("/api/studio",{method:"POST",body:{idea:$("#ap-idea").value, name:$("#ap-name").value}}); location.hash = "#studio/" + p.id; }
+  catch(e){ toast(e.message); b.disabled = false; b.textContent = "Assemble the team →"; } }
+
+/* ================= App Studio board (live) ================= */
+const ST = {tab:"prd"};
+async function renderStudio(h){
+  const id = +(h.split("/")[1]||0);
+  if (!id) {
+    const d = await api("/api/studio");
+    $("#view").innerHTML = `<div class="wrap"><div class="cx-bar"><div><h1 style="margin:0">App Studio</h1><p class="sdesc" style="margin:4px 0 0">From a business idea to a working, merged prototype — built by a team of agents led by an Engineering Manager.</p></div>
+      <a class="btn primary" href="#new" onclick="state.newMode='app'">✦ New app idea</a></div>
+      <div class="st-team">${d.agents.map(a=>`<div class="card st-agent ${a.id==="em"?"em":""}"><div class="av">${a.icon}</div><b>${esc(a.name)}</b><small>${esc(a.role)}</small></div>`).join("")}</div>
+      <div class="card" style="padding:0">${d.projects.length ? d.projects.map(p=>`<a class="row" href="#studio/${p.id}" style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><span><b>${esc(p.name||"New app")}</b> <span class="key">${esc(p.key)}</span></span><span class="chip s-${p.status==="merged"?"merged":p.status==="failed"||p.status==="needs_attention"?"failed":p.status==="stopped"?"stopped":"coding"}">${esc(p.status.replace(/_/g," "))}</span></a>`).join("") : `<p class="hint" style="padding:16px;margin:0">No apps yet — describe an idea to start.</p>`}</div></div>`;
+    return; }
+  $("#view").innerHTML = `<div class="wrap" id="st-root"><p class="hint"><span class="spinner"></span> Loading the team…</p></div>`;
+  const load = async () => { try { ST.p = await api("/api/studio/" + id); stPaint(); } catch(e){ toast(e.message); clearInterval(state.poll); } };
+  await load(); state.poll = setInterval(() => { if (ST.p && ["merged","stopped","failed","needs_attention"].includes(ST.p.status) && ST.p._painted > 1) return; load(); }, 1200);
+}
+function stPaint(){
+  const p = ST.p, el = $("#st-root"); if (!el || state.route !== "studio") return;
+  p._painted = (p._painted||0) + 1;
+  const A = Object.fromEntries(p.agent_list.map(a=>[a.id,a])), a = p.artifacts||{};
+  const chipCls = {merged:"merged", failed:"failed", needs_attention:"failed", stopped:"stopped", awaiting_approval:"pr_open"}[p.status] || "coding";
+  const acts = [p.status==="awaiting_approval"?`<button class="btn primary" onclick="stAct('approve')">✓ Approve merge request</button>`:"",
+    ["planning","awaiting_approval"].includes(p.status)?`<button class="btn" onclick="stAct('stop')">⏸ Stop</button>`:"",
+    ["stopped","failed","needs_attention","awaiting_approval"].includes(p.status)?`<button class="btn" onclick="stAct('restart')">↻ Restart</button>`:"",
+    p.slug && a.frontend_ready!==false && p.stage>=4 ? `<a class="btn" href="/apps/${esc(p.slug)}/" target="_blank" rel="noopener">Open prototype ↗</a>` : ""].join("");
+  const tabs = [["prd","PRD"],["design","Design"],["api","API"],["proto","Prototype"],["qa","QA"],["sec","Security"],["mr","Merge request"]];
+  el.innerHTML = `<div class="hdr"><div style="min-width:0"><div class="meta" style="margin-bottom:6px"><span class="chip s-${chipCls}">${esc(p.status.replace(/_/g," "))}</span><span>${esc(p.author)} · ${ago(p.created_at)}</span>${p.engine?`<span>· ${p.engine==="llm"?"✦ model":"playbook"}</span>`:""}</div>
+      <h1>${esc(p.name||"Assembling the team…")} <span class="key">${esc(p.key)}</span></h1><div class="meta">${esc(p.idea.slice(0,180))}${p.idea.length>180?"…":""}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${acts}</div></div>
+    ${p.error?`<div class="banner-err" style="margin-top:12px"><b>Stopped:</b> ${esc(p.error)}</div>`:""}
+    <div class="st-team">${p.agent_list.map(x=>{ const s = (p.agents||{})[x.id]||{status:"idle"}; return `<div class="card st-agent ${x.id==="em"?"em":""} ${s.status}"><div class="av" aria-hidden="true">${x.icon}</div><b>${esc(x.name)}</b><small>${esc(s.detail||x.role)}</small><div class="s"><i class="dot ${s.status}"></i>${esc({idle:"Idle",working:"Working",done:"Done",waiting:"Waiting",attention:"Needs attention"}[s.status]||s.status)}</div></div>`; }).join("")}</div>
+    <div class="st-grid">
+      <div class="card"><div class="card-h"><span>Team channel</span><span class="hint" style="margin:0">${(p.feed||[]).length} messages</span></div>
+        <div class="st-feed" id="st-feed">${(p.feed||[]).map(m=>`<div class="st-msg ${m.kind}"><div class="av">${(A[m.agent]||{}).icon||"•"}</div><div><div class="who">${esc((A[m.agent]||{}).name||m.agent)}${m.to?` → ${esc((A[m.to]||{}).name||m.to)}`:""}<span>${new Date(m.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span></div><p>${esc(m.text).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`(.+?)`/g,"<code>$1</code>")}</p></div></div>`).join("")}</div></div>
+      <div class="card"><div class="tabs" style="padding:0 12px;margin:0">${tabs.map(([k,n])=>`<button class="tab ${ST.tab===k?"on":""}" onclick="ST.tab='${k}';stPaint()">${n}</button>`).join("")}</div>
+        <div class="card-b">${stTab(p)}</div></div>
+    </div>`;
+  const f = $("#st-feed"); if (f) f.scrollTop = f.scrollHeight;
+}
+function stTab(p){
+  const a = p.artifacts||{}, pend = who => `<p class="hint" style="margin:0">Waiting for the ${who}…</p>`;
+  if (ST.tab==="prd") { const d = a.prd; if (!d) return pend("Product Manager");
+    return `<h3 style="margin-top:0">${esc(p.spec.name)}</h3><p>${esc(p.spec.tagline||"")}</p><p><b>Problem.</b> ${esc(d.problem||"")}</p>
+      <h4>Personas</h4><ul>${(d.personas||[]).map(x=>`<li><b>${esc(x.name)}</b> — ${esc(x.goal)}</li>`).join("")}</ul>
+      <h4>MVP features</h4><ul>${(d.features||[]).map(x=>`<li>${esc(x.name)} <span class="chip s-closed">${esc(x.priority||"Must")}</span></li>`).join("")}</ul>
+      <h4>User stories</h4>${(d.stories||[]).map(s=>`<div style="margin-bottom:10px"><b>As ${esc(s.as)}</b>, I want ${esc(s.want)}, so ${esc(s.so)}.<ul>${(s.acceptance||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}
+      <h4>Data model</h4>${p.spec.entities.map(e=>`<p style="margin:4px 0"><b>${esc(e.label)}</b>: ${e.fields.map(f=>`${esc(f.name)}${f.required?"*":""} <span class="hint" style="margin:0">${f.type}</span>`).join(", ")}</p>`).join("")}`; }
+  if (ST.tab==="design") { const d = a.design; if (!d) return pend("Product Designer");
+    return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><span style="width:36px;height:36px;border-radius:10px;background:${esc(d.tokens.primary)}"></span><span style="width:36px;height:36px;border-radius:10px;background:${esc(d.tokens.accent)}"></span><span class="hint" style="margin:0">primary ${esc(d.tokens.primary)} · accent ${esc(d.tokens.accent)} · radius ${d.tokens.radius}px · contrast ${d.tokens.contrast_on_white}:1</span></div>
+      <table class="st-tbl"><tr><th>Screen</th><th>Type</th><th>Purpose</th></tr>${d.screens.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.kind)}</td><td>${esc(x.purpose)}</td></tr>`).join("")}</table>
+      <h4>Flows</h4><ul>${d.flows.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><h4>Principles</h4><ul>${d.principles.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`; }
+  if (ST.tab==="api") { if (!a.api) return pend("Backend Engineer");
+    return `<table class="st-tbl"><tr><th>Endpoint</th><th>Methods</th></tr>${Object.entries(a.api.paths).map(([k,v])=>`<tr><td><code>${esc(k)}</code></td><td>${Object.keys(v).map(m=>m.toUpperCase()).join(" · ")}</td></tr>`).join("")}</table>
+      <details style="margin-top:12px"><summary>Server code (server.py)</summary><pre class="code" style="max-height:340px;overflow:auto">${esc(a.backend_code||"")}</pre></details>`; }
+  if (ST.tab==="proto") { if (p.stage < 4 || !p.slug) return pend("Frontend Engineer");
+    return `<div class="st-phone"><iframe src="/apps/${esc(p.slug)}/" title="${esc(p.spec.name)} prototype"></iframe></div><p class="hint" style="text-align:center">Fully working — data is saved by the live API. <a href="/apps/${esc(p.slug)}/" target="_blank" rel="noopener">Open full screen ↗</a></p>`; }
+  if (ST.tab==="qa") { if (!a.qa) return pend("QA Engineer"); const ok = a.qa.filter(r=>r.ok).length;
+    return `<p><b>${ok}/${a.qa.length}</b> automated tests passed.</p><table class="st-tbl"><tr><th></th><th>Entity</th><th>Test</th></tr>${a.qa.map(r=>`<tr><td>${r.ok?"✅":"❌"}</td><td>${esc(r.entity)}</td><td>${esc(r.test)}${r.error?`<br><span class="err">${esc(r.error)}</span>`:""}</td></tr>`).join("")}</table>`; }
+  if (ST.tab==="sec") { if (!a.security) return pend("Security & DevOps engineer");
+    return `<table class="st-tbl">${a.security.map(c=>`<tr><td>${c.ok?"✅":"❌"}</td><td>${esc(c.check)}</td></tr>`).join("")}</table>`; }
+  if (ST.tab==="mr") { if (!p.mr) return pend("Security & DevOps engineer");
+    const rv = a.em_review;
+    return `<p><b>Branch</b> <code>${esc(p.mr.branch)}</code> → <code>${esc(p.mr.base)}</code>${p.mr.commit?` · commit <code>${esc(p.mr.commit)}</code>`:""}${p.mr.merge_commit?` · merged as <code>${esc(p.mr.merge_commit)}</code>`:""}</p>
+      ${rv?`<h4>Engineering Manager review</h4><p>${esc(rv.summary)}</p><ul>${rv.checklist.map(c=>`<li>${c.ok?"✅":"❌"} ${esc(c.item)}</li>`).join("")}</ul>`:""}
+      <h4>Files</h4><ul>${p.mr.files.map(f=>`<li><code>${esc(f)}</code></li>`).join("")}</ul>
+      ${p.status==="awaiting_approval"?`<button class="btn primary" onclick="stAct('approve')">✓ Approve &amp; merge</button>`:p.status==="merged"?`<p class="chip s-merged">Merged by ${esc(p.approved_by||"")}</p>`:""}`; }
+  return "";
+}
+async function stAct(kind){
+  const msg = {stop:"Stop the team? Agents stand down after their current step.", restart:"Restart the whole run with a fresh plan?", approve:"Approve the merge request and merge the prototype into main?"}[kind];
+  if (!confirm(msg)) return;
+  try { ST.p = {...await api(`/api/studio/${ST.p.id}/${kind}`,{method:"POST"}), agent_list: ST.p.agent_list}; ST.p._painted = 0; stPaint(); toast({stop:"Team stopped", restart:"Run restarted", approve:"Merged to main 🎉"}[kind]); }
+  catch(e){ toast(e.message); } }
+
+async function renderNewChange(prefill){
   state.cr = null; state.translation = null; state.lastTranslated = null; state.answers = []; state.agreed = false;
   const live = (state.info && state.info.live_spec) || "";
   const ai = state.settings && state.settings.ai.available;
@@ -2628,7 +2757,7 @@ async function renderApps(){
 
 /* ---------- ⌘K command palette ---------- */
 function paletteItems(){
-  const nav = [["Home","#home","⌂"],["Requirements","#delivery","📝"],["Incidents","#incidents","🛡️"],["Test library","#tests","🧪"],["Data health","#data","🗄️"],["Crash demo","#demo","▶"],["Crashlytics","#crashes","🔥"],["Settings","#settings","⚙"],["Audit log","#audit","🕘"]]
+  const nav = [["Home","#home","⌂"],["Requirements","#delivery","📝"],["Incidents","#incidents","🛡️"],["Test library","#tests","🧪"],["Data health","#data","🗄️"],["Crash demo","#demo","▶"],["Crashlytics","#crashes","🔥"],["App Studio","#studio","✦"],["Settings","#settings","⚙"],["Audit log","#audit","🕘"]]
     .map(([t,h,i])=>({g:"Go to",t,i,run:()=>go(h.slice(1))}));
   const acts = [
     {g:"Actions",t:"New change request",i:"＋",run:()=>go("new")},

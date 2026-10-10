@@ -19,7 +19,7 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "10.0.2.2", "testserver"}
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
        "font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; "
-       "connect-src 'self' ws: wss:; frame-src https://www.figma.com https://embed.figma.com; "
+       "connect-src 'self' ws: wss:; frame-src 'self' https://www.figma.com https://embed.figma.com; "
        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
 
 
@@ -82,9 +82,11 @@ class SecurityMiddleware:
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
                 h = list(message.get("headers", []))
-                h += [(b"x-content-type-options", b"nosniff"), (b"x-frame-options", b"DENY"),
+                proto = path.startswith("/apps/")      # App Studio prototypes are previewed inside the portal (same origin)
+                csp = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'") if proto else CSP
+                h += [(b"x-content-type-options", b"nosniff"), (b"x-frame-options", b"SAMEORIGIN" if proto else b"DENY"),
                       (b"referrer-policy", b"no-referrer"), (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
-                      (b"content-security-policy", CSP.encode())]
+                      (b"content-security-policy", csp.encode())]
                 if path.startswith("/api/"):
                     h.append((b"cache-control", b"no-store"))
                 message["headers"] = h

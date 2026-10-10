@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from .agent import AutoHealAgent
@@ -250,6 +250,8 @@ async def lifespan(app: FastAPI):
     app.state.healer = Healer(app.state.wf)
     app.state.wf.healer = app.state.healer
     app.state.demo = Demo(app.state.wf)
+    from .studio import Studio
+    app.state.studio = Studio(app.state.wf, pace=float(os.getenv("MOBILEHEAL_STUDIO_PACE", "0.6")))
     from .crashfeed import CrashFeed
     app.state.crashfeed = CrashFeed(app.state)
     if os.getenv("MOBILEHEAL_CRASHFEED", "1") == "1":
@@ -508,6 +510,137 @@ def report_crash(body: CrashIn):
     else:
         inc = app.state.healer.record(android_capture(data))
     return {"incident": inc["key"], "status": inc["status"]}
+
+
+# ---------------- App Studio: idea → agents → working prototype → merge ----------------
+class StudioIn(BaseModel):
+    idea: str = Field(..., min_length=15, max_length=4000)
+    name: str = Field("", max_length=60)
+
+
+def _st(fn, *a):
+    try:
+        return fn(*a)
+    except KeyError:
+        raise HTTPException(404, "app project not found")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.get("/api/studio")
+def studio_list():
+    from .studio import AGENTS
+    return {"projects": app.state.studio.list(), "agents": AGENTS, "ai": app.state.wf.ai.available}
+
+
+@app.post("/api/studio", status_code=201)
+def studio_create(body: StudioIn):
+    try:
+        return app.state.studio.create(body.idea, body.name, app.state.wf.user)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/studio/{pid}")
+def studio_get(pid: int):
+    from .studio import AGENTS
+    p = _st(app.state.studio.get, pid)
+    p["agent_list"] = AGENTS
+    a = p.get("artifacts") or {}
+    a.pop("frontend_html", None)          # served at /apps/<slug>/ instead
+    return p
+
+
+@app.post("/api/studio/{pid}/approve")
+def studio_approve(pid: int):
+    return _st(app.state.studio.approve, pid, app.state.wf.user)
+
+
+@app.post("/api/studio/{pid}/stop")
+def studio_stop(pid: int):
+    return _st(app.state.studio.stop, pid, app.state.wf.user)
+
+
+@app.post("/api/studio/{pid}/restart")
+def studio_restart(pid: int):
+    return _st(app.state.studio.restart, pid, app.state.wf.user)
+
+
+def _proto(slug: str):
+    p = app.state.studio.by_slug(slug)
+    if not p or not (p.get("artifacts") or {}).get("frontend_html"):
+        raise HTTPException(404, "No prototype with that name yet")
+    return p
+
+
+def _proto_entity(p, plural):
+    e = next((x for x in p["spec"]["entities"] if x["plural"] == plural), None)
+    if not e:
+        raise HTTPException(404, "unknown resource")
+    return e
+
+
+@app.get("/apps/{slug}")
+def proto_redirect(slug: str):
+    return RedirectResponse(f"/apps/{slug}/", status_code=307)
+
+
+@app.get("/apps/{slug}/")
+def proto_page(slug: str):
+    return HTMLResponse(_proto(slug)["artifacts"]["frontend_html"])
+
+
+@app.get("/apps/{slug}/api/{plural}")
+def proto_list(slug: str, plural: str):
+    p = _proto(slug)
+    _proto_entity(p, plural)
+    return app.state.studio.store.list(slug, plural)
+
+
+@app.post("/apps/{slug}/api/{plural}", status_code=201)
+async def proto_create(slug: str, plural: str, request: Request):
+    import uuid as _u
+    p = _proto(slug)
+    e = _proto_entity(p, plural)
+    try:
+        rec = app.state.studio.store.validate(e, await request.json())
+    except ValueError as x:
+        raise HTTPException(422, str(x))
+    rid = _u.uuid4().hex[:12]
+    rec = {"id": rid, **rec}
+    app.state.studio.store.put(slug, plural, rid, rec)
+    return rec
+
+
+@app.get("/apps/{slug}/api/{plural}/{rid}")
+def proto_read(slug: str, plural: str, rid: str):
+    _proto_entity(_proto(slug), plural)
+    r = app.state.studio.store.get(slug, plural, rid)
+    if not r:
+        raise HTTPException(404, "not found")
+    return r
+
+
+@app.put("/apps/{slug}/api/{plural}/{rid}")
+async def proto_update(slug: str, plural: str, rid: str, request: Request):
+    e = _proto_entity(_proto(slug), plural)
+    if not app.state.studio.store.get(slug, plural, rid):
+        raise HTTPException(404, "not found")
+    try:
+        rec = app.state.studio.store.validate(e, await request.json())
+    except ValueError as x:
+        raise HTTPException(422, str(x))
+    rec = {"id": rid, **rec}
+    app.state.studio.store.put(slug, plural, rid, rec)
+    return rec
+
+
+@app.delete("/apps/{slug}/api/{plural}/{rid}", status_code=204)
+def proto_delete(slug: str, plural: str, rid: str):
+    _proto_entity(_proto(slug), plural)
+    if not app.state.studio.store.delete(slug, plural, rid):
+        raise HTTPException(404, "not found")
+    return Response(status_code=204)
 
 
 # ---------------- Mock Firebase Crashlytics (live) ----------------
