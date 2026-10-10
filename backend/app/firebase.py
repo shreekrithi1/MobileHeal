@@ -185,7 +185,7 @@ class Crashlytics:
 
     def _has_credentials(self) -> bool:
         if self.auth == "google":
-            return adc_info() is not None
+            return adc_info() is not None or bool(self.s.get("firebase_refresh_token"))
         return bool({"oauth": self.s.get("firebase_refresh_token"), "service_account": self.s.get("firebase_service_account"),
                      "token": self.s.get("firebase_access_token")}.get(self.auth))
 
@@ -203,7 +203,7 @@ class Crashlytics:
     def status(self) -> dict:
         email = self.s.get("firebase_oauth_email") or ""
         adc = adc_info() if self.auth == "google" else None
-        if adc:
+        if adc and not email:
             email = adc.get("account") or "your Google account (gcloud)"
         try:
             last = json.loads(self.s.db.get_setting("firebase_last_sync", "") or "{}")
@@ -227,6 +227,8 @@ class Crashlytics:
             return tok
         if self.auth == "service_account":
             return self._sa_token()
+        if self.auth == "google" and not adc_info() and self.s.get("firebase_refresh_token"):
+            self.auth = "oauth"          # signed in through the in-app Google sign-in instead of gcloud — use that
         if self.auth == "google":
             info = adc_info()
             if not info:

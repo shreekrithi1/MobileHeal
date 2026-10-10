@@ -2003,6 +2003,8 @@ async function fgTeam(){ const box=$("#fg-files"); box.innerHTML=`<span class="s
 async function fgUse(url){ const i=$("#s-figma_sync_url"); if (i) i.value=url; await act(async()=>{ await saveSettings(true); toast("Design file connected — Figma sync is on"); renderSettings("settings/design"); }); }
 async function fgHook(){ await act(async()=>{ const r = await api("/api/figma/sync/webhook",{method:"POST",body:{endpoint:$("#fg-hook").value.trim()}}); toast("Figma webhook registered → " + r.endpoint); }); }
 async function fbGoogle(){ const box=$("#fb-google");
+  if ((state.settings.firebase_oauth_client_id||"").trim()) {   // an OAuth app is set up: sign in right here in the browser
+    const sel = $("#s-firebase_auth"); if (sel) sel.value = "oauth"; return fbSignIn(); }
   try { try { await saveSettings(true); } catch(e){}
     await api("/api/firebase/google/login",{method:"POST"});
     box.innerHTML = `<span class="spinner"></span> Finish signing in in the browser tab that just opened…`;
