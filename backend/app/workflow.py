@@ -904,6 +904,15 @@ class Workflow:
         cr = self.get(cid)
         if cr["status"] != "pr_open":
             raise WorkflowError("PR is not open", 409)
+        if (cr.get("pr") or {}).get("git") and self.git.is_repo():
+            self.git.base_name = self.settings.get("base_branch") or "main"
+            try:
+                came_from = await asyncio.to_thread(self.git._on_base)
+                if came_from:
+                    self._event(cr, "MobileHeal", "merge", f"your project folder was on {came_from} — switched it back to "
+                                f"{self.git.base_name} so the merge lands there (Android Studio follows automatically)")
+            except GitError as e:
+                cr["pr"]["git_error"] = f"couldn't switch the project back to {self.git.base_name}: {e}"
         if cr.get("checks_summary", {}).get("fail"):
             raise WorkflowError("Checks are failing — revise the requirements first", 409)
         if cr.get("review") is not None and not self.reviews.satisfied(cr):

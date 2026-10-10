@@ -136,8 +136,23 @@ class GitRepo:
             if os.path.exists(idx):
                 os.unlink(idx)
 
+    base_name = "main"
+
+    def _on_base(self) -> Optional[str]:
+        """Merges must land on the base branch. If someone switched the working copy to a PR branch (e.g. to look at
+        it in Android Studio), switch back first — local uncommitted edits are carried over by git. Returns the branch
+        we came from, if any."""
+        want = self.resolve_base(self.base_name or "main")
+        cur = self.git("symbolic-ref", "--short", "HEAD", check=False)
+        if cur == want:
+            return None
+        self.git("checkout", "-q", want)
+        log.warning("working copy was on %r — switched back to %s before merging", cur or "a detached commit", want)
+        return cur or "detached HEAD"
+
     def merge_into_base(self, branch: str, files: Dict[str, str], message: str) -> str:
         """Fast path merge: write the PR's files into the working tree and commit on the base branch."""
+        self.switched_from = self._on_base()
         for path, content in files.items():
             p = self.root / path
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -149,6 +164,7 @@ class GitRepo:
         return self.head()
 
     def commit_paths(self, paths: List[str], message: str) -> str:
+        self.switched_from = self._on_base()
         self.git("add", "-A", "--", *paths)
         self.git("commit", "-q", "-m", message, "--allow-empty")
         return self.head()
