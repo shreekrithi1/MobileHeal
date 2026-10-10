@@ -8,11 +8,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mobileheal.app.generated.generatedDestinations
-import com.mobileheal.app.ui.profile.ProfileRoute
 import com.mobileheal.app.ui.screens.InfoRoute
 
 object Routes {
-    const val PROFILE = "profile"
+    const val LOGIN = "screen/login"
+    const val ORDER = "screen/order"
     const val SCREEN_PATTERN = "screen/{id}"
     fun screen(id: String) = "screen/$id"
 }
@@ -20,13 +20,11 @@ object Routes {
 @Composable
 fun AppNavHost(navController: NavHostController = rememberNavController()) {
     val back: () -> Unit = { navController.popBackStack() }
-    NavHost(navController = navController, startDestination = Routes.PROFILE) {
-        composable(Routes.PROFILE) {
-            ProfileRoute(onNavigate = { id -> navController.navigate(Routes.screen(id)) })
-        }
+    val navigate: (String) -> Unit = { route -> navController.navigate(route) }
+    NavHost(navController = navController, startDestination = Routes.LOGIN) {
         // Screens written by the MobileHeal Android Developer Agent register exact routes ("screen/<id>"),
         // which take precedence over the rule-driven fallback below.
-        generatedDestinations(onBack = back)
+        generatedDestinations(onBack = back, onNavigate = navigate)
         composable(Routes.SCREEN_PATTERN, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
             InfoRoute(onBack = back)
         }

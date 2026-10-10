@@ -3,18 +3,24 @@
 import MobileHealKit
 
 enum RulesDefaults {
-    static let specVersion = "CR-41"
+    static let specVersion = "CR-43"
 
-    static let requiredFields: [String] = ["name", "email"]
+    static let requiredFields: [String] = ["name", "email", "restaurant_name", "menu_item", "quantity", "fulfillment_method"]
 
-    static let optionalFields: [String] = ["date_of_birth", "town"]
+    static let optionalFields: [String] = ["table_number", "special_instructions", "contact_phone"]
 
     static let ui: [String: String] = [
-        "after_save": "stay",
-        "banner_color": "#FFF9C4",
-        "banner_message": "Changes saved successfully",
+        "after_save": "success_screen",
+        "app_title": "Restaurant Ordering (Demo)",
+        "background_color": "#FFFFFF",
+        "banner_color": "#212121",
+        "banner_message": "Demo login: test / test",
+        "banner_text_color": "#FFFFFF",
         "button_color": "#079455",
-        "button_label": "Save changes",
+        "button_label": "Place order",
+        "button_text_color": "#FFFFFF",
+        "success_message": "Your order has been submitted successfully (demo flow).",
+        "success_title": "Order placed",
     ]
 
     static let rules = AppRules(

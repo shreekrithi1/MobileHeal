@@ -3,17 +3,23 @@
 package com.mobileheal.app.generated
 
 object RulesDefaults {
-    const val SPEC_VERSION = "CR-41"
+    const val SPEC_VERSION = "CR-43"
 
-    val REQUIRED_FIELDS: List<String> = listOf("name", "email")
+    val REQUIRED_FIELDS: List<String> = listOf("name", "email", "restaurant_name", "menu_item", "quantity", "fulfillment_method")
 
-    val OPTIONAL_FIELDS: List<String> = listOf("date_of_birth", "town")
+    val OPTIONAL_FIELDS: List<String> = listOf("table_number", "special_instructions", "contact_phone")
 
     val UI: Map<String, String> = mapOf(
-        "after_save" to "stay",
-        "banner_color" to "#FFF9C4",
-        "banner_message" to "Changes saved successfully",
+        "after_save" to "success_screen",
+        "app_title" to "Restaurant Ordering (Demo)",
+        "background_color" to "#FFFFFF",
+        "banner_color" to "#212121",
+        "banner_message" to "Demo login: test / test",
+        "banner_text_color" to "#FFFFFF",
         "button_color" to "#079455",
-        "button_label" to "Save changes"
+        "button_label" to "Place order",
+        "button_text_color" to "#FFFFFF",
+        "success_message" to "Your order has been submitted successfully (demo flow).",
+        "success_title" to "Order placed"
     )
 }
