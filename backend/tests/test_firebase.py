@@ -202,3 +202,35 @@ def test_merged_branch_is_kept_and_demo_change_can_be_copied_to_project(tmp_path
         show = subprocess.run(["git", "show", f"{r['branch']}:backend/requirements.txt"], cwd=home, capture_output=True, text=True)
         assert "promo_code: optional" in show.stdout
         assert "promo_code" not in (home / "backend/requirements.txt").read_text()              # working tree untouched
+
+
+def test_google_signin_via_gcloud_credentials(tmp_path, monkeypatch):
+    import json as _j
+    from app import firebase as fb
+    creds = tmp_path / "adc.json"
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(creds))
+    assert fb.adc_info() is None
+    creds.write_text(_j.dumps({"type": "authorized_user", "client_id": "cid", "client_secret": "cs",
+                               "refresh_token": "rt", "account": "naren@example.com"}))
+    assert fb.adc_info()["account"] == "naren@example.com"
+    calls = []
+
+    def fake_http(url, method="GET", body=None, headers=None, form=False):
+        calls.append((url, body, headers))
+        if url == fb.TOKEN_URL:
+            return {"access_token": "ya29.x", "expires_in": 3600}
+        return {"tables": [{"tableReference": {"tableId": "com_mobileheal_app_ANDROID"}}]}
+    monkeypatch.setattr(fb, "_http", fake_http)
+
+    class _DB:
+        def get_setting(self, k, d=""): return d
+
+    class S(dict):
+        db = _DB()
+        def get(self, k, d=None): return dict.get(self, k, d)
+    s = S(firebase_project_id="mobileheal", firebase_android_package="com.mobileheal.app", firebase_auth="google")
+    monkeypatch.setattr("app.demomode.is_on", lambda _s: False)
+    c = fb.Crashlytics(s)
+    assert c.configured and c.status()["signed_in_as"] == "naren@example.com"
+    assert c.tables() == ["com_mobileheal_app_ANDROID"]
+    assert calls[0][1]["refresh_token"] == "rt" and calls[1][2]["x-goog-user-project"] == "mobileheal"

@@ -75,7 +75,7 @@ DEFAULTS = {
     "delete_branch_on_merge": "off",
     # Firebase Crashlytics (read through the Crashlytics → BigQuery export)
     "firebase_project_id": "", "firebase_android_package": "", "firebase_ios_bundle": "",
-    "firebase_bq_dataset": "firebase_crashlytics", "firebase_auth": "oauth", "firebase_oauth_client_id": "",
+    "firebase_bq_dataset": "firebase_crashlytics", "firebase_auth": "google", "firebase_oauth_client_id": "",
     "firebase_oauth_email": "", "firebase_poll_minutes": "15",
     # Figma two-way sync + design approvers
     "figma_sync_url": "", "figma_push_mode": "variables", "figma_poll_minutes": "15", "figma_push_on_approve": "on",
@@ -84,7 +84,7 @@ DEFAULTS = {
 }
 CHOICES = {"delivery_mode": ("manual", "autopilot"), "review_sync": ("on", "off"),
            "merge_policy": ("tests_required", "review_only"), "require_fix_approval": ("on", "off"),
-           "firebase_auth": ("oauth", "service_account", "token"), "delete_branch_on_merge": ("on", "off"),
+           "firebase_auth": ("google", "oauth", "service_account", "token"), "delete_branch_on_merge": ("on", "off"),
            "firebase_poll_minutes": ("0", "5", "15", "60", "360"),
            "figma_push_mode": ("variables", "comment"), "figma_poll_minutes": ("0", "1", "5", "15", "60"),
            "figma_push_on_approve": ("on", "off"), "auto_sync": ("autopilot", "always", "off"),

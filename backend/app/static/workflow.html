@@ -1931,7 +1931,10 @@ async function renderSettings(h){
       sRow("BigQuery dataset","Turn on the export once: Firebase console → Project settings → Integrations → BigQuery → Crashlytics. The dataset is <code>firebase_crashlytics</code> unless you renamed it.", sInput("firebase_bq_dataset","firebase_crashlytics")) +
       sRow("Sync every","New Crashlytics issues are pulled in the background.", sSelect("firebase_poll_minutes",[["0","Off — sync manually"],["5","5 minutes"],["15","15 minutes"],["60","Hour"],["360","6 hours"]])))}
     ${sGroup("Sign in", "",
-      sRow("Method","Google sign-in is recommended. Credentials stay in this machine's database and are never sent to the browser.", sSelect("firebase_auth",[["oauth","Google sign-in (single sign-on)"],["service_account","Service account key (JSON)"],["token","Personal access token"]])) +
+      sRow("Method","Google sign-in is recommended. Credentials stay in this machine's database and are never sent to the browser.", sSelect("firebase_auth",[["google","Sign in with Google (easiest)"],["oauth","Google sign-in with your own OAuth app"],["service_account","Service account key (JSON)"],["token","Personal access token"]])) +
+      `<div data-fbauth="google">` +
+        sRow("Google account","One click: your browser opens, you sign in with the Google account that owns the Firebase project, done. No keys or tokens to create or renew — access refreshes automatically.",
+          `<span id="fb-google" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${fb.auth==="google" && fb.signed_in_as ? `<span class="chip s-pr_open">✓ ${esc(fb.signed_in_as)}</span><button class="btn sm" onclick="fbGoogle()">Switch account</button>` : `<button class="btn primary sm" onclick="fbGoogle()"><span aria-hidden="true">G</span>&nbsp;Sign in with Google</button>`}</span>`) + `</div>` +
       `<div data-fbauth="oauth">` +
         sRow("OAuth client ID",`Google Cloud console → APIs &amp; Services → Credentials → <b>Create OAuth client ID</b> (Web application). Add this authorized redirect URI: <code>${esc(location.origin)}/api/firebase/oauth/callback</code>`, sInput("firebase_oauth_client_id","1234-abc.apps.googleusercontent.com")) +
         sRow("Client secret","", sSecret("firebase_oauth_client_secret","GOCSPX-…")) +
@@ -1999,7 +2002,15 @@ async function fgTeam(){ const box=$("#fg-files"); box.innerHTML=`<span class="s
   } catch(e){ box.textContent = e.message; } }
 async function fgUse(url){ const i=$("#s-figma_sync_url"); if (i) i.value=url; await act(async()=>{ await saveSettings(true); toast("Design file connected — Figma sync is on"); renderSettings("settings/design"); }); }
 async function fgHook(){ await act(async()=>{ const r = await api("/api/figma/sync/webhook",{method:"POST",body:{endpoint:$("#fg-hook").value.trim()}}); toast("Figma webhook registered → " + r.endpoint); }); }
-function fbAuthToggle(){ const m = ($("#s-firebase_auth")||{}).value || "oauth";
+async function fbGoogle(){ const box=$("#fb-google");
+  try { try { await saveSettings(true); } catch(e){}
+    await api("/api/firebase/google/login",{method:"POST"});
+    box.innerHTML = `<span class="spinner"></span> Finish signing in in the browser tab that just opened…`;
+    for (let i=0;i<120;i++){ await new Promise(r=>setTimeout(r,2500));
+      const st = await api("/api/firebase/google/status"); if (st.signed_in){ toast("Signed in as " + (st.account||"your Google account")); return renderSettings("settings/firebase"); } }
+    box.textContent = "Still waiting — finish the sign-in in your browser, then reopen this page.";
+  } catch(e){ box.innerHTML = `<span class="err">${esc(e.message)}</span>`; } }
+function fbAuthToggle(){ const m = ($("#s-firebase_auth")||{}).value || "google";
   document.querySelectorAll("[data-fbauth]").forEach(el => el.hidden = el.dataset.fbauth !== m); }
 document.addEventListener("change", e => { if (e.target && e.target.id === "s-firebase_auth") fbAuthToggle(); });
 async function fbSignIn(){ try { await saveSettings(true); } catch(e){ return toast(e.message); }

@@ -18,11 +18,13 @@ import base64
 import hashlib
 import json
 import logging
+import os
 import re
 import secrets
 import time
 import urllib.error
 import urllib.parse
+from pathlib import Path
 import urllib.request
 from typing import Dict, List, Optional
 
@@ -104,6 +106,57 @@ def bq_rows(resp: dict) -> List[dict]:
     return [{f["name"]: _bq_value(f, c.get("v")) for f, c in zip(fields, r.get("f", []))} for r in resp.get("rows") or []]
 
 
+# ---------------------------------------------------------------- Google sign-in via gcloud (no keys, no OAuth app)
+GCLOUD_SCOPES = "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery.readonly,openid,https://www.googleapis.com/auth/userinfo.email"
+
+
+def adc_path() -> Path:
+    env = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if env:
+        return Path(env)
+    base = Path(os.getenv("APPDATA", "")) / "gcloud" if os.name == "nt" else Path.home() / ".config" / "gcloud"
+    return base / "application_default_credentials.json"
+
+
+def adc_info() -> Optional[dict]:
+    """Google Application Default Credentials written by `gcloud auth application-default login` — refreshed
+    automatically, nothing to paste or rotate."""
+    p = adc_path()
+    try:
+        raw = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return None
+    t = raw.get("type")
+    if t == "authorized_user" and raw.get("refresh_token"):
+        return {"type": t, "raw": raw, "account": raw.get("account") or "", "path": str(p)}
+    if t == "service_account" and raw.get("private_key"):
+        return {"type": t, "raw": raw, "account": raw.get("client_email", ""), "path": str(p)}
+    return None
+
+
+def gcloud_bin() -> Optional[str]:
+    import shutil
+    for c in (shutil.which("gcloud"), "/opt/homebrew/bin/gcloud", "/usr/local/bin/gcloud",
+              str(Path.home() / "google-cloud-sdk/bin/gcloud"), "/opt/homebrew/share/google-cloud-sdk/bin/gcloud",
+              "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/bin/gcloud"):
+        if c and Path(c).exists():
+            return c
+    return None
+
+
+def gcloud_login() -> dict:
+    """Open the browser for Google sign-in through gcloud. Returns immediately; the credentials file appears when the
+    person finishes signing in."""
+    import subprocess
+    g = gcloud_bin()
+    if not g:
+        raise FirebaseError("Google Cloud CLI isn't installed. In Terminal run:  brew install --cask google-cloud-sdk  "
+                            "then click “Sign in with Google” again.")
+    subprocess.Popen([g, "auth", "application-default", "login", f"--scopes={GCLOUD_SCOPES}"],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    return {"started": True, "gcloud": g}
+
+
 class Crashlytics:
     def __init__(self, settings):
         from .demomode import is_on
@@ -126,6 +179,8 @@ class Crashlytics:
         return bool(self.project and (self.android or self.ios) and self._has_credentials())
 
     def _has_credentials(self) -> bool:
+        if self.auth == "google":
+            return adc_info() is not None
         return bool({"oauth": self.s.get("firebase_refresh_token"), "service_account": self.s.get("firebase_service_account"),
                      "token": self.s.get("firebase_access_token")}.get(self.auth))
 
@@ -142,6 +197,9 @@ class Crashlytics:
 
     def status(self) -> dict:
         email = self.s.get("firebase_oauth_email") or ""
+        adc = adc_info() if self.auth == "google" else None
+        if adc:
+            email = adc.get("account") or "your Google account (gcloud)"
         try:
             last = json.loads(self.s.db.get_setting("firebase_last_sync", "") or "{}")
         except ValueError:
@@ -164,6 +222,17 @@ class Crashlytics:
             return tok
         if self.auth == "service_account":
             return self._sa_token()
+        if self.auth == "google":
+            info = adc_info()
+            if not info:
+                raise FirebaseError("Not signed in — click “Sign in with Google” (it opens your browser once)")
+            if info["type"] == "service_account":
+                return self._sa_token_from(info["raw"])
+            r = _http(TOKEN_URL, "POST", {"grant_type": "refresh_token", "refresh_token": info["raw"]["refresh_token"],
+                                          "client_id": info["raw"]["client_id"], "client_secret": info["raw"]["client_secret"]},
+                      form=True)
+            self._token, self._exp = r["access_token"], time.time() + int(r.get("expires_in", 3600))
+            return self._token
         rt = self.s.get("firebase_refresh_token")
         if not rt:
             raise FirebaseError("Sign in with Google first")
@@ -178,7 +247,12 @@ class Crashlytics:
         if not raw:
             raise FirebaseError("Paste the service account JSON key")
         try:
-            key = json.loads(raw)
+            return self._sa_token_from(json.loads(raw))
+        except ValueError:
+            raise FirebaseError("The service account key isn't valid JSON with client_email and private_key")
+
+    def _sa_token_from(self, key: dict) -> str:
+        try:
             email, pem = key["client_email"], key["private_key"]
         except (ValueError, KeyError):
             raise FirebaseError("The service account key isn't valid JSON with client_email and private_key")
@@ -245,7 +319,10 @@ class Crashlytics:
 
     # ------------------------------------------------------------ BigQuery
     def _h(self):
-        return {"Authorization": f"Bearer {self.access_token()}"}
+        h = {"Authorization": f"Bearer {self.access_token()}"}
+        if self.auth == "google" and self.project:
+            h["x-goog-user-project"] = self.project      # bill/quota the Firebase project, not gcloud's own
+        return h
 
     def tables(self) -> List[str]:
         if self.demo:

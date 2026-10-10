@@ -1445,6 +1445,25 @@ def firebase_oauth_callback(code: str = "", state: str = "", error: str = ""):
     return RedirectResponse("/#settings/firebase?signed_in=1", status_code=302)
 
 
+@app.post("/api/firebase/google/login")
+def firebase_google_login():
+    """Easiest sign-in: opens the browser on this Mac for a normal Google sign-in (via gcloud). No OAuth app, keys or
+    tokens to create or rotate; MobileHeal refreshes access automatically."""
+    try:
+        r = firebase.gcloud_login()
+    except firebase.FirebaseError as e:
+        raise HTTPException(400, str(e))
+    _settings().set("firebase_auth", "google")
+    return r
+
+
+@app.get("/api/firebase/google/status")
+def firebase_google_status():
+    info = firebase.adc_info()
+    return {"signed_in": bool(info), "account": (info or {}).get("account") or None,
+            "gcloud": bool(firebase.gcloud_bin()), "status": firebase.Crashlytics(_settings()).status()}
+
+
 @app.post("/api/firebase/oauth/signout")
 def firebase_oauth_signout():
     s = _settings()
