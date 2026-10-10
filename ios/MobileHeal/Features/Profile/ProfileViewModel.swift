@@ -85,7 +85,7 @@ final class ProfileViewModel {
             state = .content(c)
             return
         }
-        let phone = c.values["phone_number"]!.trimmingCharacters(in: .whitespaces)  // MH-DEMO-BUG
+        let phone = (c.values["phone_number"] ?? "").trimmingCharacters(in: .whitespaces)  // MH-DEMO-BUG
         if !phone.isEmpty { c.values["phone_number"] = phone }
         c.isSaving = true
         state = .content(c)
