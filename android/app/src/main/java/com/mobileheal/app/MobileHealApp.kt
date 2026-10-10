@@ -15,13 +15,6 @@ class MobileHealApp : Application() {
             FirebaseAnalytics.getInstance(this).logEvent("app_open", null)
         }
         CrashReporter.install(this, BuildConfig.BASE_URL)
-        if (BuildConfig.DEBUG) {
-            runCatching {
-                CrashReporter.report(
-                    BuildConfig.BASE_URL,
-                    RuntimeException("MobileHeal Crashlytics Integration Verified")
-                )
-            }
-        }
+        // Removed debug verification that threw an exception
     }
 }
