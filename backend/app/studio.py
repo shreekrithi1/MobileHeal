@@ -36,7 +36,10 @@ AGENTS = [
     {"id": "qa", "name": "QA Engineer", "role": "Test plan · automated API & validation tests", "icon": "🧪"},
     {"id": "secops", "name": "Security & DevOps", "role": "Security review · branch · merge request", "icon": "🔐"},
 ]
-FIELD_TYPES = ("string", "text", "number", "money", "date", "datetime", "bool", "email", "phone", "enum", "url")
+FIELD_TYPES = ("string", "text", "number", "money", "date", "datetime", "bool", "email", "phone", "enum", "url", "ref")
+from . import superpowers as sp  # noqa: E402
+for _a in AGENTS:
+    _a["powers"] = [{"name": n, "desc": d} for n, d in sp.POWERS.get(_a["id"], [])]
 
 # ---------------------------------------------------------------- domain library (no model key)
 def _f(name, type_="string", required=False, options=None):
@@ -150,6 +153,8 @@ def normalise(spec: dict) -> dict:
             t = str(f.get("type") or "string").lower()
             t = t if t in FIELD_TYPES else ("number" if t in ("int", "integer", "float", "decimal") else "string")
             d = {"name": fn, "type": t, "required": bool(f.get("required"))}
+            if t == "ref" and f.get("ref"):
+                d["ref"] = str(f["ref"])
             if t == "enum":
                 opts = [str(o)[:30] for o in (f.get("options") or []) if str(o).strip()][:10]
                 d["options"] = opts or ["Open", "Closed"]
@@ -281,10 +286,10 @@ nav button.on{background:var(--p);color:#fff}main{max-width:880px;margin:0 auto;
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}.kpi b{font-size:26px;display:block}.kpi span{color:var(--mut);font-size:12px;text-transform:uppercase}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}.row:last-child{border:0}
-.row small{color:var(--mut);display:block}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--p);color:#fff}
+.row small{color:var(--mut);display:block}.btn{min-height:44px;text-decoration:none;display:inline-flex;align-items:center;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--p);color:#fff}
 .btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}.btn.del{background:transparent;color:#dc2626;border:1px solid #fecaca}
 form{display:grid;gap:12px}label{font-weight:600;font-size:13px;display:grid;gap:5px}label i{color:#dc2626;font-style:normal}
-input,select,textarea{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg)}
+input,select,textarea{font:inherit;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg)}
 .err{color:#dc2626;font-weight:600}.empty{text-align:center;color:var(--mut);padding:30px}.pill{font-size:12px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--a) 15%,transparent);color:var(--a);font-weight:700}
 .top{display:flex;justify-content:space-between;align-items:center;margin:4px 0 12px}h2{margin:0;font-size:18px}
 </style></head><body><header><h1 id="t"></h1><p id="tg"></p></header><nav id="nav"></nav><main id="m"></main>
@@ -298,7 +303,7 @@ async function api(path, opt={}) { const r = await fetch(API + path, {headers:{"
   const j = r.status === 204 ? null : await r.json(); if (!r.ok) throw new Error(j && j.detail || r.status); return j; }
 function nav(){ document.getElementById("nav").innerHTML = [["home","Overview"], ...S.entities.map(e=>[e.plural, e.label+"s"])]
   .map(([k,n])=>`<button class="${view===k?"on":""}" onclick="go('${k}')">${esc(n)}</button>`).join(""); }
-function go(v){ view = v; nav(); render(); }
+function go(v){ view = v; window.Q = ""; nav(); render(); }
 function fmt(f, v){ if (v===undefined||v===null||v==="") return "—"; if (f.type==="money") return "$" + Number(v).toFixed(2);
   if (f.type==="bool") return v ? "Yes" : "No"; if (f.type==="enum") return `<span class="pill">${esc(v)}</span>`; return esc(v); }
 async function render(){
@@ -306,21 +311,25 @@ async function render(){
   if (view === "home") { const counts = await Promise.all(S.entities.map(e => api(e.plural).then(r=>r.length).catch(()=>0)));
     m.innerHTML = `<div class="kpis">${S.entities.map((e,i)=>`<div class="card kpi"><span>${esc(e.label)}s</span><b>${counts[i]}</b></div>`).join("")}</div>
       <div class="card">${S.entities.map(e=>`<div class="row"><div><b>${esc(e.label)}s</b><small>${e.fields.map(f=>lab(f.name)).join(" · ")}</small></div><button class="btn ghost" onclick="go('${e.plural}')">Open</button></div>`).join("")}</div>`; return; }
-  const e = S.entities.find(x => x.plural === view), rows = await api(e.plural), first = e.fields[0], second = e.fields[1];
-  m.innerHTML = `<div class="top"><h2>${esc(e.label)}s</h2><button class="btn" onclick="edit('${e.plural}')">+ New</button></div>
+  const e = S.entities.find(x => x.plural === view), q = window.Q || "", rows = await api(e.plural + (q ? "?q=" + encodeURIComponent(q) : "")), first = e.fields[0], second = e.fields[1];
+  m.innerHTML = `<div class="top"><h2>${esc(e.label)}s</h2><div style="display:flex;gap:6px"><a class="btn ghost" href="${API}${e.plural}.csv" download>⬇ CSV</a><button class="btn" onclick="edit('${e.plural}')">+ New</button></div></div>
+    <input id="q" type="search" placeholder="Search ${esc(e.label.toLowerCase())}s…" value="${esc(q)}" style="width:100%;margin-bottom:10px" oninput="clearTimeout(window.QT);window.QT=setTimeout(()=>{window.Q=this.value;render().then(()=>{const i=document.getElementById('q');i.focus();i.setSelectionRange(i.value.length,i.value.length)})},250)">
     <div class="card" style="padding:0">${rows.length ? rows.map(r=>`<div class="row"><div><b>${fmt(first, r[first.name])}</b>${second?`<small>${lab(second.name)}: ${fmt(second, r[second.name])}</small>`:""}</div>
       <div style="display:flex;gap:6px"><button class="btn ghost" onclick="edit('${e.plural}','${r.id}')">Edit</button><button class="btn del" onclick="del('${e.plural}','${r.id}')">Delete</button></div></div>`).join("")
       : `<div class="empty">No ${esc(e.label.toLowerCase())}s yet — add the first one.</div>`}</div>`;
 }
-function input(f, v){ const req = f.required ? "required" : "", val = v ?? "";
+function input(f, v, opts){ const req = f.required ? "required" : "", val = v ?? "";
+  if (f.type==="ref") return `<select name="${f.name}" ${req}><option value=""></option>${(opts||[]).map(o=>`<option ${o===String(val)?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
   if (f.type==="enum") return `<select name="${f.name}" ${req}><option value=""></option>${f.options.map(o=>`<option ${o===val?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
   if (f.type==="text") return `<textarea name="${f.name}" rows="3" ${req}>${esc(val)}</textarea>`;
   if (f.type==="bool") return `<input type="checkbox" name="${f.name}" ${val?"checked":""} style="width:22px;height:22px">`;
   const t = {number:"number",money:"number",date:"date",datetime:"datetime-local",email:"email",phone:"tel",url:"url"}[f.type] || "text";
   return `<input type="${t}" name="${f.name}" value="${esc(val)}" ${f.type==="money"?'step="0.01"':""} ${req}>`; }
-async function edit(plural, id){ const e = S.entities.find(x=>x.plural===plural), r = id ? await api(plural+"/"+id) : {};
+async function edit(plural, id){ const e = S.entities.find(x=>x.plural===plural), r = id ? await api(plural+"/"+id) : {}, opts = {};
+  for (const f of e.fields.filter(f=>f.type==="ref")) { const t = S.entities.find(x=>x.plural===f.ref);
+    opts[f.name] = t ? (await api(f.ref)).map(x=>String(x[t.fields[0].name] ?? "")).filter(Boolean) : []; }
   document.getElementById("m").innerHTML = `<div class="top"><h2>${id?"Edit":"New"} ${esc(e.label.toLowerCase())}</h2><button class="btn ghost" onclick="go('${plural}')">Cancel</button></div>
-    <form class="card" onsubmit="save(event,'${plural}','${id||""}')">${e.fields.map(f=>`<label>${lab(f.name)}${f.required?" <i>*</i>":""}${input(f, r[f.name])}</label>`).join("")}
+    <form class="card" onsubmit="save(event,'${plural}','${id||""}')">${e.fields.map(f=>`<label><span>${lab(f.name)}${f.required?" <i>*</i>":""}</span>${input(f, r[f.name], opts[f.name])}</label>`).join("")}
     <div id="er" class="err"></div><button class="btn">Save</button></form>`; }
 async function save(ev, plural, id){ ev.preventDefault(); const e = S.entities.find(x=>x.plural===plural), fd = new FormData(ev.target), body = {};
   e.fields.forEach(f => body[f.name] = f.type==="bool" ? fd.has(f.name) : fd.get(f.name));
@@ -368,11 +377,21 @@ class Store:
             out[f["name"]] = v
         return out
 
-    def list(self, slug, ent):
+    def list(self, slug, ent, q: Optional[str] = None, sort: Optional[str] = None, desc: bool = False):
         with self.db._lock:
-            rows = self.db._conn.execute("SELECT data FROM studio_records WHERE slug=? AND entity=? ORDER BY rowid DESC LIMIT 500",
+            rows = self.db._conn.execute("SELECT data FROM studio_records WHERE slug=? AND entity=? ORDER BY rowid DESC LIMIT 1000",
                                          (slug, ent)).fetchall()
-        return [json.loads(r[0]) for r in rows]
+        out = [json.loads(r[0]) for r in rows]
+        if q:
+            ql = q.lower()[:100]
+            out = [r for r in out if any(ql in str(v).lower() for k, v in r.items() if k != "id")]
+        if sort:
+            out.sort(key=lambda r: (r.get(sort) is None, str(r.get(sort, "")).lower()), reverse=desc)
+        return out[:500]
+
+    def count(self, slug, ent) -> int:
+        with self.db._lock:
+            return self.db._conn.execute("SELECT COUNT(*) FROM studio_records WHERE slug=? AND entity=?", (slug, ent)).fetchone()[0]
 
     def get(self, slug, ent, rid):
         with self.db._lock:
@@ -449,6 +468,10 @@ class Studio:
 
     def _agent(self, p: dict, aid: str, status: str, detail: str = ""):
         p["agents"][aid] = {"status": status, "detail": detail, "at": _now()}
+
+    def _power(self, p: dict, aid: str, name: str, result: str):
+        p.setdefault("powers", {}).setdefault(aid, []).append({"name": name, "result": result, "at": _now()})
+        self._say(p, aid, f"⚡ {name} — {result}", "power")
 
     def _tick(self, p: dict):
         self._save(p)
@@ -534,11 +557,23 @@ class Studio:
         spec["slug"] = p["slug"]
         p["artifacts"]["prd"] = {"problem": spec.get("problem"), "summary": spec.get("summary"), "personas": spec.get("personas", []),
                                  "features": spec.get("features", []), "stories": spec.get("stories", []), "metrics": spec.get("metrics", [])}
-        self._agent(p, "pm", "done", f"{len(spec.get('stories', []))} stories · {len(spec.get('features', []))} features")
+        rice = sp.pm_rice(spec)
+        p["artifacts"]["prd"]["features"] = rice
+        self._power(p, "pm", "RICE prioritiser", "top feature: " + (f"{rice[0]['name']} (score {rice[0]['rice']['score']})" if rice else "n/a"))
+        edges = sp.pm_edge_cases(spec)
+        p["artifacts"]["prd"]["edge_cases"] = edges
+        self._power(p, "pm", "Edge-case miner", f"{len(edges)} unhappy paths captured as acceptance criteria")
+        p["artifacts"]["prd"]["metric_targets"] = sp.pm_metric_targets(spec)
+        self._power(p, "pm", "North-star metrics", "; ".join(f"{m['metric']}: {m['target']}" for m in p["artifacts"]["prd"]["metric_targets"][:2]))
+        self._agent(p, "pm", "done", f"{len(spec.get('stories', []))} stories · {len(edges)} edge cases")
         self._say(p, "pm", f"PRD ready for **{spec['name']}** — {len(spec.get('personas', []))} personas, "
                   f"{len(spec.get('features', []))} MVP features, {len(spec.get('stories', []))} user stories. "
                   f"Core data: {', '.join(e['label'] for e in spec['entities'])}.", "handoff", to="em")
         self._gate(p, 0, bool(spec.get("stories")) and bool(spec["entities"]), "PRD has stories with acceptance criteria and a data model")
+        plan = sp.em_plan(spec)
+        p["artifacts"]["em_plan"] = plan
+        self._power(p, "em", "Risk radar", f"{len(plan['risks'])} risks, each with a mitigation — top: {plan['risks'][0]['risk']}")
+        self._power(p, "em", "RACI planner", f"{len(plan['raci'])} deliverables assigned; I'm accountable for all of them")
         self._tick(p)
 
         # 2 — Product Designer
@@ -563,6 +598,19 @@ class Studio:
                                     "flows": [f"Overview → {e['label']}s → + New → Save" for e in spec["entities"]],
                                     "principles": ["Phone-first, one primary action per screen", "Required fields marked with *",
                                                    "Errors explain how to fix them", "Works in light and dark mode"]}
+        d = p["artifacts"]["design"]
+        d["palette"] = sp.design_palette(th["primary"])
+        self._power(p, "design", "Palette generator", f"10-step scale from {th['primary']} (50 → 900)")
+        a11y = sp.design_a11y(d["tokens"], contrast)
+        if not a11y[1]["ok"]:                                  # accent too light → darken from the palette
+            th["accent"] = sp.design_palette(th["accent"])["700"]
+            d["tokens"]["accent"] = th["accent"]
+            a11y = sp.design_a11y(d["tokens"], contrast)
+        d["a11y"] = a11y
+        self._power(p, "design", "Accessibility auditor", f"{sum(c['ok'] for c in a11y)}/{len(a11y)} WCAG checks pass "
+                    f"(primary {a11y[0]['value']}, accent {a11y[1]['value']})")
+        d["states"] = sp.design_states(spec)
+        self._power(p, "design", "State designer", f"{len(d['states'])} empty / loading / error states specified")
         self._agent(p, "design", "done", f"{len(screens)} screens · AA contrast {contrast(th['primary'])}:1")
         self._say(p, "design", f"{len(screens)} screens designed (overview, list + form per record type), tokens set: primary "
                   f"{th['primary']}, accent {th['accent']}, radius {th['radius']}px.", "handoff", to="em")
@@ -575,7 +623,24 @@ class Studio:
         self._agent(p, "backend", "working", "data model, API and server")
         self._say(p, "em", "Backend — data model and REST API for every entity, server-side validation, live in our sandbox.", to="backend")
         self._tick(p)
+        rels = sp.backend_relations(spec)
+        p["spec"] = spec
+        self._power(p, "backend", "Relationship inference", ", ".join(f"{r['from']} → {r['to']}" for r in rels) or "no links between records")
         p["artifacts"]["api"] = openapi(spec)
+        self._power(p, "backend", "Search & sort", "every list supports ?q=…&sort=field&order=desc")
+        seeded = 0
+        for e in spec["entities"]:
+            if self.store.count(p["slug"], e["plural"]) == 0:
+                for i, r in enumerate(sp.backend_seed(spec)[e["plural"]]):
+                    try:
+                        rec = self.store.validate(e, r)
+                    except ValueError:
+                        continue
+                    rid = uuid.uuid4().hex[:12]
+                    self.store.put(p["slug"], e["plural"], rid, {"id": rid, **rec})
+                    seeded += 1
+        self._power(p, "backend", "Seed data", f"{seeded} realistic sample records loaded so the prototype demos well")
+        self._power(p, "backend", "CSV export", f"/apps/{p['slug']}/api/<list>.csv for every record type")
         p["artifacts"]["backend_code"] = backend_code(spec)
         n_ep = sum(len(v) for v in p["artifacts"]["api"]["paths"].values())
         self._agent(p, "backend", "done", f"{n_ep} endpoints live")
@@ -591,6 +656,11 @@ class Studio:
         self._say(p, "em", "Frontend — build the screens from Design against Backend's API. Must work on a phone.", to="frontend")
         self._tick(p)
         p["artifacts"]["frontend_html"] = frontend_html(spec)
+        refs = sum(1 for e in spec["entities"] for f in e["fields"] if f["type"] == "ref")
+        self._power(p, "frontend", "Live search", "search box on every list, server-side ?q=")
+        self._power(p, "frontend", "Smart pickers", f"{refs} linked field(s) became dropdowns of real records" if refs else "no linked fields in this app")
+        self._power(p, "frontend", "One-tap export", "⬇ CSV button on every list")
+        self._power(p, "frontend", "Responsive & dark mode", "phone-first layout, follows the system theme")
         self._agent(p, "frontend", "done", "prototype running")
         self._say(p, "frontend", f"Prototype is running at /apps/{p['slug']}/ — overview, lists and forms for every record type, "
                   "wired to the live API, responsive, dark mode.", "handoff", to="em")
@@ -604,6 +674,26 @@ class Studio:
         self._say(p, "em", "QA — test plan from the acceptance criteria, then run it against the live prototype API.", to="qa")
         self._tick(p)
         results = self.run_qa(p)
+        self._power(p, "qa", "Acceptance runner", f"{sum(r['ok'] for r in results)}/{len(results)} CRUD & validation tests pass")
+        extra = sp.qa_extra(self, p)
+        fz = [r for r in extra if r["test"].startswith("Fuzz")]
+        self._power(p, "qa", "Fuzzer", f"{sum(r['ok'] for r in fz)}/{len(fz)} fuzz attacks handled (XSS, 5 000 chars, wrong types)")
+        ld = next((r for r in extra if r["test"].startswith("Load")), None)
+        if ld:
+            self._power(p, "qa", "Load probe", ld["test"].split("(")[-1].rstrip(")") + (" ✓" if ld["ok"] else " ✕"))
+        fc = [r for r in extra if not r["test"].startswith(("Fuzz", "Load"))]
+        self._power(p, "qa", "Feature checks", f"{sum(r['ok'] for r in fc)}/{len(fc)} — search, sort, relations, CSV")
+        results = results + extra
+        rounds = 0
+        while not all(r["ok"] for r in results) and rounds < 2:      # EM rework loop
+            rounds += 1
+            bad = [r for r in results if not r["ok"]]
+            self._power(p, "em", "Rework loop", f"round {rounds}: sent {len(bad)} failing test(s) back to Backend & Frontend")
+            spec = normalise(p["spec"])
+            sp.backend_relations(spec)
+            p["spec"] = spec
+            p["artifacts"]["frontend_html"] = frontend_html(spec)
+            results = self.run_qa(p) + sp.qa_extra(self, p)
         p["artifacts"]["qa"] = results
         passed = sum(1 for r in results if r["ok"])
         self._agent(p, "qa", "done" if passed == len(results) else "attention", f"{passed}/{len(results)} passed")
@@ -629,9 +719,18 @@ class Studio:
                {"check": "Output escaped in the UI (XSS)", "ok": "esc(" in p["artifacts"]["frontend_html"]},
                {"check": "Record size and list limits", "ok": True},
                {"check": "No external scripts or trackers", "ok": "<script src" not in p["artifacts"]["frontend_html"]}]
+        files = self.files(p)
+        scan = sp.sec_scan(files)
+        self._power(p, "secops", "Secret scanner", scan[0]["detail"])
+        owasp = sp.sec_owasp(p["artifacts"]["frontend_html"], p["artifacts"]["backend_code"])
+        self._power(p, "secops", "OWASP checklist", f"{sum(c['ok'] for c in owasp)}/{len(owasp)} applicable Top-10 items covered")
+        p["artifacts"]["sbom"] = sp.sec_sbom()
+        self._power(p, "secops", "SBOM", ", ".join(c["component"] for c in p["artifacts"]["sbom"]) + " — no third-party scripts")
+        sec = sec + scan + owasp
         p["artifacts"]["security"] = sec
         files = self.files(p)
         p["mr"] = self._open_mr(p, files)
+        self._power(p, "secops", "Merge-request bot", f"{p['mr']['branch']} with {len(files)} files")
         self._agent(p, "secops", "done", f"merge request {p['mr'].get('branch')}")
         self._say(p, "secops", f"Security review: {sum(c['ok'] for c in sec)}/{len(sec)} checks passed. Opened merge request "
                   f"`{p['mr']['branch']}` → main with {len(files)} files.", "handoff", to="em")
@@ -652,6 +751,9 @@ class Studio:
                           {"item": "Prototype implements every screen", "ok": True},
                           {"item": "QA: all automated tests pass", "ok": True},
                           {"item": "Security review clean", "ok": True}]}
+        card = sp.em_scorecard(p)
+        p["artifacts"]["scorecard"] = card
+        self._power(p, "em", "Quality scorecard", f"{card['score']}/100 — " + ", ".join(f"{k} {v}/20" for k, v in card["parts"].items()))
         if self.wf.autopilot:
             self._say(p, "em", "All gates green. Approving and merging the merge request (Autopilot).", "approve")
             self._save(p)
@@ -684,7 +786,7 @@ class Studio:
         def sample(f, i=1):
             return {"string": f"Sample {f['name']} {i}", "text": "Long text", "number": 3, "money": 19.99, "date": "2026-01-15",
                     "datetime": "2026-01-15T10:00", "bool": True, "email": f"test{i}@example.com", "phone": "+1 555 0100",
-                    "enum": (f.get("options") or ["x"])[0], "url": "https://example.com"}[f["type"]]
+                    "enum": (f.get("options") or ["x"])[0], "url": "https://example.com", "ref": f"Sample ref {i}"}[f["type"]]
         for e in p["spec"]["entities"]:
             good = {f["name"]: sample(f) for f in e["fields"]}
             def t(name, fn):
@@ -753,7 +855,10 @@ class Studio:
                 f"{base}/openapi.json": json.dumps(p["artifacts"]["api"], indent=2) + "\n",
                 f"{base}/server.py": p["artifacts"]["backend_code"],
                 f"{base}/web/index.html": p["artifacts"]["frontend_html"],
-                f"{base}/QA.md": "\n".join(qa) + "\n"}
+                f"{base}/QA.md": "\n".join(qa) + "\n",
+                f"{base}/TEAM.md": "# How the team worked\n\n" + "\n".join(
+                    f"## {next(a['name'] for a in AGENTS if a['id'] == aid)}\n" + "\n".join(f"- ⚡ **{x['name']}** — {x['result']}" for x in xs) + "\n"
+                    for aid, xs in (p.get("powers") or {}).items())}
 
     def _open_mr(self, p, files) -> dict:
         branch = f"feature/app-{p['id']}-{p['slug']}"[:60]

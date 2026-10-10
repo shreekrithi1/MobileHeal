@@ -464,6 +464,10 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
 .st-msg .who{font-size:12.5px;font-weight:700}.st-msg .who span{color:var(--faint);font-weight:500;margin-left:6px}
 .st-msg p{margin:2px 0 0;font-size:13.5px}.st-msg.gate p{color:var(--green)}.st-msg.block p,.st-msg.error p{color:var(--red)}
 .st-msg.merged{background:var(--green-soft);border-radius:10px;padding:10px}
+.st-msg.power p{color:var(--purple)} .st-pw{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.st-pw span{font-size:10.5px;font-weight:650;padding:1px 7px;border-radius:99px;background:var(--sunk);color:var(--muted)}
+.st-pw span.used{background:var(--purple-soft);color:var(--purple)}
+.st-score{font-size:44px;font-weight:800;line-height:1}
 .st-phone{width:300px;height:600px;border:10px solid #111;border-radius:36px;overflow:hidden;margin:0 auto;background:#fff}
 .st-phone iframe{width:100%;height:100%;border:0}
 .st-tbl{width:100%;border-collapse:collapse;font-size:13px}.st-tbl td,.st-tbl th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
@@ -797,7 +801,7 @@ async function renderNewApp(){
   $("#view").innerHTML = newModeToggle("app") + `
     <div class="hdr"><div><div class="meta" style="margin-bottom:6px"><span class="chip s-coding">App Studio</span></div>
       <h1>Describe the business idea</h1><div class="meta">A team of AI agents — led by an Engineering Manager — writes the PRD, designs the screens, builds the backend and a working prototype, tests it end-to-end, reviews security and opens a merge request. The Engineering Manager approves the final merge.</div></div></div>
-    <div class="st-team">${(st.agents||[]).map(a=>`<div class="card st-agent ${a.id==="em"?"em":""}"><div class="av" aria-hidden="true">${a.icon}</div><b>${esc(a.name)}</b><small>${esc(a.role)}</small></div>`).join("")}</div>
+    <div class="st-team">${(st.agents||[]).map(a=>`<div class="card st-agent ${a.id==="em"?"em":""}"><div class="av" aria-hidden="true">${a.icon}</div><b>${esc(a.name)}</b><small>${esc(a.role)}</small><div class="st-pw">${(a.powers||[]).map(w=>`<span title="${esc(w.desc)}">⚡ ${esc(w.name)}</span>`).join("")}</div></div>`).join("")}</div>
     <div class="card"><div class="card-b">
       <div class="field"><label for="ap-idea">Business idea</label>
         <textarea id="ap-idea" class="input big" rows="5" placeholder="Who is it for, what do they do with it, what does success look like?"></textarea>
@@ -812,7 +816,7 @@ async function apCreate(b){ b.disabled = true; b.innerHTML = `<span class="spinn
   catch(e){ toast(e.message); b.disabled = false; b.textContent = "Assemble the team →"; } }
 
 /* ================= App Studio board (live) ================= */
-const ST = {tab:"prd"};
+const ST = {tab:"team"};
 async function renderStudio(h){
   const id = +(h.split("/")[1]||0);
   if (!id) {
@@ -835,12 +839,12 @@ function stPaint(){
     ["planning","awaiting_approval"].includes(p.status)?`<button class="btn" onclick="stAct('stop')">⏸ Stop</button>`:"",
     ["stopped","failed","needs_attention","awaiting_approval"].includes(p.status)?`<button class="btn" onclick="stAct('restart')">↻ Restart</button>`:"",
     p.slug && a.frontend_ready!==false && p.stage>=4 ? `<a class="btn" href="/apps/${esc(p.slug)}/" target="_blank" rel="noopener">Open prototype ↗</a>` : ""].join("");
-  const tabs = [["prd","PRD"],["design","Design"],["api","API"],["proto","Prototype"],["qa","QA"],["sec","Security"],["mr","Merge request"]];
+  const tabs = [["team","Team ⚡"],["prd","PRD"],["design","Design"],["api","API"],["proto","Prototype"],["qa","QA"],["sec","Security"],["mr","Merge request"]];
   el.innerHTML = `<div class="hdr"><div style="min-width:0"><div class="meta" style="margin-bottom:6px"><span class="chip s-${chipCls}">${esc(p.status.replace(/_/g," "))}</span><span>${esc(p.author)} · ${ago(p.created_at)}</span>${p.engine?`<span>· ${p.engine==="llm"?"✦ model":"playbook"}</span>`:""}</div>
       <h1>${esc(p.name||"Assembling the team…")} <span class="key">${esc(p.key)}</span></h1><div class="meta">${esc(p.idea.slice(0,180))}${p.idea.length>180?"…":""}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${acts}</div></div>
     ${p.error?`<div class="banner-err" style="margin-top:12px"><b>Stopped:</b> ${esc(p.error)}</div>`:""}
-    <div class="st-team">${p.agent_list.map(x=>{ const s = (p.agents||{})[x.id]||{status:"idle"}; return `<div class="card st-agent ${x.id==="em"?"em":""} ${s.status}"><div class="av" aria-hidden="true">${x.icon}</div><b>${esc(x.name)}</b><small>${esc(s.detail||x.role)}</small><div class="s"><i class="dot ${s.status}"></i>${esc({idle:"Idle",working:"Working",done:"Done",waiting:"Waiting",attention:"Needs attention"}[s.status]||s.status)}</div></div>`; }).join("")}</div>
+    <div class="st-team">${p.agent_list.map(x=>{ const s = (p.agents||{})[x.id]||{status:"idle"}; return `<div class="card st-agent ${x.id==="em"?"em":""} ${s.status}"><div class="av" aria-hidden="true">${x.icon}</div><b>${esc(x.name)}</b><small>${esc(s.detail||x.role)}</small><div class="s"><i class="dot ${s.status}"></i>${esc({idle:"Idle",working:"Working",done:"Done",waiting:"Waiting",attention:"Needs attention"}[s.status]||s.status)}</div><div class="st-pw">${(x.powers||[]).map(w=>`<span class="${((p.powers||{})[x.id]||[]).some(u=>u.name===w.name)?"used":""}" title="${esc(w.desc)}">⚡ ${esc(w.name)}</span>`).join("")}</div></div>`; }).join("")}</div>
     <div class="st-grid">
       <div class="card"><div class="card-h"><span>Team channel</span><span class="hint" style="margin:0">${(p.feed||[]).length} messages</span></div>
         <div class="st-feed" id="st-feed">${(p.feed||[]).map(m=>`<div class="st-msg ${m.kind}"><div class="av">${(A[m.agent]||{}).icon||"•"}</div><div><div class="who">${esc((A[m.agent]||{}).name||m.agent)}${m.to?` → ${esc((A[m.to]||{}).name||m.to)}`:""}<span>${new Date(m.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span></div><p>${esc(m.text).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`(.+?)`/g,"<code>$1</code>")}</p></div></div>`).join("")}</div></div>
@@ -851,15 +855,27 @@ function stPaint(){
 }
 function stTab(p){
   const a = p.artifacts||{}, pend = who => `<p class="hint" style="margin:0">Waiting for the ${who}…</p>`;
+  if (ST.tab==="team") {
+    const sc = a.scorecard, pl = a.em_plan, A = Object.fromEntries(p.agent_list.map(x=>[x.id,x]));
+    return `${sc?`<div style="display:flex;gap:18px;align-items:center;margin-bottom:14px"><div class="st-score" style="color:var(--${sc.score>=90?"green":sc.score>=70?"amber":"red"})">${sc.score}</div><div><b>Quality scorecard</b><div class="hint" style="margin:0">${Object.entries(sc.parts).map(([k,v])=>`${esc(k)} ${v}/20`).join(" · ")}</div></div></div>`:""}
+      ${p.agent_list.map(x=>{ const used = (p.powers||{})[x.id]||[]; return `<div style="margin-bottom:12px"><b>${x.icon} ${esc(x.name)}</b>
+        <table class="st-tbl">${(x.powers||[]).map(w=>{ const u = used.filter(y=>y.name===w.name).pop(); return `<tr><td style="width:34%"><b>⚡ ${esc(w.name)}</b><br><span class="hint" style="margin:0">${esc(w.desc)}</span></td><td>${u?esc(u.result):`<span class="hint" style="margin:0">not used yet</span>`}</td></tr>`; }).join("")}</table></div>`; }).join("")}
+      ${pl?`<h4>Risk radar</h4><table class="st-tbl"><tr><th>Risk</th><th>Mitigation</th></tr>${pl.risks.map(r=>`<tr><td>${esc(r.risk)}</td><td>${esc(r.mitigation)}</td></tr>`).join("")}</table>
+        <h4>RACI</h4><table class="st-tbl"><tr><th>Deliverable</th><th>R</th><th>A</th><th>C</th><th>I</th></tr>${pl.raci.map(r=>`<tr><td>${esc(r.deliverable)}</td><td>${esc(r.R)}</td><td>${esc(r.A)}</td><td>${esc(r.C)}</td><td>${esc(r.I)}</td></tr>`).join("")}</table>`:""}`; }
   if (ST.tab==="prd") { const d = a.prd; if (!d) return pend("Product Manager");
     return `<h3 style="margin-top:0">${esc(p.spec.name)}</h3><p>${esc(p.spec.tagline||"")}</p><p><b>Problem.</b> ${esc(d.problem||"")}</p>
       <h4>Personas</h4><ul>${(d.personas||[]).map(x=>`<li><b>${esc(x.name)}</b> — ${esc(x.goal)}</li>`).join("")}</ul>
-      <h4>MVP features</h4><ul>${(d.features||[]).map(x=>`<li>${esc(x.name)} <span class="chip s-closed">${esc(x.priority||"Must")}</span></li>`).join("")}</ul>
+      <h4>MVP features <span class="hint" style="margin:0">· RICE prioritised</span></h4><table class="st-tbl"><tr><th>Feature</th><th>Priority</th><th>RICE</th></tr>${(d.features||[]).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.priority||"Must")}</td><td>${x.rice?`<b>${x.rice.score}</b> <span class="hint" style="margin:0">${x.rice.reach}×${x.rice.impact}×${x.rice.confidence}÷${x.rice.effort}</span>`:""}</td></tr>`).join("")}</table>
+      ${d.edge_cases?`<h4>Edge cases</h4><table class="st-tbl">${d.edge_cases.map(x=>`<tr><td>${esc(x.entity)}</td><td>${esc(x.case)}</td><td>${esc(x.expected)}</td></tr>`).join("")}</table>`:""}
+      ${d.metric_targets?`<h4>Success metrics</h4><ul>${d.metric_targets.map(m=>`<li>${esc(m.metric)} — <b>${esc(m.target)}</b></li>`).join("")}</ul>`:""}
       <h4>User stories</h4>${(d.stories||[]).map(s=>`<div style="margin-bottom:10px"><b>As ${esc(s.as)}</b>, I want ${esc(s.want)}, so ${esc(s.so)}.<ul>${(s.acceptance||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}
       <h4>Data model</h4>${p.spec.entities.map(e=>`<p style="margin:4px 0"><b>${esc(e.label)}</b>: ${e.fields.map(f=>`${esc(f.name)}${f.required?"*":""} <span class="hint" style="margin:0">${f.type}</span>`).join(", ")}</p>`).join("")}`; }
   if (ST.tab==="design") { const d = a.design; if (!d) return pend("Product Designer");
     return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><span style="width:36px;height:36px;border-radius:10px;background:${esc(d.tokens.primary)}"></span><span style="width:36px;height:36px;border-radius:10px;background:${esc(d.tokens.accent)}"></span><span class="hint" style="margin:0">primary ${esc(d.tokens.primary)} · accent ${esc(d.tokens.accent)} · radius ${d.tokens.radius}px · contrast ${d.tokens.contrast_on_white}:1</span></div>
       <table class="st-tbl"><tr><th>Screen</th><th>Type</th><th>Purpose</th></tr>${d.screens.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.kind)}</td><td>${esc(x.purpose)}</td></tr>`).join("")}</table>
+      ${d.palette?`<h4>Palette</h4><div style="display:flex;border-radius:10px;overflow:hidden">${Object.entries(d.palette).map(([k,v])=>`<div title="${k} ${v}" style="flex:1;height:34px;background:${esc(v)};color:${+k>=500?"#fff":"#111"};font-size:10px;display:grid;place-items:center">${k}</div>`).join("")}</div>`:""}
+      ${d.a11y?`<h4>Accessibility audit</h4><table class="st-tbl">${d.a11y.map(c=>`<tr><td>${c.ok?"✅":"❌"}</td><td>${esc(c.check)}</td><td>${esc(c.value)}</td></tr>`).join("")}</table>`:""}
+      ${d.states?`<h4>States</h4><table class="st-tbl">${d.states.map(x=>`<tr><td>${esc(x.screen)}</td><td><b>${esc(x.state)}</b></td><td>${esc(x.spec)}</td></tr>`).join("")}</table>`:""}
       <h4>Flows</h4><ul>${d.flows.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><h4>Principles</h4><ul>${d.principles.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`; }
   if (ST.tab==="api") { if (!a.api) return pend("Backend Engineer");
     return `<table class="st-tbl"><tr><th>Endpoint</th><th>Methods</th></tr>${Object.entries(a.api.paths).map(([k,v])=>`<tr><td><code>${esc(k)}</code></td><td>${Object.keys(v).map(m=>m.toUpperCase()).join(" · ")}</td></tr>`).join("")}</table>
@@ -869,7 +885,8 @@ function stTab(p){
   if (ST.tab==="qa") { if (!a.qa) return pend("QA Engineer"); const ok = a.qa.filter(r=>r.ok).length;
     return `<p><b>${ok}/${a.qa.length}</b> automated tests passed.</p><table class="st-tbl"><tr><th></th><th>Entity</th><th>Test</th></tr>${a.qa.map(r=>`<tr><td>${r.ok?"✅":"❌"}</td><td>${esc(r.entity)}</td><td>${esc(r.test)}${r.error?`<br><span class="err">${esc(r.error)}</span>`:""}</td></tr>`).join("")}</table>`; }
   if (ST.tab==="sec") { if (!a.security) return pend("Security & DevOps engineer");
-    return `<table class="st-tbl">${a.security.map(c=>`<tr><td>${c.ok?"✅":"❌"}</td><td>${esc(c.check)}</td></tr>`).join("")}</table>`; }
+    return `<table class="st-tbl">${a.security.map(c=>`<tr><td>${c.ok?"✅":"❌"}</td><td>${esc(c.check)}${c.detail?`<br><span class="hint" style="margin:0">${esc(c.detail)}</span>`:""}</td></tr>`).join("")}</table>
+      ${a.sbom?`<h4>SBOM</h4><table class="st-tbl">${a.sbom.map(c=>`<tr><td>${esc(c.component)}</td><td>${esc(c.where)}</td><td>${esc(c.license)}</td></tr>`).join("")}</table>`:""}`; }
   if (ST.tab==="mr") { if (!p.mr) return pend("Security & DevOps engineer");
     const rv = a.em_review;
     return `<p><b>Branch</b> <code>${esc(p.mr.branch)}</code> → <code>${esc(p.mr.base)}</code>${p.mr.commit?` · commit <code>${esc(p.mr.commit)}</code>`:""}${p.mr.merge_commit?` · merged as <code>${esc(p.mr.merge_commit)}</code>`:""}</p>

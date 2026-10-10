@@ -591,10 +591,15 @@ def proto_page(slug: str):
 
 
 @app.get("/apps/{slug}/api/{plural}")
-def proto_list(slug: str, plural: str):
+def proto_list(slug: str, plural: str, q: str = "", sort: str = "", order: str = "asc"):
     p = _proto(slug)
+    if plural.endswith(".csv"):
+        from .superpowers import to_csv
+        e = _proto_entity(p, plural[:-4])
+        return Response(to_csv(e, app.state.studio.store.list(slug, e["plural"], q or None, sort or None, order == "desc")),
+                        media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{slug}-{e["plural"]}.csv"'})
     _proto_entity(p, plural)
-    return app.state.studio.store.list(slug, plural)
+    return app.state.studio.store.list(slug, plural, q or None, sort or None, order == "desc")
 
 
 @app.post("/apps/{slug}/api/{plural}", status_code=201)
