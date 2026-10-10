@@ -494,6 +494,20 @@ class Healer:
         self._log(inc, "Fix", "running")
         engine, new_src, why, old_line, new_line = None, None, None, line_text, None
         p = patcher.patch_source_lang(original, d["line"], d["exc_type"], d["message"], lang)
+        if not p and lang in ("kotlin", "swift"):
+            # Release builds (R8 / inlining / edited files) often report a line that isn't the crashing statement.
+            # Look for the nearest line in the file that the same fix pattern applies to.
+            n = len(original.splitlines())
+            for ln in sorted(range(1, n + 1), key=lambda x: abs(x - (d["line"] or 1))):
+                if ln == d["line"]:
+                    continue
+                q = patcher.patch_source_lang(original, ln, d["exc_type"], d["message"], lang)
+                if q:
+                    p = q
+                    self._log(inc, "Diagnose", "done", f"stack trace pointed at line {d['line']}; the crashing statement is on line {ln}")
+                    self.wf._event(inc, "MobileHeal", "diagnose", f"relocated the crash from line {d['line']} to line {ln}: `{q[1]}`")
+                    d["line"] = ln
+                    break
         if p:
             new_src, old_line, new_line, why = p
             engine = "playbook"

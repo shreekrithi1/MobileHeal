@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
                 .launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        println("Test " + 1 / 0)  // disabled by MobileHeal: divides by zero  // disabled by MobileHeal: divides by zero
+        //System.out.println("Test " + 1/0)
         setContent { MaterialTheme { AppNavHost() } }
     }
 }

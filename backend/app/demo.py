@@ -127,6 +127,13 @@ def android_report(root: Path) -> dict:
 
 
 STARTUP_FILE = "android/app/src/main/java/com/mobileheal/app/MainActivity.kt"
+DIV0 = re.compile(r"/\s*0(?![\w.])")          # 1/0, 1 / 0 …
+
+
+def _live_div0(line: str) -> bool:
+    """An active (not commented-out) statement that divides by the literal 0."""
+    code = line.split("//", 1)[0]
+    return bool(code.strip()) and bool(DIV0.search(code))
 STARTUP_COMMENTED = '//System.out.println("Test " + 1/0)'
 STARTUP_BUG = 'System.out.println("Test " + 1/0)  // MH-DEMO-BUG'
 STARTUP_REPORT = {
@@ -147,7 +154,7 @@ def startup_report(root: Path) -> dict:
     p = Path(root) / STARTUP_FILE
     if p.exists():
         for i, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
-            if "1/0" in l and not l.strip().startswith("//"):
+            if _live_div0(l):
                 line = i
                 break
     return {**STARTUP_REPORT, "stack": STARTUP_REPORT["stack"].replace("{line}", str(line))}
@@ -176,7 +183,7 @@ class Demo:
                     continue
                 fixed = IOS_BUG_LINE.strip() not in self._read(sc["file"])
             elif sc["id"] == "android_startup":
-                fixed = not any("1/0" in l and not l.strip().startswith("//") for l in self._read(sc["file"]).splitlines())
+                fixed = not any(_live_div0(l) for l in self._read(sc["file"]).splitlines())
             else:
                 fixed = ANDROID_BUG_LINE.strip() not in self._read(sc["file"])
             out.append({**sc, "fixed": fixed, "incidents": related[:5]})
@@ -192,12 +199,12 @@ class Demo:
             src = p.read_text(encoding="utf-8")
             lines = src.splitlines(keepends=True)
             for i, l in enumerate(lines):
-                if "1/0" in l and l.strip().startswith("//"):
+                if DIV0.search(l) and l.strip().startswith("//") and "println" in l:
                     indent = l[:len(l) - len(l.lstrip())]
                     lines[i] = indent + STARTUP_BUG + "\n"
                     break
             else:
-                if not any("1/0" in l for l in lines):     # line missing entirely: put it back before setContent
+                if not any(DIV0.search(l) for l in lines):     # line missing entirely: put it back before setContent
                     for i, l in enumerate(lines):
                         if "setContent" in l:
                             lines.insert(i, l[:len(l) - len(l.lstrip())] + STARTUP_BUG + "\n")

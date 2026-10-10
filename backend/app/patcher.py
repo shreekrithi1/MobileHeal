@@ -243,7 +243,8 @@ def _kt_div_zero(line: str, exc_type: str, msg: str) -> Optional[Patch]:
     code = line.split("//", 1)[0]
     if re.search(r"/\s*0(?![\w.])", code):
         indent = line[:len(line) - len(line.lstrip())]
-        return (indent + "// " + line.strip().replace("  // MH-DEMO-BUG", "") + "  // disabled by MobileHeal: divides by zero",
+        stmt = re.sub(r"\s*//.*$", "", line.strip())          # drop old trailing comments (MH-DEMO-BUG, earlier notes)
+        return (indent + "// " + stmt + "  // disabled by MobileHeal: divides by zero",
                 "This statement divides by the literal 0, so it always throws ArithmeticException. It is debug code — "
                 "disable it.")
     m = re.search(r"(\w[\w.]*)\s*/\s*(\w[\w.]*)", code)
