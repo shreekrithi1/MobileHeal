@@ -773,11 +773,13 @@ class Workflow:
                 return
             rv = self.reviews.evaluate(cr) if cr.get("review") else {}
             if (cr.get("checks_summary") or {}).get("fail"):
-                return self._autopilot_pause(cr, "checks are failing")
+                return self._autopilot_fix(cr, "checks are failing: " + ", ".join(
+                    c["name"] for c in cr.get("checks") or [] if c.get("status") == "fail"))
             if rv.get("status") != "approved":
                 blocking = [b for v in (rv.get("per_platform") or {}).values() for b in v["blocking"]]
-                return self._autopilot_pause(cr, ("changes requested by " + ", ".join(sorted(set(blocking))))
-                                             if blocking else "waiting for approvals")
+                if blocking:
+                    return self._autopilot_fix(cr, "changes requested by " + ", ".join(sorted(set(blocking))))
+                return self._autopilot_pause(cr, "waiting for approvals")
             if self._stale(cr):
                 n = cr.get("autopilot_rebases", 0)
                 if n >= 2:
@@ -801,6 +803,28 @@ class Workflow:
             except Exception as e:
                 cr = self.get(cid)
                 self._autopilot_pause(cr, f"merge blocked: {e}")
+
+    AUTOPILOT_FIX_ATTEMPTS = 3
+
+    def _autopilot_fix(self, cr: dict, why: str):
+        """Autopilot never stops to ask on a fixable problem: it re-runs the developer agents with the failure as
+        input (fresh branch, checks and reviews), up to AUTOPILOT_FIX_ATTEMPTS times, then pauses with the evidence."""
+        n = cr.get("autopilot_fixes", 0)
+        if n >= self.AUTOPILOT_FIX_ATTEMPTS:
+            return self._autopilot_pause(cr, f"{why} — still failing after {n} automatic fix attempts")
+        cr["autopilot_fixes"] = n + 1
+        fb = [c.get("output") or c.get("detail") or "" for c in cr.get("checks") or [] if c.get("status") == "fail"]
+        for c in (cr.get("review") or {}).get("comments") or []:
+            if not c.get("resolved") and c.get("severity") in ("blocker", "error", "major"):
+                fb.append(f"{c.get('reviewer', 'Reviewer')}: {c.get('body') or c.get('text') or ''}")
+        cr["fix_feedback"] = "\n\n".join(x[-3000:] for x in fb if x)[:9000]
+        self._event(cr, "Autopilot", "autopilot", f"{why} — fixing it automatically (attempt {n + 1}/{self.AUTOPILOT_FIX_ATTEMPTS}): "
+                    "re-running the developer agents with the failures, then checks and reviews")
+        self._save(cr)
+        try:
+            self.update_branch(cr["id"], actor="Autopilot")
+        except Exception as e:
+            self._autopilot_pause(self.get(cr["id"]), f"{why} — automatic fix couldn't start: {e}")
 
     def _stale(self, cr: dict) -> bool:
         if cr.get("kind") == "incident":
@@ -957,7 +981,7 @@ class Workflow:
             except Exception as e:
                 cr["deployed"] = f"restart required ({e})"
 
-    def update_branch(self, cid: int) -> dict:
+    def update_branch(self, cid: int, actor: Optional[str] = None) -> dict:
         """Rebase: regenerate the PR against the current live rules."""
         cr = self.get(cid)
         if cr["status"] != "pr_open":
@@ -982,7 +1006,8 @@ class Workflow:
         cr["status"], cr["stage"], cr["tested"] = "coding", 2, False
         cr.pop("override", None)
         cr.pop("autopilot_paused", None)
-        self._event(cr, self.user, "rebase", "updated branch with latest rules")
+        self._event(cr, actor or self.user, "rebase", "updated branch with latest rules"
+                    + (" and the failures to fix" if cr.get("fix_feedback") else ""))
         self._save(cr)
         self.spawn(self._run_coding, cid)
         return cr

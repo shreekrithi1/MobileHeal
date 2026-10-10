@@ -482,6 +482,10 @@ class AndroidAgent:
                  f"Rules after:\n```\n{cr['spec_text']}\n```\nUX design notes: {json.dumps(cr['design']['notes'])}\n\n"
                  f"Project files:\n" + "\n".join(self._tree()) + "\n\nKey sources:\n" + self._context()
                  + self._repo_context())
+        if cr.get("fix_feedback"):
+            brief += ("\n\nThe previous attempt at this change FAILED with the errors below (build/test output and reviewer "
+                      "comments). Fix every one of them; make sure every unit test compiles against the real constructors "
+                      "and signatures shown in Key sources:\n" + cr["fix_feedback"])
         say("Plan", "running", "Claude is planning the change…")
         plan = ai.json(self._system(), brief + '\n\nFirst, PLAN the change. Return JSON: {"summary": "", '
                        '"changes": [{"path": "android/…", "action": "create|modify", "purpose": ""}], '
@@ -518,8 +522,36 @@ class AndroidAgent:
                 if isinstance(f, dict) and self._safe(str(f.get("path", ""))) and isinstance(f.get("content"), str)}
 
     # ------------------------------------------------------------ verify + repair loop
+    def _max_repairs(self) -> int:
+        return MAX_REPAIRS + (2 if getattr(self.wf, "autopilot", False) else 0)   # Autopilot tries harder before giving up
+
+    def _drop_broken_new_tests(self, result, say):
+        """Autopilot only: if the build still fails ONLY because of unit-test files the agent itself created, leave those
+        tests out (the production code compiled) and rebuild — recorded as a lint warning so reviewers see it."""
+        b = result.get("build") or {}
+        if b.get("status") != "fail" or not getattr(self.wf, "autopilot", False):
+            return
+        errs = b.get("errors") or []
+        files = result["files"]
+        bad = {p for p in files if "/src/test/" in p and self._read(p) is None
+               and any(p.split("/")[-1] in e for e in errs)}
+        other = [e for e in errs if not any(p.split("/")[-1] in e for p in bad)]
+        if not bad or other:
+            return
+        kept = {p: c for p, c in files.items() if p not in bad}
+        say("Autopilot fix", "running", f"leaving out {len(bad)} generated test file(s) that don't compile and rebuilding")
+        nb = build(self.root, kept) if kept else {"status": "skipped", "detail": "no Android code changed", "output": ""}
+        if nb["status"] == "fail":
+            say("Autopilot fix", "fail", "still failing without them")
+            return
+        result["files"], result["build"] = kept, nb
+        result["lint"] = (result.get("lint") or []) + [{"path": p, "severity": "warning",
+                          "message": "generated unit test didn't compile and was left out by Autopilot — add a test in a follow-up"}
+                                                      for p in sorted(bad)]
+        say("Autopilot fix", "done", f"build passes; left out {', '.join(p.split('/')[-1] for p in sorted(bad))}")
+
     def _verify(self, result, say, repair):
-        for attempt in range(MAX_REPAIRS + 1):
+        for attempt in range(self._max_repairs() + 1):
             result["iterations"] = attempt + 1
             files = result["files"]
             issues = lint(files, self._existing_tests())
@@ -535,7 +567,10 @@ class AndroidAgent:
             result["build"] = b
             say("Gradle build & unit tests", {"pass": "done", "fail": "fail"}.get(b["status"], "warn"), b["detail"])
             problems = [f"{i['path']}: {i['message']}" for i in errs] + (b.get("errors") or [] if b["status"] == "fail" else [])
-            if not problems or repair is None or attempt == MAX_REPAIRS:
+            if not problems:
+                return
+            if repair is None or attempt == self._max_repairs():
+                self._drop_broken_new_tests(result, say)
                 return
             say("Repair", "running", f"fixing {len(problems)} problem(s) (attempt {attempt + 1})")
             try:

@@ -234,3 +234,44 @@ def test_reviewers_block_a_spec_wipe_and_flag_removed_required_fields():
     cr2 = {**cr, "id": 10, "spec_text": "name: required\ncity: optional\nzip: optional\n", "review": None}
     r2 = board.run(cr2)
     assert r2["status"] == "approved" and any(c["rule"] == "spec-removed-required" for c in r2["comments"])
+
+
+def _flaky_checks(monkeypatch, fail_times):
+    from app import workflow as wfm
+    orig, seen = wfm.Workflow._agent_checks, {"n": 0, "feedback": []}
+
+    def fake(self, cr):
+        seen["n"] += 1
+        seen["feedback"].append(cr.get("fix_feedback"))
+        if seen["n"] <= fail_times:
+            return orig(self, cr) + [{"name": "Android build & unit tests (Gradle)", "status": "fail", "ms": 1,
+                                      "detail": "1 error line(s)", "output": "e: FooTest.kt:38 Cannot infer type"}]
+        return orig(self, cr)
+    monkeypatch.setattr(wfm.Workflow, "_agent_checks", fake)
+    return seen
+
+
+def test_autopilot_fixes_failing_checks_without_asking(manual, monkeypatch):
+    c, root = manual
+    seen = _flaky_checks(monkeypatch, 1)
+    c.post("/api/delivery-mode", json={"mode": "autopilot"})
+    cr = c.post("/api/cr", json={"title": "City optional", "description": "", "spec_text": SPEC + "city: optional\n"}).json()
+    cr = wait(c, cr["id"], {"merged"}, 150)
+    texts = [e["text"] for e in cr["timeline"] if e["actor"] == "Autopilot"]
+    assert any("fixing it automatically (attempt 1/3)" in t for t in texts), texts
+    assert not any(t.startswith("paused") for t in texts)
+    assert seen["n"] == 2 and "Cannot infer type" in (seen["feedback"][1] or "")
+
+
+def test_autopilot_pauses_after_three_fix_attempts(manual, monkeypatch):
+    c, _ = manual
+    _flaky_checks(monkeypatch, 99)
+    c.post("/api/delivery-mode", json={"mode": "autopilot"})
+    cr = c.post("/api/cr", json={"title": "City optional", "description": "", "spec_text": SPEC + "city: optional\n"}).json()
+    t0 = time.time()
+    while time.time() - t0 < 200:
+        cr = c.get(f"/api/cr/{cr['id']}").json()
+        if cr.get("autopilot_paused"):
+            break
+        time.sleep(0.5)
+    assert "after 3 automatic fix attempts" in cr["autopilot_paused"] and cr["status"] == "pr_open"
