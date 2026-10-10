@@ -110,7 +110,7 @@ class ProfileViewModel @Inject constructor(
         if (content.saving) return
         // Only normalize phone_number if it's part of the active fields; don't inject or overwrite when absent
         val fields = if ("phone_number" in content.fields) {
-        val phone = content.fields["phone_number"]!!.trim()  // MH-DEMO-BUG
+        val phone = content.fields["phone_number"].orEmpty().trim()  // MH-DEMO-BUG
             content.fields + ("phone_number" to phone)
         } else {
             content.fields
