@@ -82,7 +82,7 @@ class SecurityMiddleware:
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
                 h = list(message.get("headers", []))
-                proto = path.startswith("/apps/")      # App Studio prototypes are previewed inside the portal (same origin)
+                proto = path.startswith("/apps/") or path == "/app"      # App Studio prototypes are previewed inside the portal (same origin)
                 csp = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'") if proto else CSP
                 h += [(b"x-content-type-options", b"nosniff"), (b"x-frame-options", b"SAMEORIGIN" if proto else b"DENY"),
                       (b"referrer-policy", b"no-referrer"), (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),

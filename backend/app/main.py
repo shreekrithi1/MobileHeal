@@ -1726,6 +1726,17 @@ def workflow_page():
 
 
 # ---------------- Dashboard (FR-4.2) ----------------
+CODELAB = BASE.parent / "codelab"
+if CODELAB.is_dir():   # tutorial, demo scripts and pitch deck, served by the app itself
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/codelab", StaticFiles(directory=CODELAB, html=True), name="codelab")
+
+
+@app.get("/app")
+def portal_app():
+    return FileResponse(STATIC / "workflow.html")
+
+
 @app.get("/")
 def home(request: Request, token: str = ""):
     resp = FileResponse(STATIC / "workflow.html")
