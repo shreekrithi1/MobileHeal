@@ -1,0 +1,64 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SnipBook</title><style>
+:root{--p:#1F7A8C;--a:#B68904;--r:12px;--bg:#f6f7fb;--fg:#111827;--mut:#6b7280;--line:#e5e7eb;--card:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0f17;--fg:#e5e7eb;--mut:#9ca3af;--line:#1f2937;--card:#111827}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg)}
+header{background:var(--p);color:#fff;padding:18px 20px}header h1{margin:0;font-size:20px}header p{margin:2px 0 0;opacity:.85;font-size:13px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0}
+nav button{border:0;background:transparent;padding:8px 12px;border-radius:99px;font-weight:600;color:var(--mut);cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--p);color:#fff}main{max-width:880px;margin:0 auto;padding:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}.kpi b{font-size:26px;display:block}.kpi span{color:var(--mut);font-size:12px;text-transform:uppercase}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}.row:last-child{border:0}
+.row small{color:var(--mut);display:block}.btn{min-height:44px;text-decoration:none;display:inline-flex;align-items:center;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--p);color:#fff}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}.btn.del{background:transparent;color:#dc2626;border:1px solid #fecaca}
+form{display:grid;gap:12px}label{font-weight:600;font-size:13px;display:grid;gap:5px}label i{color:#dc2626;font-style:normal}
+input,select,textarea{font:inherit;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg)}
+.err{color:#dc2626;font-weight:600}.empty{text-align:center;color:var(--mut);padding:30px}.pill{font-size:12px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--a) 15%,transparent);color:var(--a);font-weight:700}
+.top{display:flex;justify-content:space-between;align-items:center;margin:4px 0 12px}h2{margin:0;font-size:18px}
+</style></head><body><header><h1 id="t"></h1><p id="tg"></p></header><nav id="nav"></nav><main id="m"></main>
+<script>
+const S = {"name": "SnipBook", "tagline": "Simple salon bookings that just work", "slug": "snipbook", "entities": [{"name": "Customer", "plural": "customers", "label": "Customer", "fields": [{"name": "full_name", "type": "string", "required": true}, {"name": "email", "type": "email", "required": false}, {"name": "phone", "type": "phone", "required": true}, {"name": "notes", "type": "text", "required": false}, {"name": "marketing_opt_in", "type": "bool", "required": false}]}, {"name": "Service", "plural": "services", "label": "Service", "fields": [{"name": "name", "type": "string", "required": true}, {"name": "description", "type": "text", "required": false}, {"name": "duration_minutes", "type": "number", "required": true}, {"name": "price", "type": "money", "required": true}, {"name": "is_active", "type": "bool", "required": true}]}, {"name": "Staff", "plural": "staffs", "label": "Staff", "fields": [{"name": "first_name", "type": "string", "required": true}, {"name": "last_name", "type": "string", "required": true}, {"name": "email", "type": "email", "required": false}, {"name": "phone", "type": "phone", "required": false}, {"name": "role", "type": "enum", "required": true, "options": ["stylist", "owner", "admin"]}, {"name": "is_active", "type": "bool", "required": true}]}, {"name": "Appointment", "plural": "appointments", "label": "Appointment", "fields": [{"name": "customer_id", "type": "string", "required": true}, {"name": "service_id", "type": "string", "required": true}, {"name": "staff_id", "type": "string", "required": true}, {"name": "start_at", "type": "datetime", "required": true}, {"name": "end_at", "type": "datetime", "required": true}, {"name": "status", "type": "enum", "required": true, "options": ["booked", "confirmed", "completed", "canceled", "no_show"]}, {"name": "total_price", "type": "money", "required": true}, {"name": "notes", "type": "text", "required": false}]}], "theme": {"primary": "#1F7A8C", "accent": "#B68904", "radius": 12}}, API = location.pathname.replace(/\/$/,"") + "/api/";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const lab = n => n.replace(/_/g," ").replace(/^./, c=>c.toUpperCase());
+let view = "home";
+document.getElementById("t").textContent = S.name; document.getElementById("tg").textContent = S.tagline;
+async function api(path, opt={}) { const r = await fetch(API + path, {headers:{"Content-Type":"application/json"}, ...opt});
+  const j = r.status === 204 ? null : await r.json(); if (!r.ok) throw new Error(j && j.detail || r.status); return j; }
+function nav(){ document.getElementById("nav").innerHTML = [["home","Overview"], ...S.entities.map(e=>[e.plural, e.label+"s"])]
+  .map(([k,n])=>`<button class="${view===k?"on":""}" onclick="go('${k}')">${esc(n)}</button>`).join(""); }
+function go(v){ view = v; window.Q = ""; nav(); render(); }
+function fmt(f, v){ if (v===undefined||v===null||v==="") return "—"; if (f.type==="money") return "$" + Number(v).toFixed(2);
+  if (f.type==="bool") return v ? "Yes" : "No"; if (f.type==="enum") return `<span class="pill">${esc(v)}</span>`; return esc(v); }
+async function render(){
+  const m = document.getElementById("m");
+  if (view === "home") { const counts = await Promise.all(S.entities.map(e => api(e.plural).then(r=>r.length).catch(()=>0)));
+    m.innerHTML = `<div class="kpis">${S.entities.map((e,i)=>`<div class="card kpi"><span>${esc(e.label)}s</span><b>${counts[i]}</b></div>`).join("")}</div>
+      <div class="card">${S.entities.map(e=>`<div class="row"><div><b>${esc(e.label)}s</b><small>${e.fields.map(f=>lab(f.name)).join(" · ")}</small></div><button class="btn ghost" onclick="go('${e.plural}')">Open</button></div>`).join("")}</div>`; return; }
+  const e = S.entities.find(x => x.plural === view), q = window.Q || "", rows = await api(e.plural + (q ? "?q=" + encodeURIComponent(q) : "")), first = e.fields[0], second = e.fields[1];
+  m.innerHTML = `<div class="top"><h2>${esc(e.label)}s</h2><div style="display:flex;gap:6px"><a class="btn ghost" href="${API}${e.plural}.csv" download>⬇ CSV</a><button class="btn" onclick="edit('${e.plural}')">+ New</button></div></div>
+    <input id="q" type="search" placeholder="Search ${esc(e.label.toLowerCase())}s…" value="${esc(q)}" style="width:100%;margin-bottom:10px" oninput="clearTimeout(window.QT);window.QT=setTimeout(()=>{window.Q=this.value;render().then(()=>{const i=document.getElementById('q');i.focus();i.setSelectionRange(i.value.length,i.value.length)})},250)">
+    <div class="card" style="padding:0">${rows.length ? rows.map(r=>`<div class="row"><div><b>${fmt(first, r[first.name])}</b>${second?`<small>${lab(second.name)}: ${fmt(second, r[second.name])}</small>`:""}</div>
+      <div style="display:flex;gap:6px"><button class="btn ghost" onclick="edit('${e.plural}','${r.id}')">Edit</button><button class="btn del" onclick="del('${e.plural}','${r.id}')">Delete</button></div></div>`).join("")
+      : `<div class="empty">No ${esc(e.label.toLowerCase())}s yet — add the first one.</div>`}</div>`;
+}
+function input(f, v, opts){ const req = f.required ? "required" : "", val = v ?? "";
+  if (f.type==="ref") return `<select name="${f.name}" ${req}><option value=""></option>${(opts||[]).map(o=>`<option ${o===String(val)?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
+  if (f.type==="enum") return `<select name="${f.name}" ${req}><option value=""></option>${f.options.map(o=>`<option ${o===val?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
+  if (f.type==="text") return `<textarea name="${f.name}" rows="3" ${req}>${esc(val)}</textarea>`;
+  if (f.type==="bool") return `<input type="checkbox" name="${f.name}" ${val?"checked":""} style="width:22px;height:22px">`;
+  const t = {number:"number",money:"number",date:"date",datetime:"datetime-local",email:"email",phone:"tel",url:"url"}[f.type] || "text";
+  return `<input type="${t}" name="${f.name}" value="${esc(val)}" ${f.type==="money"?'step="0.01"':""} ${req}>`; }
+async function edit(plural, id){ const e = S.entities.find(x=>x.plural===plural), r = id ? await api(plural+"/"+id) : {}, opts = {};
+  for (const f of e.fields.filter(f=>f.type==="ref")) { const t = S.entities.find(x=>x.plural===f.ref);
+    opts[f.name] = t ? (await api(f.ref)).map(x=>String(x[t.fields[0].name] ?? "")).filter(Boolean) : []; }
+  document.getElementById("m").innerHTML = `<div class="top"><h2>${id?"Edit":"New"} ${esc(e.label.toLowerCase())}</h2><button class="btn ghost" onclick="go('${plural}')">Cancel</button></div>
+    <form class="card" onsubmit="save(event,'${plural}','${id||""}')">${e.fields.map(f=>`<label><span>${lab(f.name)}${f.required?" <i>*</i>":""}</span>${input(f, r[f.name], opts[f.name])}</label>`).join("")}
+    <div id="er" class="err"></div><button class="btn">Save</button></form>`; }
+async function save(ev, plural, id){ ev.preventDefault(); const e = S.entities.find(x=>x.plural===plural), fd = new FormData(ev.target), body = {};
+  e.fields.forEach(f => body[f.name] = f.type==="bool" ? fd.has(f.name) : fd.get(f.name));
+  try { await api(plural + (id?"/"+id:""), {method: id?"PUT":"POST", body: JSON.stringify(body)}); go(plural); }
+  catch(x){ document.getElementById("er").textContent = x.message; } }
+async function del(plural, id){ if (confirm("Delete this record?")) { await api(plural+"/"+id, {method:"DELETE"}); render(); } }
+nav(); render();
+</script></body></html>

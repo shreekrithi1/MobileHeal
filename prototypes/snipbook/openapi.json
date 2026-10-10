@@ -1,0 +1,246 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SnipBook API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/apps/snipbook/api/customers": {
+      "get": {
+        "summary": "List customers"
+      },
+      "post": {
+        "summary": "Create a customer",
+        "requestBody": {
+          "$ref": "#/components/schemas/Customer"
+        }
+      }
+    },
+    "/apps/snipbook/api/customers/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Customer"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/snipbook/api/services": {
+      "get": {
+        "summary": "List services"
+      },
+      "post": {
+        "summary": "Create a service",
+        "requestBody": {
+          "$ref": "#/components/schemas/Service"
+        }
+      }
+    },
+    "/apps/snipbook/api/services/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Service"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/snipbook/api/staffs": {
+      "get": {
+        "summary": "List staffs"
+      },
+      "post": {
+        "summary": "Create a staff",
+        "requestBody": {
+          "$ref": "#/components/schemas/Staff"
+        }
+      }
+    },
+    "/apps/snipbook/api/staffs/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Staff"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/snipbook/api/appointments": {
+      "get": {
+        "summary": "List appointments"
+      },
+      "post": {
+        "summary": "Create a appointment",
+        "requestBody": {
+          "$ref": "#/components/schemas/Appointment"
+        }
+      }
+    },
+    "/apps/snipbook/api/appointments/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Appointment"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Customer": {
+        "type": "object",
+        "required": [
+          "full_name",
+          "phone"
+        ],
+        "properties": {
+          "full_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "marketing_opt_in": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Service": {
+        "type": "object",
+        "required": [
+          "name",
+          "duration_minutes",
+          "price",
+          "is_active"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "type": "number"
+          },
+          "price": {
+            "type": "number"
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Staff": {
+        "type": "object",
+        "required": [
+          "first_name",
+          "last_name",
+          "role",
+          "is_active"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "stylist",
+              "owner",
+              "admin"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Appointment": {
+        "type": "object",
+        "required": [
+          "customer_id",
+          "service_id",
+          "staff_id",
+          "start_at",
+          "end_at",
+          "status",
+          "total_price"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string"
+          },
+          "service_id": {
+            "type": "string"
+          },
+          "staff_id": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "booked",
+              "confirmed",
+              "completed",
+              "canceled",
+              "no_show"
+            ]
+          },
+          "total_price": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
