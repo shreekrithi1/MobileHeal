@@ -33,7 +33,9 @@ log = logging.getLogger("mobileheal.firebase")
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 BQ = "https://bigquery.googleapis.com/bigquery/v2"
-SCOPES = ["openid", "email", "https://www.googleapis.com/auth/bigquery.readonly",
+# Running a query is a BigQuery *job*; Google refuses jobs with only bigquery.readonly ("insufficient authentication
+# scopes"), so the bigquery scope is required. MobileHeal still only ever runs SELECT queries.
+SCOPES = ["openid", "email", "https://www.googleapis.com/auth/bigquery",
           "https://www.googleapis.com/auth/cloud-platform.read-only"]
 SA_SCOPES = SCOPES[2:]
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{4,61}[a-z0-9]$")          # GCP project id
@@ -63,7 +65,10 @@ def _http(url: str, method: str = "GET", body=None, headers=None, form: bool = F
             raw = r.read()
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "replace")[:400]
+        detail = e.read().decode("utf-8", "replace")[:8000]
+        if "insufficient authentication scopes" in detail.lower():
+            raise FirebaseError("Google 403 — this sign-in didn't grant BigQuery access. Click “Sign out”, then "
+                                "“Sign in with Google” again and allow BigQuery when Google asks.")
         try:
             j = json.loads(detail)
             detail = (j.get("error") or {}).get("message") if isinstance(j.get("error"), dict) else \
@@ -72,7 +77,7 @@ def _http(url: str, method: str = "GET", body=None, headers=None, form: bool = F
             pass
         hint = {401: "sign in again / check the token", 403: "the account needs BigQuery Data Viewer + Job User",
                 404: "check the project id and that the Crashlytics BigQuery export is enabled"}.get(e.code, "")
-        raise FirebaseError(f"Google {e.code}{' — ' + hint if hint else ''}: {detail}")
+        raise FirebaseError(f"Google {e.code}{' — ' + hint if hint else ''}: {str(detail)[:300]}")
     except urllib.error.URLError as e:
         raise FirebaseError(f"Cannot reach Google: {e.reason}")
 
