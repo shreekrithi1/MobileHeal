@@ -1,0 +1,205 @@
+{
+  "screens": [
+    {
+      "name": "Overview",
+      "kind": "dashboard",
+      "purpose": "counts per record type, quick links"
+    },
+    {
+      "name": "Users",
+      "kind": "list",
+      "entity": "User",
+      "purpose": "browse, edit and delete users"
+    },
+    {
+      "name": "User form",
+      "kind": "form",
+      "entity": "User",
+      "purpose": "create/edit with 3 required field(s), inline validation"
+    },
+    {
+      "name": "Pets",
+      "kind": "list",
+      "entity": "Pet",
+      "purpose": "browse, edit and delete pets"
+    },
+    {
+      "name": "Pet form",
+      "kind": "form",
+      "entity": "Pet",
+      "purpose": "create/edit with 4 required field(s), inline validation"
+    },
+    {
+      "name": "Products",
+      "kind": "list",
+      "entity": "Product",
+      "purpose": "browse, edit and delete products"
+    },
+    {
+      "name": "Product form",
+      "kind": "form",
+      "entity": "Product",
+      "purpose": "create/edit with 5 required field(s), inline validation"
+    },
+    {
+      "name": "Orders",
+      "kind": "list",
+      "entity": "Order",
+      "purpose": "browse, edit and delete orders"
+    },
+    {
+      "name": "Order form",
+      "kind": "form",
+      "entity": "Order",
+      "purpose": "create/edit with 8 required field(s), inline validation"
+    },
+    {
+      "name": "Order Items",
+      "kind": "list",
+      "entity": "OrderItem",
+      "purpose": "browse, edit and delete order items"
+    },
+    {
+      "name": "Order Item form",
+      "kind": "form",
+      "entity": "OrderItem",
+      "purpose": "create/edit with 7 required field(s), inline validation"
+    }
+  ],
+  "tokens": {
+    "primary": "#4338CA",
+    "accent": "#BF5432",
+    "radius": 12,
+    "font": "Inter / system UI",
+    "contrast_on_white": 7.9
+  },
+  "flows": [
+    "Overview \u2192 Users \u2192 + New \u2192 Save",
+    "Overview \u2192 Pets \u2192 + New \u2192 Save",
+    "Overview \u2192 Products \u2192 + New \u2192 Save",
+    "Overview \u2192 Orders \u2192 + New \u2192 Save",
+    "Overview \u2192 Order Items \u2192 + New \u2192 Save"
+  ],
+  "principles": [
+    "Phone-first, one primary action per screen",
+    "Required fields marked with *",
+    "Errors explain how to fix them",
+    "Works in light and dark mode"
+  ],
+  "palette": {
+    "50": "#F0EFFB",
+    "100": "#E1DFF7",
+    "200": "#C3BFEE",
+    "300": "#A19CE4",
+    "400": "#726AD7",
+    "500": "#4338CA",
+    "600": "#3B31B2",
+    "700": "#322A98",
+    "800": "#282279",
+    "900": "#1E195B"
+  },
+  "a11y": [
+    {
+      "check": "Primary button text (white on primary) \u2265 4.5:1",
+      "value": "7.9:1",
+      "ok": true
+    },
+    {
+      "check": "Accent used only for badges/large text \u2265 3:1",
+      "value": "4.64:1",
+      "ok": true
+    },
+    {
+      "check": "Touch targets \u2265 44 px (buttons 44 px, inputs 44 px)",
+      "value": "44 px",
+      "ok": true
+    },
+    {
+      "check": "Every input has a visible label; required fields marked *",
+      "value": "yes",
+      "ok": true
+    },
+    {
+      "check": "Works in dark mode (prefers-color-scheme)",
+      "value": "yes",
+      "ok": true
+    }
+  ],
+  "states": [
+    {
+      "screen": "Users",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No users yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Users",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "User form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Pets",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No pets yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Pets",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Pet form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Products",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No products yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Products",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Product form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Orders",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No orders yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Orders",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Order form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Order Items",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No order items yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Order Items",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Order Item form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    }
+  ]
+}
