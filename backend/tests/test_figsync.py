@@ -182,3 +182,21 @@ def test_team_files(monkeypatch):
     assert files[0]["key"] == "K2" and files[0]["url"].startswith("https://www.figma.com/design/K2/")
     with pytest.raises(figsync.SyncError):
         fs.team_files("https://example.com")
+
+
+def test_rate_limit_backs_off(monkeypatch):
+    import io, urllib.error
+    from app import figma as fgm
+    calls = []
+
+    def boom(req, timeout=30):
+        calls.append(1)
+        raise urllib.error.HTTPError(req.full_url, 429, "x", {"Retry-After": "120"}, io.BytesIO(b'{"err":"Rate limit exceeded"}'))
+    monkeypatch.setattr(figsync.urllib.request, "urlopen", boom)
+    monkeypatch.setattr(fgm, "_COOL_UNTIL", 0.0)
+    with pytest.raises(figsync.SyncError, match="rate limit"):
+        figsync._req("https://api.figma.com/v1/files/K/versions", "t")
+    with pytest.raises(figsync.SyncError, match="pauses"):
+        figsync._req("https://api.figma.com/v1/files/K/versions", "t")
+    assert len(calls) == 1 and 100 < fgm.rate_limited() <= 120
+    monkeypatch.setattr(fgm, "_COOL_UNTIL", 0.0)

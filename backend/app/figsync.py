@@ -75,6 +75,8 @@ def describe(changes: Dict[str, Tuple[Optional[str], str]]) -> List[str]:
 
 # ---------------------------------------------------------------- HTTP
 def _req(url: str, token: str, method: str = "GET", body: Optional[dict] = None) -> dict:
+    if fg.rate_limited():
+        raise SyncError(fg.cooldown_msg())
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method,
                                  headers={"X-Figma-Token": token, "Accept": "application/json",
@@ -85,6 +87,8 @@ def _req(url: str, token: str, method: str = "GET", body: Optional[dict] = None)
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")[:300]
+        if e.code == 429:
+            raise SyncError(fg.note_429(e.headers))
         raise SyncError(f"Figma {e.code}: {detail}")
     except urllib.error.URLError as e:
         raise SyncError(f"Cannot reach Figma: {e.reason}")
@@ -221,6 +225,11 @@ class FigmaSync:
         """Detect a new Figma version; turn design changes into a 'From Figma' change request."""
         if not self.configured:
             raise SyncError("Connect Figma first — Settings → Design & testing → Figma sync")
+        if not self.demo and self.plugin_live():
+            return {"version": None, "new_version": False, "cr": None, "changes": [], "via": "plugin",
+                    "detail": "the MobileHeal Figma plugin is open and syncing live — no API call needed"}
+        if not self.demo and fg.rate_limited():
+            raise SyncError(fg.cooldown_msg())
         st = self._state()
         vers = self.versions()
         latest = vers[0] if vers else {"id": "unknown", "user": "a designer", "label": ""}
@@ -287,6 +296,7 @@ class FigmaSync:
         lines = describe(diff) or ["no visual changes"]
         msg = (f"🔄 MobileHeal{(' ' + cr['key']) if cr else ''}: {reason or 'design updated'}\n" + "\n".join("• " + x for x in lines[:12])
                + "\nApply with the MobileHeal Figma plugin if Variables aren't enabled for this file.")
+        st0 = self._state()
         result = {"variables": None, "comment": None, "mode": self.s.get("figma_push_mode") or "variables", "changes": lines}
         if self.demo:
             st = _demo_state(self.s)
@@ -300,10 +310,15 @@ class FigmaSync:
             _demo_save(self.s, st)
             result.update(variables=f"{len(items)} variables updated (demo)", comment="posted (demo)")
         else:
-            if result["mode"] == "variables":
+            if self.plugin_live():
+                result["variables"] = "applied live by the MobileHeal Figma plugin"
+            elif result["mode"] == "variables" and not st0.get("variables_refused"):
                 try:
                     result["variables"] = self._push_variables(items)
                 except SyncError as e:
+                    if "403" in str(e) or "scope" in str(e).lower():
+                        st0["variables_refused"] = True
+                        self._save_state(st0)
                     result["variables_error"] = (str(e)[:200] + " — the Variables REST API needs Figma Enterprise and a token "
                                                  "with file_variables:write. Use the MobileHeal Figma plugin instead.")
             try:
@@ -379,6 +394,15 @@ class FigmaSync:
         version = {"id": "plugin-" + str(int(time.time())), "user": (who or "a designer")[:60], "label": "", "created_at": _now()}
         cr = self._upsert_cr(changed, live, version, {"name": file_name or "Figma file", "frame": "Profile"})
         return {"cr": cr, "changes": describe({k: (live.get(k), v) for k, v in changed.items()})}
+
+    def plugin_seen(self):
+        self.s.db.set_setting("figma_plugin_seen", str(time.time()))
+
+    def plugin_live(self, within: float = 90) -> bool:
+        try:
+            return time.time() - float(self.s.db.get_setting("figma_plugin_seen", "0") or 0) < within
+        except ValueError:
+            return False
 
     def tokens_version(self) -> str:
         import hashlib

@@ -37,13 +37,47 @@ def parse_url(url: str) -> dict:
             "embed": "https://www.figma.com/embed?embed_host=mobileheal&url=" + urllib.parse.quote(url, safe="")}
 
 
+# Figma rate limits by plan (free/Starter seats are very low). After a 429 we stop calling Figma until the
+# Retry-After time passes instead of hammering it (which only extends the block).
+_COOL_UNTIL = 0.0
+
+
+def rate_limited() -> float:
+    """Seconds left before MobileHeal calls Figma's API again (0 = not limited)."""
+    import time as _t
+    return max(0.0, _COOL_UNTIL - _t.time())
+
+
+def note_429(headers) -> str:
+    import time as _t
+    global _COOL_UNTIL
+    try:
+        wait = int((headers or {}).get("Retry-After") or 0)
+    except (TypeError, ValueError):
+        wait = 0
+    wait = wait if wait > 0 else 300
+    _COOL_UNTIL = _t.time() + wait
+    return cooldown_msg()
+
+
+def cooldown_msg() -> str:
+    left = int(rate_limited())
+    when = f"{left // 3600} h {left % 3600 // 60} min" if left >= 3600 else f"{max(1, left // 60)} min"
+    return (f"Figma rate limit reached — MobileHeal pauses Figma API calls for {when}. "
+            "The MobileHeal Figma plugin keeps syncing live meanwhile (it doesn't use the API).")
+
+
 def _get(path: str, token: str) -> dict:
+    if rate_limited():
+        raise FigmaError(cooldown_msg())
     req = urllib.request.Request(API + path, headers={"X-Figma-Token": token, "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")[:300]
+        if e.code == 429:
+            raise FigmaError(note_429(e.headers))
         if e.code == 403:
             raise FigmaError("Figma refused access (403) — check the token and that it can open this file")
         if e.code == 404:

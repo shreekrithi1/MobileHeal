@@ -209,7 +209,7 @@ def _start_figma_poll():
                     continue
                 last = _t.time()
                 fs = figsync.FigmaSync(app.state.wf)
-                if fs.configured and not fs.demo:
+                if fs.configured and not fs.demo and not fs.plugin_live() and not fg.rate_limited():
                     fs.check()
             except Exception:
                 logging.getLogger("mobileheal").exception("figma poll failed")
@@ -1384,6 +1384,7 @@ def figma_team_files(team: str):
 @app.get("/api/figma/plugin/tokens")
 def figma_plugin_tokens():
     fs = _fs()
+    fs.plugin_seen()
     toks = figsync.tokens_from_spec(app.state.agent.read_text())
     return JSONResponse({"collection": figsync.COLLECTION, "tokens": toks, "version": fs.tokens_version(),
                          "variables": figsync.variables_payload_items(toks)}, headers={"Access-Control-Allow-Origin": "*"})
