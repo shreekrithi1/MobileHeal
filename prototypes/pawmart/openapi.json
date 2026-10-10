@@ -1,0 +1,339 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PawMart API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/apps/pawmart/api/users": {
+      "get": {
+        "summary": "List users"
+      },
+      "post": {
+        "summary": "Create a user",
+        "requestBody": {
+          "$ref": "#/components/schemas/User"
+        }
+      }
+    },
+    "/apps/pawmart/api/users/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/User"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/pawmart/api/pets": {
+      "get": {
+        "summary": "List pets"
+      },
+      "post": {
+        "summary": "Create a pet",
+        "requestBody": {
+          "$ref": "#/components/schemas/Pet"
+        }
+      }
+    },
+    "/apps/pawmart/api/pets/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Pet"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/pawmart/api/products": {
+      "get": {
+        "summary": "List products"
+      },
+      "post": {
+        "summary": "Create a product",
+        "requestBody": {
+          "$ref": "#/components/schemas/Product"
+        }
+      }
+    },
+    "/apps/pawmart/api/products/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Product"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/pawmart/api/orders": {
+      "get": {
+        "summary": "List orders"
+      },
+      "post": {
+        "summary": "Create a order",
+        "requestBody": {
+          "$ref": "#/components/schemas/Order"
+        }
+      }
+    },
+    "/apps/pawmart/api/orders/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/Order"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    },
+    "/apps/pawmart/api/order_items": {
+      "get": {
+        "summary": "List order_items"
+      },
+      "post": {
+        "summary": "Create a order item",
+        "requestBody": {
+          "$ref": "#/components/schemas/OrderItem"
+        }
+      }
+    },
+    "/apps/pawmart/api/order_items/{id}": {
+      "get": {
+        "summary": "Read"
+      },
+      "put": {
+        "summary": "Update",
+        "requestBody": {
+          "$ref": "#/components/schemas/OrderItem"
+        }
+      },
+      "delete": {
+        "summary": "Delete"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "full_name",
+          "email"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "is_marketing_opt_in": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Pet": {
+        "type": "object",
+        "required": [
+          "pet_id",
+          "user_id",
+          "name",
+          "species"
+        ],
+        "properties": {
+          "pet_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string",
+            "enum": [
+              "Dog",
+              "Cat",
+              "Bird",
+              "Fish",
+              "SmallAnimal",
+              "Reptile",
+              "Other"
+            ]
+          },
+          "breed": {
+            "type": "string"
+          },
+          "birth_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "diet_notes": {
+            "type": "string"
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "name",
+          "category",
+          "price",
+          "in_stock"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Food",
+              "Treats",
+              "Toys",
+              "Health",
+              "Grooming",
+              "Litter",
+              "Accessories",
+              "Other"
+            ]
+          },
+          "price": {
+            "type": "number"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "in_stock": {
+            "type": "boolean"
+          },
+          "image_url": {
+            "type": "string",
+            "format": "url"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "order_id",
+          "status",
+          "email",
+          "shipping_address",
+          "subtotal_amount",
+          "shipping_amount",
+          "tax_amount",
+          "total_amount"
+        ],
+        "properties": {
+          "order_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Cart",
+              "PendingPayment",
+              "Paid",
+              "Shipped",
+              "Delivered",
+              "Canceled"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "shipping_address": {
+            "type": "string"
+          },
+          "subtotal_amount": {
+            "type": "number"
+          },
+          "shipping_amount": {
+            "type": "number"
+          },
+          "tax_amount": {
+            "type": "number"
+          },
+          "total_amount": {
+            "type": "number"
+          }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "required": [
+          "order_item_id",
+          "order_id",
+          "product_id",
+          "product_name",
+          "unit_price",
+          "quantity",
+          "line_total"
+        ],
+        "properties": {
+          "order_item_id": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "line_total": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

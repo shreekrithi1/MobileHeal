@@ -1,0 +1,39 @@
+# QA report
+
+- ✅ User: Create a record
+- ✅ User: It appears in the list
+- ✅ User: Edit it
+- ✅ User: Required fields are enforced
+- ✅ User: Invalid values are rejected
+- ✅ User: Delete it
+- ✅ Pet: Create a record
+- ✅ Pet: It appears in the list
+- ✅ Pet: Edit it
+- ✅ Pet: Required fields are enforced
+- ✅ Pet: Invalid values are rejected
+- ✅ Pet: Delete it
+- ✅ Product: Create a record
+- ✅ Product: It appears in the list
+- ✅ Product: Edit it
+- ✅ Product: Required fields are enforced
+- ✅ Product: Invalid values are rejected
+- ✅ Product: Delete it
+- ✅ Order: Create a record
+- ✅ Order: It appears in the list
+- ✅ Order: Edit it
+- ✅ Order: Required fields are enforced
+- ✅ Order: Invalid values are rejected
+- ✅ Order: Delete it
+- ✅ Order Item: Create a record
+- ✅ Order Item: It appears in the list
+- ✅ Order Item: Edit it
+- ✅ Order Item: Required fields are enforced
+- ✅ Order Item: Invalid values are rejected
+- ✅ Order Item: Delete it
+- ✅ User: Search finds records (?q=)
+- ✅ User: Sort orders records (?sort=)
+- ✅ User: Fuzz: XSS payload stored as text and escaped in the UI
+- ✅ User: Fuzz: 5 000-character input is capped
+- ✅ Product: Fuzz: letters in a number field are rejected
+- ✅ User: CSV export has a header and every row
+- ✅ User: Load: 200 inserts + list under 3 s (20 ms)

@@ -1,0 +1,343 @@
+{
+  "name": "PawMart",
+  "tagline": "Everything your pet needs, in one tap",
+  "summary": "A mobile-first pet store app to discover, purchase, and reorder pet supplies with personalized recommendations based on pet profiles.",
+  "problem": "Pet owners struggle to quickly find the right products for their pets\u2019 specific needs, compare options, and reorder essentials on time.",
+  "personas": [
+    {
+      "name": "Busy Pet Parent",
+      "goal": "Quickly find and reorder trusted essentials for their dog with minimal effort."
+    },
+    {
+      "name": "First-Time Cat Owner",
+      "goal": "Discover vetted products suitable for a new kitten and purchase a starter kit."
+    }
+  ],
+  "features": [
+    {
+      "name": "Product catalog with search and filters",
+      "priority": "Must"
+    },
+    {
+      "name": "Pet profiles to personalize recommendations",
+      "priority": "Must"
+    },
+    {
+      "name": "Cart and checkout with guest flow",
+      "priority": "Must"
+    },
+    {
+      "name": "Order history and one-tap reorder",
+      "priority": "Should"
+    },
+    {
+      "name": "Basic promotions and coupon codes",
+      "priority": "Should"
+    },
+    {
+      "name": "Push notifications for low-stock/reorder reminders",
+      "priority": "Could"
+    },
+    {
+      "name": "Product reviews and ratings",
+      "priority": "Could"
+    }
+  ],
+  "stories": [
+    {
+      "as": "Busy Pet Parent",
+      "want": "to find grain-free dog food quickly",
+      "so": "I can buy the right product without browsing endlessly",
+      "acceptance": [
+        "Can search by keyword and filter by diet type and brand",
+        "Sees price, size variants, and stock status",
+        "Can add a selected variant to cart from product detail"
+      ]
+    },
+    {
+      "as": "First-Time Cat Owner",
+      "want": "to create a pet profile",
+      "so": "I receive tailored product recommendations",
+      "acceptance": [
+        "Can add pet name, species, breed, age, and dietary notes",
+        "Sees a personalized recommendations section",
+        "Can update pet details later"
+      ]
+    },
+    {
+      "as": "Guest User",
+      "want": "to checkout without creating an account",
+      "so": "I can complete a purchase fast",
+      "acceptance": [
+        "Can enter shipping, email, and payment details at checkout",
+        "Sees order summary with taxes and shipping before paying",
+        "Receives order confirmation with order number"
+      ]
+    },
+    {
+      "as": "Returning Customer",
+      "want": "to reorder a previous purchase",
+      "so": "I can restock quickly",
+      "acceptance": [
+        "Can view past orders with items and totals",
+        "Can add all or selected items to cart",
+        "Sees updated prices and stock before confirming"
+      ]
+    }
+  ],
+  "metrics": [
+    "Conversion rate from product view to purchase",
+    "Repeat purchase rate within 30 days",
+    "Average time to checkout completion"
+  ],
+  "entities": [
+    {
+      "name": "User",
+      "plural": "users",
+      "label": "User",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "full_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true
+        },
+        {
+          "name": "phone",
+          "type": "phone",
+          "required": false
+        },
+        {
+          "name": "is_marketing_opt_in",
+          "type": "bool",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Pet",
+      "plural": "pets",
+      "label": "Pet",
+      "fields": [
+        {
+          "name": "pet_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "species",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "Dog",
+            "Cat",
+            "Bird",
+            "Fish",
+            "SmallAnimal",
+            "Reptile",
+            "Other"
+          ]
+        },
+        {
+          "name": "breed",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "birth_date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "diet_notes",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "plural": "products",
+      "label": "Product",
+      "fields": [
+        {
+          "name": "product_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "category",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "Food",
+            "Treats",
+            "Toys",
+            "Health",
+            "Grooming",
+            "Litter",
+            "Accessories",
+            "Other"
+          ]
+        },
+        {
+          "name": "price",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "brand",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "in_stock",
+          "type": "bool",
+          "required": true
+        },
+        {
+          "name": "image_url",
+          "type": "url",
+          "required": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "plural": "orders",
+      "label": "Order",
+      "fields": [
+        {
+          "name": "order_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "Cart",
+            "PendingPayment",
+            "Paid",
+            "Shipped",
+            "Delivered",
+            "Canceled"
+          ]
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true
+        },
+        {
+          "name": "shipping_address",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "subtotal_amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "shipping_amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "tax_amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "total_amount",
+          "type": "money",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "OrderItem",
+      "plural": "order_items",
+      "label": "Order Item",
+      "fields": [
+        {
+          "name": "order_item_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "order_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "product_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "product_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "unit_price",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "line_total",
+          "type": "money",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "theme": {
+    "primary": "#4338CA",
+    "accent": "#BF5432",
+    "radius": 12
+  },
+  "slug": "pawmart"
+}
