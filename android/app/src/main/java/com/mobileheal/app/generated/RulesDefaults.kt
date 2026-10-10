@@ -3,11 +3,11 @@
 package com.mobileheal.app.generated
 
 object RulesDefaults {
-    const val SPEC_VERSION = "CR-45"
+    const val SPEC_VERSION = "CR-41"
 
     val REQUIRED_FIELDS: List<String> = listOf("name", "email")
 
-    val OPTIONAL_FIELDS: List<String> = listOf("date_of_birth", "town", "zip_code")
+    val OPTIONAL_FIELDS: List<String> = listOf("date_of_birth", "town")
 
     val UI: Map<String, String> = mapOf(
         "after_save" to "stay",
