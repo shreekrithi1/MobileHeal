@@ -443,6 +443,18 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
 .cx-tl li{display:grid;grid-template-columns:62px 1fr;gap:8px}.cx-tl time{color:var(--faint);font-variant-numeric:tabular-nums;font-size:12px}
 @media (max-width:1100px){.cx-head{grid-template-columns:34px minmax(0,1fr) 90px 128px}.cx-head .cx-spark,.cx-head .cx-hide{display:none}.cx-body{grid-template-columns:1fr}.cx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+/* ---- HIL production switch, owners, council ---- */
+.hil{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:16px;padding:16px 18px;border-radius:14px;border:1px solid var(--green);background:linear-gradient(90deg,var(--green-soft),var(--panel))}
+.hil-l{display:flex;gap:12px;align-items:center}.hil-dot{width:12px;height:12px;border-radius:50%;background:var(--green);animation:cxpulse 1.6s infinite;flex:none}
+.hil-switch{display:flex;gap:10px;align-items:center;cursor:pointer;white-space:nowrap}.hil-switch input{display:none}
+.hil-switch span{width:52px;height:30px;border-radius:30px;background:var(--line);position:relative;transition:.2s}
+.hil-switch span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:var(--shadow);transition:.2s}
+.hil-switch input:checked+span{background:var(--green)}.hil-switch input:checked+span:before{transform:translateX(22px)}
+.own-row{display:grid;gap:6px;margin-top:6px}.own-row .own{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.3}
+.own-row .own b{display:block;color:var(--fg);font-weight:650}.own-row .own.bot b{color:var(--purple)}
+.cn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cn-card{padding:12px 14px}.cn-card .v{font-size:11px;font-weight:750;text-transform:uppercase;letter-spacing:.04em}
+.cn-card .v.support{color:var(--green)}.cn-card .v.concern{color:var(--amber)}.cn-card .v.block{color:var(--red)}
 /* ---- App Studio ---- */
 .nm-toggle{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin:0 0 16px}
 .nm-toggle button{border:0;background:transparent;padding:8px 14px;border-radius:9px;font-weight:650;color:var(--muted);cursor:pointer}
@@ -1046,9 +1058,9 @@ function setTab(t){ state.tab=t; history.replaceState(null,"",`#cr/${state.cr.id
 function renderCR(){
   const cr = state.cr, st = stageOf(cr);
   const tabs = isInc(cr) ? [["overview","Incident"],["diagnosis","Diagnosis & fix"],["code","Code", cr.stats?cr.stats.files:null],
-      ["checks","Checks", cr.checks?cr.checks.length:null],["test","Approve fix"],["review","Code review", rvCount(cr)],["pr","Pull request"]]
+      ["checks","Checks", cr.checks?cr.checks.length:null],["test","Approve fix"],["review","Code review", rvCount(cr)],["pr","Pull request"],["council","Agent council"]]
     : [["overview","Overview"],["design","UX Design"],["code","Code", cr.stats?cr.stats.files:null],
-    ["checks","Checks", cr.checks?cr.checks.length:null],["test","Tests", state.tests?state.tests.cases.length:null],["review","Code review", rvCount(cr)],["pr","Pull request"]];
+    ["checks","Checks", cr.checks?cr.checks.length:null],["test","Tests", state.tests?state.tests.cases.length:null],["review","Code review", rvCount(cr)],["pr","Pull request"],["council","Agent council"]];
   const prLine = cr.pr ? `<span>PR <b>#${cr.pr.number}</b></span>${cr.pr.type?`<span class="chip ${cr.pr.type==='hotfix'?'s-failed':cr.pr.type==='feature'?'s-coding':'s-closed'}">${esc(cr.pr.type)}</span>`:""}<span class="branch">${esc(cr.pr.branch)}</span><span>→</span><span class="branch">${esc(cr.pr.base)}</span>
      ${cr.stats?`<span><span class="plus">+${cr.stats.additions}</span> <span class="minus">−${cr.stats.deletions}</span></span>`:""}
      ${cr.pr.github_url?`<a href="${esc(cr.pr.github_url)}" target="_blank" rel="noopener">View on ${cr.pr.provider==="gitlab"?"GitLab":"GitHub"}${cr.pr.github_url.startsWith("/demo/")?" (demo)":""} ↗</a>`:""}
@@ -1060,6 +1072,9 @@ function renderCR(){
       <div class="meta">${prLine}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${syncChip(cr)}${flowActions(cr)}${headerActions(cr)}</div></div>
     ${stepper(st, cr)}
+    <div id="owners-row"></div>
+    ${cr.status==="pr_open"&&cr.deploy_ready?`<div class="hil"><div class="hil-l"><span class="hil-dot"></span><div><b>Ready to deploy to production</b><div class="hint" style="margin:0">Reviewed by 2 agents per platform, all checks and tests green — prepared by ${esc(cr.deploy_ready.by)} ${ago(cr.deploy_ready.at)}. Human-in-the-loop: flip the switch to ship.</div></div></div>
+      <label class="hil-switch" title="Deploy to production"><input type="checkbox" onchange="if(this.checked) hilDeploy(this)"><span></span><b>Deploy to production</b></label></div>`:""}
     ${cr.status==="stopped"?`<div class="banner-err" style="margin-top:16px;background:var(--amber-soft);color:var(--fg)"><span style="font-size:18px">⏸</span><div style="flex:1"><b>Workflow stopped</b> (it was ${esc((cr.stopped_from||"").replace(/_/g," "))}). Agents and Autopilot leave it alone until you restart it.</div><button class="btn sm primary" onclick="flowAct('restart')">↻ Restart</button></div>`:""}
     ${cr.status==="reverted"?`<div class="banner-err" style="margin-top:16px;background:var(--sunk);color:var(--fg)"><span style="font-size:18px">↶</span><div style="flex:1"><b>Reverted.</b> ${esc(cr.reverted_commit||"")}. Live rules and phones are back to the previous version.</div><button class="btn sm primary" onclick="flowAct('restart')">↻ Restart from requirements</button></div>`:""}
     ${cr.status==="merged"?mergedBanner(cr):""}
@@ -1069,7 +1084,8 @@ function renderCR(){
     ${cr.status==="needs_engineer"?`<div class="banner-err" style="margin-top:16px"><b>Auto-heal couldn't produce a verified fix.</b> ${esc(cr.error||"See Diagnosis for what was tried.")}</div>`:""}
     ${cr.status==="failed"?`<div class="banner-err" style="margin-top:16px"><b>Coding failed:</b> ${esc(cr.error)}</div>`:""}
     <div class="tabs">${tabs.map(([k,n,c])=>`<button class="tab ${state.tab===k?'on':''}" onclick="setTab('${k}')">${n}${c!=null?`<span class="count">${c}</span>`:""}</button>`).join("")}</div>
-    <div id="tabbody">${(isInc(cr) ? {overview:iOverview, diagnosis:iDiagnosis, code:tCode, checks:tChecks, test:iReview, review:tReview, pr:tPR} : {overview:tOverview, design:tDesign, code:tCode, checks:tChecks, test:tTests, review:tReview, pr:tPR})[state.tab](cr)}</div>`;
+    <div id="tabbody">${(isInc(cr) ? {overview:iOverview, diagnosis:iDiagnosis, code:tCode, checks:tChecks, test:iReview, review:tReview, pr:tPR, council:tCouncil} : {overview:tOverview, design:tDesign, code:tCode, checks:tChecks, test:tTests, review:tReview, pr:tPR, council:tCouncil})[state.tab](cr)}</div>`;
+  cxOwners(cr);
   renderList();
 }
 function mergedBanner(cr){
@@ -1452,6 +1468,8 @@ function tReview(cr){
 </div>
           <div style="display:flex;gap:10px;align-items:flex-start"><div style="font-size:13.5px;flex:1;min-width:0">${md(c.body)}</div>${open&&!c.resolved?`<button class="btn sm" style="flex:none" onclick="rvResolve('${c.id}')">Resolve</button>`:""}</div></div>`).join(""):`<div class="card-b"><div class="empty">No ${f==="open"?"open ":""}comments.</div></div>`}
         ${open?`<div class="card-b" style="border-top:1px solid var(--line);display:grid;gap:8px">
+          ${r.humans_required?`<div class="banner-err" style="margin:0;background:var(--blue-soft);color:var(--fg)"><span>👥</span><div><b>Manual mode: ${r.humans_required} human approvals required</b> — ${(r.human_approvers||[]).length}/${r.humans_required} so far${(r.human_approvers||[]).length?` (${esc(r.human_approvers.join(", "))})`:""}. Each approver signs with their own name.</div></div>`:""}
+          <input id="rv-who" class="input" placeholder="Approve as (your name)" value="${esc((state.settings||{}).user_name||"")}" aria-label="Reviewer name">
           <textarea id="rv-body" class="input" rows="3" placeholder="Leave a review comment${remote?` — it's also posted to ${remote}`:""}"></textarea>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <select id="rv-plat" class="input" style="width:auto" aria-label="Platform">${["all",...r.platforms].map(p=>`<option value="${p}">${PLAT[p][1]}</option>`).join("")}</select>
@@ -1483,7 +1501,7 @@ function tReview(cr){
 async function rvAfter(cr){ state.cr = cr.review !== undefined && cr.id ? cr : await api(`/api/cr/${state.cr.id}`); await refreshList(); renderCR(); }
 async function rvSubmit(st){ const body = $("#rv-body").value.trim(), platform = $("#rv-plat").value;
   if (st==="commented" && !body) return toast("Write a comment first");
-  await act(async()=>{ await rvAfter(await api(`/api/cr/${state.cr.id}/review`,{method:"POST",body:{state:st, body, platform}})); },
+  await act(async()=>{ await rvAfter(await api(`/api/cr/${state.cr.id}/review`,{method:"POST",body:{state:st, body, platform, reviewer:($("#rv-who")||{}).value||""}})); },
     {approved:"Approved", changes_requested:"Changes requested", commented:"Comment posted"}[st]); }
 async function rvDismiss(id){ const reason = prompt("Why are you dismissing this review? (recorded in the audit log)"); if (!reason) return;
   await act(async()=>{ await rvAfter(await api(`/api/cr/${state.cr.id}/review/dismiss`,{method:"POST",body:{reviewer:id, reason}})); }, "Review dismissed"); }
@@ -1581,6 +1599,30 @@ async function approve(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}
 async function markTested(passed, override=false, notes=null){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/test`,{method:"POST",body:{notes:notes ?? (($("#t-notes")||{}).value||""),passed,override}}); if(!isInc(state.cr)) await loadTests(); await refreshList(); state.tab=passed?"pr":"test"; renderCR(); }, passed?(isInc(state.cr)?"Fix approved — ready to merge":"Marked as tested — ready to merge"):"Feedback recorded"); }
 async function merge(){ await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/merge`,{method:"POST"}); await refreshList(); await refreshInfo(); renderCR(); }, isInc(state.cr)?"Fix merged and deployed":"Merged — change is live on phones"); }
 async function updateBranch(){ await act(async()=>{ await api(`/api/cr/${state.cr.id}/update-branch`,{method:"POST"}); await loadCR(state.cr.id,"code"); }, "Regenerating against latest rules"); }
+async function cxOwners(cr){
+  try { const c = await api(`/api/cr/${cr.id}/council`); c.crId = cr.id; state.council = c;
+    const el = $("#owners-row"); if (!el || !state.cr || state.cr.id !== cr.id) return;
+    el.innerHTML = `<div class="own-row" style="grid-template-columns:repeat(${c.owners.length},minmax(0,1fr))">${c.owners.map(o=>`<div class="own ${o.bot?"bot":""}">Owner<b>${esc(o.owner)}</b></div>`).join("")}</div>`;
+    if (state.tab==="council") { const tb = $("#tabbody"); if (tb) tb.innerHTML = tCouncil(cr); }
+  } catch(e){} }
+function tCouncil(cr){
+  const c = state.council && state.council.crId === cr.id ? state.council : null;
+  if (!c) return `<div class="card"><div class="card-b"><p class="hint" style="margin:0"><span class="spinner"></span> The council is reviewing…</p></div></div>`;
+  const inc = c.kind === "incident";
+  return `<div class="card"><div class="card-b">
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><div style="font-size:30px;font-weight:800">${esc(c.consensus)}</div>
+        <div style="flex:1;min-width:240px"><b>${inc?"Root-cause analysis":"Council opinion"}</b>${inc?` <span class="chip s-failed">${esc(c.severity)}</span> <span class="chip ${c.classification.type==="defect"?"s-coding":"s-design_review"}">${esc(c.classification.label)}</span>`:""}<div class="hint" style="margin:0">${esc(c.summary)}</div></div>
+        ${inc&&c.classification.type==="requirement_gap"&&!cr.linked_cr?`<button class="btn" onclick="toCR()">Open change request →</button>`:""}${cr.linked_cr?`<a class="btn" href="#cr/${cr.linked_cr.id}">${esc(cr.linked_cr.key)} →</a>`:""}</div>
+      ${inc?`<h4 style="margin:6px 0">5 whys</h4><ol style="margin:0 0 12px">${c.five_whys.map(w=>`<li>${md(w)}</li>`).join("")}</ol>`:""}
+      <div class="cn-grid">${c.opinions.map(o=>`<div class="card cn-card"><div style="display:flex;justify-content:space-between;align-items:center"><b>${o.icon} ${esc(o.name)}</b><span class="v ${o.verdict}">${esc(o.verdict)}</span></div>
+        <div style="font-size:13.5px;margin:6px 0">${md(o.opinion)}</div>${o.watch?`<div class="hint" style="margin:0">👁 Watching: ${esc(o.watch)}</div>`:""}</div>`).join("")}</div>
+      <h4 style="margin:14px 0 6px">Owners</h4><table class="st-tbl">${c.owners.map(o=>`<tr><td>${esc(o.step)}</td><td><b>${esc(o.owner)}</b></td></tr>`).join("")}</table>
+      <p class="hint">Production gate: <b>${c.prod_gate==="hil"?"Human-in-the-loop switch":"Autopilot deploys"}</b> · change it in Settings → Delivery &amp; approvals.</p>
+    </div></div>`;
+}
+async function hilDeploy(el){ if (!confirm(`Deploy ${state.cr.key} to production now?`)) { el.checked = false; return; }
+  await act(async()=>{ state.cr = await api(`/api/cr/${state.cr.id}/deploy`,{method:"POST"}); await refreshList(); renderCR(); }, "Deployed to production 🚀"); }
+async function toCR(){ await act(async()=>{ const n = await api(`/api/cr/${state.cr.id}/to-change-request`,{method:"POST"}); location.hash = "#cr/" + n.id; }, "Change request opened"); }
 function flowActions(cr){
   const st = cr.status, running = ["design_review","coding","pr_open","detected","diagnosing","awaiting_approval","fixing"].includes(st);
   const b = [];
@@ -2233,6 +2275,10 @@ async function renderSettings(h){
       sRow("Mode","<b>Manual</b> — people approve the design, each automatic fix, testing and the merge. <b>Autopilot</b> — agents take every requirement, change request and production incident from requirements to deployment; the 2-approval code review still applies.", sSelect("delivery_mode",[["manual","Manual"],["autopilot","Autopilot"]])) +
       sRow("Base branch","Every PR gets a new branch (<code>feature/</code>, <code>change/</code> or <code>hotfix/</code>) cut from, and merged into, this branch.", sInput("base_branch","main")) +
       sRow("Delete branch after merge","Off keeps every merged <code>feature/</code>, <code>change/</code> and <code>hotfix/</code> branch so you can inspect it in Android Studio (Git → Branches).", sToggle("delete_branch_on_merge", s.delete_branch_on_merge==="on")))}
+    ${sGroup("Production deploy","",
+      sRow("Production gate","<b>Human-in-the-loop</b> — Autopilot prepares everything (fix, PR, 2 agent approvals per platform, tests) and stops at a <b>Deploy to production</b> switch a person flips. <b>Autopilot</b> — the bot deploys too.", sSelect("prod_gate",[["hil","Human-in-the-loop switch (recommended)"],["auto","Autopilot deploys"]])) +
+      sRow("Human approvals (Manual mode)","Distinct people who must approve a PR in Manual mode, on top of the reviewer agents.", sSelect("manual_human_approvals",[["2","2 people"],["1","1 person"],["3","3 people"],["0","None — agents only"]])) +
+      sRow("Step owners","Who owns each step (shown under the progress bar). JSON, e.g. <code>{\"requirements\":\"Priya (Product)\",\"design\":\"Maya (UX)\",\"deploy\":\"Alex (Release)\"}</code>. Keys: requirements, design, coding, pr, review, deploy, detect, rca, approve_fix.", sInput("step_owners",'{"deploy":"Alex (Release)"}')))}
     ${sGroup("Code review","",
       sRow("Reviewer agents","Two per platform. Platforms are picked from the files a PR touches; shared rules and API changes go to both.", `<div class="hint" style="margin:0">🤖 Android Architecture · Android Quality &amp; Security<br>📱 iOS SwiftUI · iOS Quality &amp; Security</div>`) +
       sRow("Approvals required","Per impacted platform, from agents or people. Any “changes requested” blocks the merge until it's resolved or dismissed with a reason.", `<span class="hint" style="margin:0">2 per platform</span>`) +

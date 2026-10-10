@@ -371,7 +371,17 @@ class ReviewBoard:
             per[plat] = {"approvals": approvals, "required": rv["required"], "blocking": blocking,
                          "ok": approvals >= rv["required"] and not blocking}
         rv["per_platform"] = per
-        rv["status"] = "approved" if per and all(p["ok"] for p in per.values()) else \
+        need = 0
+        if not getattr(self.wf, "autopilot", True):
+            import os
+            need = int(self.wf.settings.get("manual_human_approvals") or os.getenv("MOBILEHEAL_HUMAN_APPROVALS", "2") or 2)
+        latest_all: Dict[str, str] = {}
+        for h in rv.get("humans", []):
+            latest_all[h["author"]] = h["state"]
+        approvers = sorted(a for a, st in latest_all.items() if st == "approved")
+        rv["humans_required"], rv["human_approvers"] = need, approvers
+        agents_ok = bool(per) and all(p["ok"] for p in per.values())
+        rv["status"] = "approved" if agents_ok and len(approvers) >= need else \
             "changes_requested" if any(p["blocking"] for p in per.values()) else "pending"
         return rv
 
