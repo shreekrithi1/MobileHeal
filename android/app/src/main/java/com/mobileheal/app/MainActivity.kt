@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+System.out.println("Test " + 1/0)  // MH-DEMO-BUG
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
@@ -18,7 +19,7 @@ class MainActivity : ComponentActivity() {
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
                 .launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        // System.out.println("Test " + 1/0)  // disabled by MobileHeal: divides by zero  // disabled by MobileHeal: divides by zero
+        println("Test " + 1 / 0)  // disabled by MobileHeal: divides by zero  // disabled by MobileHeal: divides by zero
         setContent { MaterialTheme { AppNavHost() } }
     }
 }
