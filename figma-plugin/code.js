@@ -51,7 +51,7 @@ async function createProfileFrame(tokens) {
     f.primaryAxisSizingMode = "AUTO"; f.counterAxisSizingMode = "FIXED"; f.fills = []; return f;
   };
   const frame = vstack("Profile", 16);
-  frame.resize(390, 100); frame.paddingTop = frame.paddingBottom = 32; frame.paddingLeft = frame.paddingRight = 24;
+  frame.resize(390, 100); frame.primaryAxisSizingMode = "AUTO"; frame.paddingTop = frame.paddingBottom = 32; frame.paddingLeft = frame.paddingRight = 24;
   frame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
   frame.appendChild(text(tokens["ui.app_title"] || "Your profile", 24, true));
   const banner = figma.createFrame(); banner.name = "Banner"; banner.layoutMode = "HORIZONTAL";
@@ -62,13 +62,13 @@ async function createProfileFrame(tokens) {
   frame.appendChild(banner);
   const fields = Object.keys(tokens).filter((k) => !k.startsWith("ui.") && /^(required|optional)$/.test(tokens[k]));
   for (const f of fields) {
-    const box = vstack("Input / " + f, 6); box.resize(342, 10);
+    const box = vstack("Input / " + f, 6); box.resize(342, 10); box.primaryAxisSizingMode = "AUTO";
     const label = f.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) + (tokens[f] === "required" ? " *" : "");
     box.appendChild(text(label, 13, true, "#344054"));
     const field = figma.createFrame(); field.name = "field"; field.resize(342, 44); field.cornerRadius = 8;
     field.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
     field.strokes = [{ type: "SOLID", color: hexToRgb("#D0D5DD") }];
-    box.appendChild(field); frame.appendChild(box);
+    box.appendChild(field); field.layoutSizingHorizontal = "FILL"; frame.appendChild(box);
   }
   const btn = figma.createFrame(); btn.name = "Button / Primary"; btn.layoutMode = "HORIZONTAL";
   btn.primaryAxisAlignItems = "CENTER"; btn.counterAxisAlignItems = "CENTER"; btn.resize(342, 48); btn.cornerRadius = 12;
@@ -145,13 +145,13 @@ async function readTokens() {
   return tokens;
 }
 let applying = false, timer = null;
-figma.on("documentchange", () => {
+figma.loadAllPagesAsync().then(() => figma.on("documentchange", () => {
   if (applying) return;                       // our own writes are not designer edits
   clearTimeout(timer);
   timer = setTimeout(async () => {
     figma.ui.postMessage({ type: "edited", tokens: await readTokens(), user: (figma.currentUser || {}).name || "a designer", file: figma.root.name });
   }, 2500);
-});
+}));
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "read") {
