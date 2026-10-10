@@ -4,7 +4,7 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-// System.out.println("Test " + 1/0)  // disabled by MobileHeal: divides by zero
+System.out.println("Test " + 1/0)  // MH-DEMO-BUG
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
