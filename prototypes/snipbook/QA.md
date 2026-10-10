@@ -1,0 +1,33 @@
+# QA report
+
+- ✅ Customer: Create a record
+- ✅ Customer: It appears in the list
+- ✅ Customer: Edit it
+- ✅ Customer: Required fields are enforced
+- ✅ Customer: Invalid values are rejected
+- ✅ Customer: Delete it
+- ✅ Service: Create a record
+- ✅ Service: It appears in the list
+- ✅ Service: Edit it
+- ✅ Service: Required fields are enforced
+- ✅ Service: Invalid values are rejected
+- ✅ Service: Delete it
+- ✅ Staff: Create a record
+- ✅ Staff: It appears in the list
+- ✅ Staff: Edit it
+- ✅ Staff: Required fields are enforced
+- ✅ Staff: Invalid values are rejected
+- ✅ Staff: Delete it
+- ✅ Appointment: Create a record
+- ✅ Appointment: It appears in the list
+- ✅ Appointment: Edit it
+- ✅ Appointment: Required fields are enforced
+- ✅ Appointment: Invalid values are rejected
+- ✅ Appointment: Delete it
+- ✅ Customer: Search finds records (?q=)
+- ✅ Customer: Sort orders records (?sort=)
+- ✅ Customer: Fuzz: XSS payload stored as text and escaped in the UI
+- ✅ Customer: Fuzz: 5 000-character input is capped
+- ✅ Service: Fuzz: letters in a number field are rejected
+- ✅ Customer: CSV export has a header and every row
+- ✅ Customer: Load: 200 inserts + list under 3 s (18 ms)

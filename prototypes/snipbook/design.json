@@ -1,0 +1,177 @@
+{
+  "screens": [
+    {
+      "name": "Overview",
+      "kind": "dashboard",
+      "purpose": "counts per record type, quick links"
+    },
+    {
+      "name": "Customers",
+      "kind": "list",
+      "entity": "Customer",
+      "purpose": "browse, edit and delete customers"
+    },
+    {
+      "name": "Customer form",
+      "kind": "form",
+      "entity": "Customer",
+      "purpose": "create/edit with 2 required field(s), inline validation"
+    },
+    {
+      "name": "Services",
+      "kind": "list",
+      "entity": "Service",
+      "purpose": "browse, edit and delete services"
+    },
+    {
+      "name": "Service form",
+      "kind": "form",
+      "entity": "Service",
+      "purpose": "create/edit with 4 required field(s), inline validation"
+    },
+    {
+      "name": "Staffs",
+      "kind": "list",
+      "entity": "Staff",
+      "purpose": "browse, edit and delete staffs"
+    },
+    {
+      "name": "Staff form",
+      "kind": "form",
+      "entity": "Staff",
+      "purpose": "create/edit with 4 required field(s), inline validation"
+    },
+    {
+      "name": "Appointments",
+      "kind": "list",
+      "entity": "Appointment",
+      "purpose": "browse, edit and delete appointments"
+    },
+    {
+      "name": "Appointment form",
+      "kind": "form",
+      "entity": "Appointment",
+      "purpose": "create/edit with 7 required field(s), inline validation"
+    }
+  ],
+  "tokens": {
+    "primary": "#1F7A8C",
+    "accent": "#B68904",
+    "radius": 12,
+    "font": "Inter / system UI",
+    "contrast_on_white": 4.98
+  },
+  "flows": [
+    "Overview \u2192 Customers \u2192 + New \u2192 Save",
+    "Overview \u2192 Services \u2192 + New \u2192 Save",
+    "Overview \u2192 Staffs \u2192 + New \u2192 Save",
+    "Overview \u2192 Appointments \u2192 + New \u2192 Save"
+  ],
+  "principles": [
+    "Phone-first, one primary action per screen",
+    "Required fields marked with *",
+    "Errors explain how to fix them",
+    "Works in light and dark mode"
+  ],
+  "palette": {
+    "50": "#EDF4F6",
+    "100": "#DBEAED",
+    "200": "#B7D4DA",
+    "300": "#8FBCC6",
+    "400": "#579BA9",
+    "500": "#1F7A8C",
+    "600": "#1B6B7B",
+    "700": "#175C69",
+    "800": "#134954",
+    "900": "#0E373F"
+  },
+  "a11y": [
+    {
+      "check": "Primary button text (white on primary) \u2265 4.5:1",
+      "value": "4.98:1",
+      "ok": true
+    },
+    {
+      "check": "Accent used only for badges/large text \u2265 3:1",
+      "value": "3.2:1",
+      "ok": true
+    },
+    {
+      "check": "Touch targets \u2265 44 px (buttons 44 px, inputs 44 px)",
+      "value": "44 px",
+      "ok": true
+    },
+    {
+      "check": "Every input has a visible label; required fields marked *",
+      "value": "yes",
+      "ok": true
+    },
+    {
+      "check": "Works in dark mode (prefers-color-scheme)",
+      "value": "yes",
+      "ok": true
+    }
+  ],
+  "states": [
+    {
+      "screen": "Customers",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No customers yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Customers",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Customer form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Services",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No services yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Services",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Service form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Staffs",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No staffs yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Staffs",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Staff form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    },
+    {
+      "screen": "Appointments",
+      "state": "Empty",
+      "spec": "Illustration-free message 'No appointments yet \u2014 add the first one' + primary button"
+    },
+    {
+      "screen": "Appointments",
+      "state": "Loading",
+      "spec": "Keep the header; list area shows a quiet placeholder"
+    },
+    {
+      "screen": "Appointment form",
+      "state": "Error",
+      "spec": "Message under the form in red saying what to fix; inputs keep their values"
+    }
+  ]
+}

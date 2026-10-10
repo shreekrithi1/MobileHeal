@@ -123,6 +123,7 @@ class ReviewIn(BaseModel):
     state: str = Field("commented", pattern="^(approved|changes_requested|commented)$")
     body: str = Field("", max_length=4000)
     platform: str = Field("all", pattern="^(all|android|ios)$")
+    reviewer: str = Field("", max_length=60)
 
 
 class DismissIn(BaseModel):
@@ -1343,7 +1344,7 @@ def set_delivery_mode(body: ModeIn):
 
 @app.post("/api/cr/{cid}/review")
 def cr_review(cid: int, body: ReviewIn):
-    return _wf(app.state.wf.review_action, cid, body.state, body.body, body.platform)
+    return _wf(app.state.wf.review_action, cid, body.state, body.body, body.platform, body.reviewer)
 
 
 @app.post("/api/cr/{cid}/review/dismiss")
@@ -1678,6 +1679,25 @@ async def cr_merge(cid: int):
 @app.post("/api/cr/{cid}/update-branch")
 async def cr_update_branch(cid: int):
     return _wf(app.state.wf.update_branch, cid)
+
+
+@app.get("/api/cr/{cid}/council")
+def cr_council(cid: int):
+    from . import council
+    cr = _wf(app.state.wf.get, cid)
+    return {**council.build(cr), "owners": council.owners(app.state.wf.settings, app.state.wf.autopilot,
+                                                          cr.get("kind") or "change"),
+            "prod_gate": app.state.wf.prod_gate}
+
+
+@app.post("/api/cr/{cid}/deploy")
+def cr_deploy(cid: int):
+    return _wf(app.state.wf.deploy, cid)
+
+
+@app.post("/api/cr/{cid}/to-change-request")
+def cr_from_incident(cid: int):
+    return _wf(app.state.wf.incident_to_cr, cid)
 
 
 @app.post("/api/cr/{cid}/stop")

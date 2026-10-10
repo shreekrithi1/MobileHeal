@@ -1,0 +1,297 @@
+{
+  "name": "SnipBook",
+  "tagline": "Simple salon bookings that just work",
+  "summary": "SnipBook is a lightweight booking app for hair salons where customers select a service and time, while the salon views a daily schedule and marks appointments as done.",
+  "problem": "Independent salons struggle with missed calls, double-bookings, and messy calendars. Owners need a simple way for clients to self-book and a clear daily view to track and complete appointments.",
+  "personas": [
+    {
+      "name": "Salon Owner",
+      "goal": "Fill the calendar, avoid double-bookings, and quickly mark appointments as completed."
+    },
+    {
+      "name": "Stylist",
+      "goal": "See my day at a glance and know which services and clients are next."
+    },
+    {
+      "name": "Customer",
+      "goal": "Book a service at a convenient time in seconds and receive confirmation."
+    }
+  ],
+  "features": [
+    {
+      "name": "Customer self-booking by service and time",
+      "priority": "Must"
+    },
+    {
+      "name": "Daily calendar view for the salon",
+      "priority": "Must"
+    },
+    {
+      "name": "Mark appointment as done/completed",
+      "priority": "Must"
+    },
+    {
+      "name": "Service catalog management (name, duration, price)",
+      "priority": "Must"
+    },
+    {
+      "name": "Prevent double-booking per staff and time slot",
+      "priority": "Must"
+    },
+    {
+      "name": "Basic customer profile capture (name, phone, email)",
+      "priority": "Must"
+    },
+    {
+      "name": "Confirm/cancel/reschedule appointments",
+      "priority": "Should"
+    },
+    {
+      "name": "Email/SMS booking confirmations and reminders",
+      "priority": "Should"
+    },
+    {
+      "name": "Notes on appointments for special requests",
+      "priority": "Should"
+    },
+    {
+      "name": "Buffer time between services",
+      "priority": "Could"
+    }
+  ],
+  "stories": [
+    {
+      "as": "Customer",
+      "want": "to pick a service and available time slot",
+      "so": "I can book without calling the salon",
+      "acceptance": [
+        "I can see available time slots for my chosen service",
+        "Booking confirms instantly if the slot is free",
+        "I receive a confirmation with date, time, and service"
+      ]
+    },
+    {
+      "as": "Salon Owner",
+      "want": "to view today's appointments in a single calendar",
+      "so": "I can prepare and manage the day efficiently",
+      "acceptance": [
+        "I can filter by staff member",
+        "Appointments show customer name, service, and time",
+        "Past times are visually distinct from future slots"
+      ]
+    },
+    {
+      "as": "Stylist",
+      "want": "to mark an appointment as completed",
+      "so": "the schedule stays accurate and metrics are tracked",
+      "acceptance": [
+        "I can change status from booked to completed",
+        "Completed appointments are visually distinct",
+        "Status change is timestamped"
+      ]
+    },
+    {
+      "as": "System",
+      "want": "to prevent double-booking of the same staff",
+      "so": "no two appointments overlap for a stylist",
+      "acceptance": [
+        "Overlapping bookings for the same staff are blocked",
+        "User receives a clear error message with alternatives",
+        "Calendar updates reflect the reserved time instantly"
+      ]
+    },
+    {
+      "as": "Salon Owner",
+      "want": "to manage services with duration and price",
+      "so": "customers can book accurately and pricing is clear",
+      "acceptance": [
+        "I can add, edit, deactivate services",
+        "Duration drives available time slots",
+        "Price is shown to customers during booking"
+      ]
+    },
+    {
+      "as": "Customer",
+      "want": "to reschedule or cancel my appointment",
+      "so": "I can adjust plans without calling",
+      "acceptance": [
+        "I can select a new available time for the same service",
+        "I receive updated confirmation",
+        "Past appointments cannot be rescheduled"
+      ]
+    }
+  ],
+  "metrics": [
+    "Weekly completed bookings",
+    "Calendar utilization rate (booked hours / available hours)",
+    "No-show/cancellation rate"
+  ],
+  "entities": [
+    {
+      "name": "Customer",
+      "plural": "customers",
+      "label": "Customer",
+      "fields": [
+        {
+          "name": "full_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": false
+        },
+        {
+          "name": "phone",
+          "type": "phone",
+          "required": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "marketing_opt_in",
+          "type": "bool",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Service",
+      "plural": "services",
+      "label": "Service",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "duration_minutes",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "price",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "plural": "staffs",
+      "label": "Staff",
+      "fields": [
+        {
+          "name": "first_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "last_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": false
+        },
+        {
+          "name": "phone",
+          "type": "phone",
+          "required": false
+        },
+        {
+          "name": "role",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "stylist",
+            "owner",
+            "admin"
+          ]
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Appointment",
+      "plural": "appointments",
+      "label": "Appointment",
+      "fields": [
+        {
+          "name": "customer_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "service_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "staff_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "start_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "end_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "booked",
+            "confirmed",
+            "completed",
+            "canceled",
+            "no_show"
+          ]
+        },
+        {
+          "name": "total_price",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "theme": {
+    "primary": "#1F7A8C",
+    "accent": "#B68904",
+    "radius": 12
+  },
+  "slug": "snipbook"
+}

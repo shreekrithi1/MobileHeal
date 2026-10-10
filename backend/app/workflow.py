@@ -701,16 +701,50 @@ class Workflow:
         except Exception as e:
             log.exception("review failed")
             cr["review_error"] = str(e)
+        try:
+            from . import council
+            c = council.build(cr)
+            cr["council"] = {"consensus": c["consensus"], "decision": c["decision"], "summary": c["summary"],
+                             **({"classification": c["classification"], "severity": c["severity"]} if c.get("classification") else {})}
+            self._event(cr, "Agent council", "council", (f"root-cause analysis ({c['severity']}, {c['classification']['label']}): "
+                        if c.get("classification") else "reviewed the change: ") + f"{c['consensus']} agree — {c['summary']}")
+            if c.get("classification", {}).get("type") == "requirement_gap" and self.autopilot and not cr.get("linked_cr"):
+                self._requirement_from_incident(cr, actor="Autopilot")
+        except Exception:
+            log.exception("council failed")
         self._save(cr)
         if self.autopilot:
             self.spawn(self.autopilot_continue, cr["id"])
 
-    def review_action(self, cid: int, state: str, body: str, platform: str = "all") -> dict:
+    def _requirement_from_incident(self, inc: dict, actor: str) -> dict:
+        """The council found a requirement gap — open a change request (requirements → design → … → deploy)."""
+        d = inc.get("incident") or {}
+        field = (d.get("message") or "").strip("'\" ")
+        text = self._read(codegen.SPEC_PATH) or ""
+        new = self.create(f"Confirm rule for '{field}' (from {inc['key']})",
+                          f"Raised by the agent council from incident {inc['key']}: the app crashed because '{field}' was "
+                          "missing. Product to confirm whether it is required or optional; the code fix ships separately.",
+                          text, author=f"{actor} (from {inc['key']})")
+        inc["linked_cr"] = {"id": new["id"], "key": new["key"]}
+        self._event(inc, actor, "council", f"opened {new['key']} for the requirement gap")
+        return new
+
+    def incident_to_cr(self, cid: int, actor: Optional[str] = None) -> dict:
+        inc = self.get(cid)
+        if inc.get("kind") != "incident":
+            raise WorkflowError("Only incidents can raise a change request", 409)
+        if inc.get("linked_cr"):
+            raise WorkflowError(f"Already linked to {inc['linked_cr']['key']}", 409)
+        new = self._requirement_from_incident(inc, actor or self.user)
+        self._save(inc)
+        return new
+
+    def review_action(self, cid: int, state: str, body: str, platform: str = "all", reviewer: str = "") -> dict:
         cr = self.get(cid)
         if cr["status"] != "pr_open":
             raise WorkflowError("Only open PRs can be reviewed", 409)
         try:
-            self.reviews.human(cr, self.user, state, body, platform)
+            self.reviews.human(cr, (reviewer or "").strip()[:60] or self.user, state, body, platform)
         except ValueError as e:
             raise WorkflowError(str(e))
         self._save(cr)
@@ -814,6 +848,20 @@ class Workflow:
                     self.mark_tested(cid, f"Autopilot: {s.get('pass', 0)} automated checks passed and "
                                           f"{sum(v['approvals'] for v in rv['per_platform'].values())} review approvals.",
                                      True, override=True, actor="Autopilot")
+                if self.prod_gate == "hil":
+                    cr = self.get(cid)
+                    if not cr.get("deploy_ready"):
+                        cr["deploy_ready"] = {"at": now(), "by": "Autopilot"}
+                        self._event(cr, "Autopilot", "deploy", "ready to deploy — reviewed, tested and approved. Waiting for the "
+                                    "human-in-the-loop switch to deploy to production.")
+                        self._save(cr)
+                        if self.watchdog is not None:
+                            try:
+                                self.watchdog.notify("warning", f"{cr['key']}: ready to deploy to production",
+                                                     "Flip the production switch to ship it.", f"#cr/{cid}", source="Autopilot")
+                            except Exception:
+                                pass
+                    return
                 if self.loop is not None and self.loop.is_running():
                     asyncio.run_coroutine_threadsafe(self.merge(cid, actor="Autopilot"), self.loop).result(timeout=600)
                 else:
@@ -1038,6 +1086,27 @@ class Workflow:
         self._save(cr)
         self.spawn(self._run_coding, cid)
         return cr
+
+    @property
+    def prod_gate(self) -> str:
+        """'hil' = a person flips the production switch (default); 'auto' = Autopilot deploys too."""
+        return self.settings.get("prod_gate") or os.getenv("MOBILEHEAL_PROD_GATE", "hil")
+
+    def deploy(self, cid: int, actor: Optional[str] = None) -> dict:
+        """The human-in-the-loop production switch: deploy a PR that is ready (merge = deploy)."""
+        cr = self.get(cid)
+        if cr["status"] != "pr_open":
+            raise WorkflowError("Nothing to deploy — the PR isn't open", 409)
+        who = actor or self.user
+        if not cr.get("tested") and self.autopilot:
+            raise WorkflowError("Autopilot hasn't finished verifying this PR yet", 409)
+        self._event(cr, who, "deploy", "flipped the production switch — deploying")
+        self._save(cr)
+        if self.loop is not None and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.merge(cid, actor=who), self.loop).result(timeout=600)
+        else:
+            asyncio.run(self.merge(cid, actor=who))
+        return self.get(cid)
 
     # ------------------------------------------------------------ stop / revert / restart
     def _new_run(self, cr: dict):
