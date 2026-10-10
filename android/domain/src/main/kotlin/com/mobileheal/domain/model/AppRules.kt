@@ -24,7 +24,7 @@ data class AppRules(
 
     /**
      * Fields to show in UI with consistent ordering:
-     *  - name and email always first (even if absent from rules)
+     *  - name always first (even if absent from rules)
      *  - date_of_birth (if present in rules)
      *  - town (if present in rules)
      *  - city (if present in rules; legacy support)
@@ -34,9 +34,8 @@ data class AppRules(
         get() {
             val ruleFields = fields.map { it.field }
             val ordered = linkedSetOf<String>()
-            // Always include primary identifiers first
+            // Always include primary identifier first
             ordered += "name"
-            ordered += "email"
             // UX-specified ordering preferences
             if ("date_of_birth" in ruleFields) ordered += "date_of_birth"
             // New preferred locality field
