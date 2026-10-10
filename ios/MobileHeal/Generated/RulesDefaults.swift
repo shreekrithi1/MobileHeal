@@ -3,11 +3,11 @@
 import MobileHealKit
 
 enum RulesDefaults {
-    static let specVersion = "CR-28"
+    static let specVersion = "CR-30"
 
-    static let requiredFields: [String] = ["name", "email", "city"]
+    static let requiredFields: [String] = ["name", "email"]
 
-    static let optionalFields: [String] = ["date_of_birth"]
+    static let optionalFields: [String] = ["date_of_birth", "city"]
 
     static let ui: [String: String] = [
         "after_save": "stay",
