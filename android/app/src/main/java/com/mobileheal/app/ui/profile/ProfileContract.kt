@@ -12,7 +12,7 @@ sealed interface ProfileUiState {
     data class Empty(val rules: AppRules, val connected: Boolean) : ProfileUiState
 
     data class Content(
-        val fields: Map<String, String>,   // display order: name, email, then rule fields
+        val fields: Map<String, String>,   // display order: name, then rule fields
         val missing: List<String>,
         val rules: AppRules,
         val saving: Boolean = false,

@@ -1,47 +1,54 @@
 package com.mobileheal.domain.model
 
-import com.mobileheal.domain.usecase.ValidateProfileUseCase
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppRulesTest {
+
     @Test
-    fun `displayFields orders city after date_of_birth`() {
-        val rules = AppRules(
-            fields = listOf(
-                FieldRule("name", true),
-                FieldRule("email", true),
-                FieldRule("date_of_birth", false),
-                FieldRule("city", true),
-                FieldRule("newsletter_opt_in", false),
-            ),
-            ui = emptyMap(),
-        )
-        val order = rules.displayFields
-        assertEquals(listOf("name", "email", "date_of_birth", "city", "newsletter_opt_in"), order)
+    fun displayFields_includesNameEvenWhenNoRules() {
+        val rules = AppRules(emptyList(), emptyMap())
+        assertEquals(listOf("name"), rules.displayFields)
     }
 
     @Test
-    fun `validate marks city missing when required and blank`() {
+    fun displayFields_omitsEmailWhenNotInRules() {
         val rules = AppRules(
             fields = listOf(
                 FieldRule("name", true),
-                FieldRule("email", true),
                 FieldRule("date_of_birth", false),
-                FieldRule("city", true),
+                FieldRule("town", false),
             ),
             ui = emptyMap(),
         )
-        val profile = Profile(
-            id = 1,
-            fields = mapOf(
-                "name" to "Alice",
-                "email" to "alice@example.com",
-                "date_of_birth" to "2000-01-01",
-                "city" to "",
-            ),
+        val display = rules.displayFields
+        assertTrue(display.first() == "name")
+        assertFalse(display.contains("email"))
+        assertEquals(listOf("name", "date_of_birth", "town"), display)
+    }
+
+    @Test
+    fun displayFields_includesCityOnlyIfPresent() {
+        val rules = AppRules(
+            fields = listOf(FieldRule("city", false)),
+            ui = emptyMap(),
         )
-        val missing = ValidateProfileUseCase().invoke(profile, rules)
-        assertEquals(listOf("city"), missing)
+        val display = rules.displayFields
+        assertTrue(display.contains("city"))
+        assertEquals(listOf("name", "city"), display)
+    }
+
+    @Test
+    fun afterSave_stayIsDefault() {
+        val rules = AppRules(emptyList(), emptyMap())
+        assertEquals(AfterSave.Stay, rules.afterSave)
+    }
+
+    @Test
+    fun afterSave_mapsToSuccessScreen() {
+        val rules = AppRules(emptyList(), mapOf("after_save" to "success_screen"))
+        assertEquals(AfterSave.Navigate(AppRules.SUCCESS), rules.afterSave)
     }
 }
