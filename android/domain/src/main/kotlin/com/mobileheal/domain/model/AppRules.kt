@@ -26,7 +26,8 @@ data class AppRules(
      * Fields to show in UI with consistent ordering:
      *  - name and email always first (even if absent from rules)
      *  - date_of_birth (if present in rules)
-     *  - city (if present in rules)
+     *  - town (if present in rules)
+     *  - city (if present in rules; legacy support)
      *  - followed by remaining rule-defined fields in their declared order
      */
     val displayFields: List<String>
@@ -38,6 +39,9 @@ data class AppRules(
             ordered += "email"
             // UX-specified ordering preferences
             if ("date_of_birth" in ruleFields) ordered += "date_of_birth"
+            // New preferred locality field
+            if ("town" in ruleFields) ordered += "town"
+            // Legacy locality field (only if explicitly present in rules)
             if ("city" in ruleFields) ordered += "city"
             // Append the rest in rule order
             ruleFields.forEach { f -> ordered += f }
