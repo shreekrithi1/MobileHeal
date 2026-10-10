@@ -84,7 +84,7 @@ fun InfoScreen(state: InfoUiState, onBack: () -> Unit) {
         ) {
             Surface(shape = CircleShape, color = accent, modifier = Modifier.size(72.dp)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("✓", color = ui.color("button_text_color", Color.White), style = MaterialTheme.typography.headlineMedium)
+                    Text("\u2713", color = ui.color("button_text_color", Color.Black), style = MaterialTheme.typography.headlineMedium)
                 }
             }
             Spacer(Modifier.height(16.dp))
