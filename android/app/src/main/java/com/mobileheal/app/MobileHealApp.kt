@@ -16,7 +16,12 @@ class MobileHealApp : Application() {
         }
         CrashReporter.install(this, BuildConfig.BASE_URL)
         if (BuildConfig.DEBUG) {
-            CrashReporter.report(BuildConfig.BASE_URL, RuntimeException("MobileHeal Crashlytics Integration Verified"))
+            runCatching {
+                CrashReporter.report(
+                    BuildConfig.BASE_URL,
+                    RuntimeException("MobileHeal Crashlytics Integration Verified")
+                )
+            }
         }
     }
 }
