@@ -15,6 +15,8 @@ import pytest
 
 PROJECT = Path(__file__).resolve().parents[2]
 os.environ.setdefault("MOBILEHEAL_CRASHFEED", "0")   # no live mock-Crashlytics traffic during tests (tick() is called explicitly)
+os.environ.setdefault("MOBILEHEAL_HUMAN_APPROVALS", "0")   # tests approve as agents unless a test opts in
+os.environ.setdefault("MOBILEHEAL_PROD_GATE", "auto")       # tests ship directly unless a test turns the HIL switch on
 _copytree = shutil.copytree
 
 

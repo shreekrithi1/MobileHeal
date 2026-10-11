@@ -1262,6 +1262,50 @@ def run_export(rid: int):
     return run
 
 
+class RegressionIn(BaseModel):
+    cr_id: Optional[int] = None
+
+
+@app.get("/api/regression")
+def regression_overview():
+    wf = app.state.wf
+    lib = _ts().list(library=True)
+    return {"autopilot": wf.autopilot, "runs": wf.regression.list(),
+            "latest": wf.regression.latest(),
+            "library": {"total": len(lib), "zephyr": sum(1 for c in lib if c.get("source") == "zephyr"),
+                        "automated": sum(1 for c in lib if any(s.get("auto") for s in c.get("steps") or []))},
+            "zephyr_configured": tc.Zephyr(_settings()).configured}
+
+
+@app.get("/api/regression/{rid}")
+def regression_get(rid: int):
+    try:
+        return app.state.wf.regression.get(rid)
+    except KeyError:
+        raise HTTPException(404, "regression run not found")
+
+
+@app.post("/api/regression/run")
+def regression_run(body: RegressionIn):
+    wf = app.state.wf
+    cr = _wf(wf.get, body.cr_id) if body.cr_id else None
+    return wf.run_regression(cr, actor="Autopilot" if wf.autopilot else wf.user,
+                             trigger=("Autopilot" if wf.autopilot else "Manual run") + (f" · {cr['key']}" if cr else " · full library"))
+
+
+@app.post("/api/regression/import-zephyr")
+def regression_import():
+    z = tc.Zephyr(_settings())
+    if not z.configured:
+        raise HTTPException(400, "Configure Zephyr in Settings first")
+    try:
+        cases = z.fetch_cases(100)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    have = {c.get("external_key") for c in _ts().list(library=True)}
+    return _do_import([c for c in cases if c.get("key") not in have], None, True)
+
+
 @app.get("/api/datasets")
 def datasets():
     profiles = [{"id": f"profile-{p['id']}", "name": f"Profile #{p['id']} {p.get('name') or ''}".strip(),

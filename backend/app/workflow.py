@@ -67,6 +67,8 @@ class Workflow:
         self.settings = Settings(db)
         self.ai = AI(self.settings)
         self.tests = tc.TestStore(db)
+        from .regression import Regression
+        self.regression = Regression(db, self.tests)
         self.backend = self.root / "backend"
         with db._lock:
             db._conn.execute("""CREATE TABLE IF NOT EXISTS change_requests (
@@ -842,6 +844,20 @@ class Workflow:
                 self._save(cr)
                 self.update_branch(cid)
                 return
+            reg = cr.get("regression") or {}
+            if not reg.get("all_passed") or reg.get("run") != cr.get("run"):
+                rep = self.run_regression(cr, actor="Autopilot", trigger=f"Autopilot · {cr['key']} PR")
+                cr = self.get(cid)
+                cr["regression"]["run"] = cr.get("run")
+                if not rep["all_passed"]:
+                    self._save(cr)
+                    bad = [f"{c['key']} {c['title']}" for c in rep["cases"] if c["status"] == "failed"][:5]
+                    return self._autopilot_fix(cr, f"regression {rep['key']} has {rep['failed']} failing test(s): " + "; ".join(bad))
+                if not cr.get("tested"):
+                    cr["tested"], cr["stage"] = True, 5
+                    self._event(cr, "Autopilot", "test", f"all automated tests passed in {rep['key']} "
+                                f"({rep['passed']}/{rep['total']}) — test data generated automatically, no tester input")
+                self._save(cr)
             try:
                 if not cr.get("tested"):
                     s = cr.get("checks_summary") or {}
@@ -869,6 +885,33 @@ class Workflow:
             except Exception as e:
                 cr = self.get(cid)
                 self._autopilot_pause(cr, f"merge blocked: {e}")
+
+    def run_regression(self, cr: Optional[dict] = None, actor: Optional[str] = None, trigger: str = "Manual run") -> dict:
+        """Runs every library test case (Zephyr-imported and local) plus the change request's own cases headlessly,
+        with autopilot test data — never asks anyone for input — and reports on the change request's timeline."""
+        from . import regression as rg
+        zephyr = tc.Zephyr(self.settings)
+        try:
+            imported = self.regression.ensure_imported(zephyr)
+        except Exception:
+            imported = 0
+        text = (cr or {}).get("spec_text") or self._read(codegen.SPEC_PATH) or ""   # incidents use the live rules
+        try:
+            rules, ui = rg.spec_rules_ui(text)
+        except RuleParseError:
+            rules, ui = [], {}
+        rep = self.regression.run(rules, ui, actor=actor or self.user, trigger=trigger, cr=cr, zephyr=zephyr)
+        rep["imported"] = imported
+        if cr:
+            cr = self.get(cr["id"])
+            summary = (f"regression {rep['key']}: {rep['passed']}/{rep['total']} passed"
+                       + (f", {rep['failed']} failed" if rep["failed"] else "")
+                       + (f", {rep['skipped']} manual-only skipped" if rep["skipped"] else "")
+                       + (f" · {imported} case(s) imported from Zephyr" if imported else ""))
+            cr["regression"] = {k: rep[k] for k in ("id", "key", "total", "passed", "failed", "skipped", "all_passed", "finished_at")}
+            self._event(cr, actor or self.user, "test" if rep["all_passed"] else "test_failed", summary)
+            self._save(cr)
+        return rep
 
     AUTOPILOT_FIX_ATTEMPTS = 3
 

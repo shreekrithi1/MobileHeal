@@ -496,6 +496,7 @@ table.lib td{vertical-align:top} table.lib td:first-child,table.lib td:nth-child
   <a href="#delivery" data-r="delivery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l1 2h3v15H5V6h3z"/><path d="M9 12h6M9 16h4"/></svg>Requirements<span class="badge amber" id="b-req"></span></a>
   <a href="#studio" data-r="studio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2l.9-5.5-4-3.9 5.5-.8z"/></svg>App Studio</a>
   <a href="#tests" data-r="tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg>Test library</a>
+  <a href="#regression" data-r="regression"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="m9 12 2 2 4-4"/></svg>Regression<span class="badge" id="b-reg"></span></a>
   <div class="rail-label">Operate</div>
   <a href="#incidents" data-r="incidents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>Incidents<span class="badge" id="b-inc"></span></a>
   <a href="#data" data-r="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/></svg>Data health<span class="badge" id="b-data"></span></a>
@@ -602,7 +603,7 @@ function chip(cr){ if (cr.source==="figma" && cr.status==="design_review") retur
 /* ---------------- routing ---------------- */
 function go(r){ location.hash = r; }
 window.addEventListener("hashchange", route);
-const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", data:"Data health", demo:"Crash demo", crashes:"Crashlytics", studio:"App Studio", settings:"Settings", audit:"Audit log"};
+const PAGE_TITLE = {home:"Home", delivery:"Requirements", incidents:"Incidents", tests:"Test library", regression:"Regression", data:"Data health", demo:"Crash demo", crashes:"Crashlytics", studio:"App Studio", settings:"Settings", audit:"Audit log"};
 function setNav(active){ document.querySelectorAll("#rail a[data-r]").forEach(a => { const on = a.dataset.r === active; a.classList.toggle("on", on); on ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"); }); }
 function setCrumbs(parts){ $("#crumbs").innerHTML = parts.map((p,i)=> i===parts.length-1 ? `<b>${esc(p[0])}</b>` : `<a href="${p[1]}">${esc(p[0])}</a><span aria-hidden="true">›</span>`).join(""); document.title = parts[parts.length-1][0] + " · MobileHeal"; }
 
@@ -684,11 +685,11 @@ async function route(){
   const h = location.hash.slice(1) || "home";
   clearInterval(state.poll);
   document.querySelector('.app').classList.remove('list-open'); $("#shell").classList.remove("rail-open");
-  const page = ["home","tests","settings","audit","demo","data","crashes","studio"].find(p => h===p || h.startsWith(p+"/"));
+  const page = ["home","tests","regression","settings","audit","demo","data","crashes","studio"].find(p => h===p || h.startsWith(p+"/"));
   document.querySelector(".app").classList.toggle("full", !!page);
   $("#main").scrollTop = 0;
   if (page) { state.route = page; state.cr = null; setNav(page); setCrumbs([[PAGE_TITLE[page], "#"+page]]);
-    await ({home:renderHome, tests:renderLibrary, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData, crashes:renderCrashes, studio:renderStudio})[page](h); return; }
+    await ({home:renderHome, tests:renderLibrary, regression:renderRegression, settings:renderSettings, audit:renderAudit, demo:renderDemo, data:renderData, crashes:renderCrashes, studio:renderStudio})[page](h); return; }
   if (h === "delivery" || h === "incidents") {
     state.filter = h==="incidents" ? "incident" : "change"; state.route = h; state.cr = null; setNav(h); setCrumbs([[PAGE_TITLE[h], "#"+h]]);
     renderIndex(h); renderList(); return; }
@@ -2017,8 +2018,10 @@ function rnResolve(v, field){
   if (!m) return {value:String(v??"")};
   const key = `${r.idx}:${r.op}`;
   if (key in r.answers) return {value:r.answers[key]};
-  if (m[1]) return {ask:m[2], suggest:r.data[field]||r.data[snakeOf(m[2])]||""};
-  const f = m[2].trim(); if (r.data[f]!==undefined && r.data[f]!=="") return {value:r.data[f]};
+  const ap = (state.mode||{}).mode==="autopilot";
+  if (m[1] && !ap) return {ask:m[2], suggest:r.data[field]||r.data[snakeOf(m[2])]||""};
+  const f = m[1] ? (field||snakeOf(m[2])) : m[2].trim(); if (r.data[f]!==undefined && r.data[f]!=="") return {value:r.data[f]};
+  if (ap) { const v = sampleValue(f); r.data[f]=v; return {value:v}; }   // Autopilot never asks: generated test data
   return {ask:`No test data for “${label(f)}”. Enter a value:`, suggest:""};
 }
 const snakeOf = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
@@ -2119,6 +2122,51 @@ async function dsAdd(){ const values = Object.fromEntries($("#ds-vals").value.sp
   if (!$("#ds-name").value.trim() || !Object.keys(values).length) return toast("Give the dataset a name and at least one value");
   await act(async()=>{ await api("/api/datasets",{method:"POST",body:{name:$("#ds-name").value, values}}); renderLibrary(); }, "Dataset saved"); }
 async function dsDelete(id){ await act(async()=>{ await api(`/api/datasets/${id}`,{method:"DELETE"}); renderLibrary(); }); }
+
+/* ---------- regression ---------- */
+function sampleValue(f){ f=String(f||""); if(/phone|mobile/.test(f)) return "555-0100"; if(/email/.test(f)) return "jane@example.com";
+  if(/date|birth/.test(f)) return "1990-01-31"; if(/postal|zip/.test(f)) return "94105"; if(f==="name") return "Jane Doe"; return "Sample "+label(f); }
+const REG = {open:{}, running:false};
+const regChip = s => `<span class="chip ${s==='passed'?'s-pr_open':s==='failed'?'s-failed':'s-closed'}">${s==='skipped'?'manual only':s}</span>`;
+async function renderRegression(){
+  $("#view").innerHTML = `<div class="wrap"><div class="skel"></div></div>`;
+  await regPaint(true);
+  state.poll = setInterval(()=>regPaint(false), 4000);
+}
+async function regPaint(first){
+  if (state.route!=="regression") return;
+  const d = await api("/api/regression"); const L = d.latest; const ap = d.autopilot;
+  const pct = L && L.total ? Math.round(100*L.passed/L.total) : 0;
+  const html = `<div class="wrap">
+    <div class="hdr"><div><h1>Regression</h1><div class="meta">Every test case in the library — ${d.library.zephyr} imported from Zephyr, ${d.library.total} in total, ${d.library.automated} automated — run headlessly against the app's rules.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="regImport()">⇣ Import from Zephyr</button><a class="btn" href="#tests">Test library</a>
+      <button class="btn primary" onclick="regRun()" ${REG.running?"disabled":""}>${REG.running?'<span class="spinner"></span> Running…':"▶ Run full regression"}</button></div></div>
+    ${ap?`<div class="ap-banner" style="margin-top:14px"><span aria-hidden="true">✈︎</span><div><b>Autopilot runs this automatically.</b> On every pull request it imports the Zephyr cases, fills every value from test data (generating any that are missing), runs all tests and reports here and on the change request — it never asks anyone for input. Failures go back to the developer agents to fix.</div></div>`
+        :`<div class="banner-err" style="margin-top:14px;background:var(--blue-soft,#e8f0fe);color:var(--fg)"><span aria-hidden="true">ℹ</span><div>Manual mode: run the regression when you like. Switch to <b>Autopilot</b> in Settings → Delivery to have it run on every PR with automatic test data.</div></div>`}
+    ${L?`<div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:16px">
+      ${[["Pass rate",pct+"%",L.all_passed?"var(--green)":"var(--red)"],["Passed",L.passed,"var(--green)"],["Failed",L.failed,L.failed?"var(--red)":"inherit"],["Manual steps skipped",L.manual_skipped,"inherit"],["Duration",(L.ms/1000).toFixed(1)+" s","inherit"]]
+        .map(([k,v,c])=>`<div class="card"><div class="card-b"><div class="hint" style="margin:0">${k}</div><div style="font-size:28px;font-weight:700;color:${c}">${v}</div></div></div>`).join("")}</div>
+    <div class="card" style="margin-top:14px"><div class="card-h">${esc(L.key)} · ${esc(L.trigger)} <span class="count">${L.total}</span>
+        <span style="flex:1"></span><span class="hint" style="margin:0">${esc(L.actor)} · ${new Date(L.finished_at).toLocaleString()}${L.zephyr_exported?` · ${L.zephyr_exported} result(s) sent to Zephyr`:""}${L.cr_key?` · <a href="#cr/${L.cr_id}">${esc(L.cr_key)}</a>`:""}</span></div>
+      <div class="card-b" style="padding:0"><table class="t lib"><tr><th>Case</th><th>Title</th><th>Scope</th><th>Result</th><th>Steps</th><th>Test data</th></tr>
+      ${L.cases.map(c=>`<tr style="cursor:pointer" onclick="REG.open[${c.case_id}]=!REG.open[${c.case_id}];regPaint()"><td><b>${esc(c.external_key||c.key)}</b>${c.external_key?`<div class="hint" style="margin:0">${esc(c.key)}</div>`:""}</td>
+        <td>${esc(c.title)}</td><td>${c.source==="zephyr"?'<span class="chip s-design_review">Zephyr</span>':c.scope==="change"?'<span class="chip">this change</span>':'<span class="chip s-closed">library</span>'}</td>
+        <td>${regChip(c.status)}</td><td>${c.steps.filter(s=>s.status==="pass").length}/${c.steps.length}</td>
+        <td class="hint" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(Object.entries(c.data_used).slice(0,3).map(([k,v])=>`${label(k)}: ${v}`).join(" · "))}</td></tr>
+        ${REG.open[c.case_id]?`<tr><td colspan="6" style="background:var(--soft,#f8f9fa)">${c.steps.map(s=>`<div style="margin:4px 0"><b>Step ${s.n}</b> ${regChip(s.status==="pass"?"passed":s.status==="fail"?"failed":"skipped")} ${esc(s.actual)}${s.log&&s.log.length?`<div class="hint" style="margin:2px 0 0 12px">${s.log.map(esc).join("<br>")}</div>`:""}</div>`).join("")}</td></tr>`:""}`).join("")
+        || `<tr><td colspan="6"><div class="empty">No test cases. Import from Zephyr to start.</div></td></tr>`}</table></div></div>`
+      : `<div class="card" style="margin-top:16px"><div class="card-b"><div class="empty">No regression run yet. ${ap?"Autopilot runs one on the next pull request — or":""} click <b>Run full regression</b>.</div></div></div>`}
+    <div class="card" style="margin-top:14px"><div class="card-h">History <span class="count">${d.runs.length}</span></div><div class="card-b" style="padding:0">
+      <table class="t"><tr><th>Run</th><th>Trigger</th><th>Result</th><th>When</th></tr>${d.runs.map(r=>`<tr><td><b>${esc(r.key)}</b></td><td>${esc(r.trigger)}</td>
+        <td>${r.all_passed?regChip("passed"):regChip("failed")} ${r.passed}/${r.total}${r.failed?` · ${r.failed} failed`:""}</td><td class="hint">${new Date(r.finished_at).toLocaleString()}</td></tr>`).join("")
+        || `<tr><td colspan="4"><div class="empty">Nothing yet.</div></td></tr>`}</table></div></div></div>`;
+  $("#view").innerHTML = html;
+  const b = $("#b-reg"); if (b) b.textContent = L && L.failed ? L.failed : "";
+}
+async function regRun(){ REG.running=true; regPaint(); try { const r = await api("/api/regression/run",{method:"POST",body:{}}); toast(`${r.key}: ${r.passed}/${r.total} passed${r.failed?`, ${r.failed} failed`:""}`); }
+  catch(e){ toast(e.message); } REG.running=false; regPaint(); }
+async function regImport(){ try { const r = await api("/api/regression/import-zephyr",{method:"POST",body:{}}); toast(r.imported?`Imported ${r.imported} test case(s) from Zephyr`:"Zephyr cases are already in the library"); regPaint(); } catch(e){ toast(e.message); } }
+
 
 /* ---------- settings ---------- */
 /* =====================================================================
