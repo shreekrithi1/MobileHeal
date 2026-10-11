@@ -79,7 +79,7 @@ fun ProfileScreen(state: ProfileUiState, onAction: (ProfileAction) -> Unit) {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = ui.color("background_color", MaterialTheme.colorScheme.surface)),
                 actions = {
                     Text(
-                        if (connected) "● Live" else "○ Offline",
+                        if (connected) "\u25cf Live" else "\u25cb Offline",
                         color = if (connected) Color(0xFF12B76A) else Color.Gray,
                         modifier = Modifier.padding(end = 16.dp),
                     )
@@ -148,7 +148,7 @@ private fun ContentBody(state: ProfileUiState.Content, onAction: (ProfileAction)
                 contentColor = ui.color("button_text_color", MaterialTheme.colorScheme.onPrimary),
             ),
         ) {
-            Text(if (state.saving) "Saving…" else ui["button_label"] ?: "Save")
+            Text(if (state.saving) "Saving\u2026" else ui["button_label"] ?: "Save")
         }
         state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }

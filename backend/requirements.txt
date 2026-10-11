@@ -7,6 +7,7 @@ email: required
 date_of_birth: optional
 town: optional
 zip_code: optional
+phone_number: required
 ui.button_color = #079455
 ui.button_label = Save changes
 ui.after_save = stay
